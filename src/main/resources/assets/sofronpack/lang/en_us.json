@@ -20,5 +20,7 @@
   "block.sofronpack.farmland_slab": "Farmland Slab",
   "block.sofronpack.farmland_stairs": "Farmland Stairs",
   "item.sofronpack.rice": "Rice",
-  "block.sofronpack.rice_crop": "Rice Crop"
+  "block.sofronpack.rice_crop": "Rice Crop",
+  "item.sofronpack.wild_rice": "Wild Rice Seeds",
+  "block.sofronpack.wild_rice_crop": "Wild Rice"
 }

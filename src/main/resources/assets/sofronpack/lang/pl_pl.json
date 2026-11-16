@@ -20,5 +20,7 @@
   "block.sofronpack.farmland_slab": "Półblok pola uprawnego",
   "block.sofronpack.farmland_stairs": "Schody z pola uprawnego",
   "item.sofronpack.rice": "Ryż",
-  "block.sofronpack.rice_crop": "Ryż"
+  "block.sofronpack.rice_crop": "Ryż",
+  "item.sofronpack.wild_rice": "Nasiona dzikiego ryżu",
+  "block.sofronpack.wild_rice_crop": "Dziki ryż"
 }

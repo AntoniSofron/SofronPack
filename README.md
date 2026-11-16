@@ -2,6 +2,10 @@
 
 **One mod, one JAR, one ID: `sofronpack`.** This is the unified successor to [SofronPackGen](https://github.com/AntoniSofron/SofronPackGen) and [SofronPackLight](https://github.com/AntoniSofron/SofronPackLight).
 
+## New in v0.1.1: wild rice
+
+Wild rice (`sofronpack:wild_rice`) is a rare two-block plant in one-block-deep swamp water, rooted on ordinary dirt immediately near shore. Mature wild plants naturally generate in new swamp chunks. Breaking either half yields wild rice seeds, with the same 1-to-3 count at age 7 as cultivated rice. Plant the wild seed into a **full water-source block** directly above ordinary dirt, with **air above the water** (not two blocks of water). Wild rice progresses through the same eight ages and uses the ordinary wet-farmland rice growth probability, plus bone meal. Its temporary models reuse the existing rice crop textures.
+
 ## What is included
 
 - **Gen:** the existing custom Overworld density functions and approved world-generation configuration; custom tree shapes, swamp willows and biome palettes; new soil blocks, soil slabs and stairs, waterlogged farmland and rice.

@@ -31,11 +31,25 @@ public final class RiceContent {
             BuiltInRegistries.ITEM, RICE_ID, new BlockItem(CROP,
                     new Item.Properties().setId(ResourceKey.create(Registries.ITEM, RICE_ID))));
 
+    public static final Identifier WILD_RICE_ID =
+            Identifier.fromNamespaceAndPath(TerraLabMod.MOD_ID, "wild_rice");
+    public static final Identifier WILD_RICE_CROP_ID =
+            Identifier.fromNamespaceAndPath(TerraLabMod.MOD_ID, "wild_rice_crop");
+
+    public static final WildRiceCropBlock WILD_RICE_CROP = Registry.register(
+            BuiltInRegistries.BLOCK, WILD_RICE_CROP_ID, new WildRiceCropBlock(
+                    BlockBehaviour.Properties.ofFullCopy(net.minecraft.world.level.block.Blocks.WHEAT)
+                            .setId(ResourceKey.create(Registries.BLOCK, WILD_RICE_CROP_ID))));
+
+    public static final Item WILD_RICE = Registry.register(
+            BuiltInRegistries.ITEM, WILD_RICE_ID, new BlockItem(WILD_RICE_CROP,
+                    new Item.Properties().setId(ResourceKey.create(Registries.ITEM, WILD_RICE_ID))));
+
     private RiceContent() {}
 
     public static void register() {
         CreativeModeTabEvents.modifyOutputEvent(ResourceKey.create(Registries.CREATIVE_MODE_TAB,
                 Identifier.withDefaultNamespace("natural_blocks")))
-                .register(output -> output.accept(RICE));
+                .register(output -> { output.accept(RICE); output.accept(WILD_RICE); });
     }
 }

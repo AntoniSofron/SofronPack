@@ -103,7 +103,15 @@ public final class RiceCropBlock extends CropBlock {
         return super.mayPlaceOn(soil, level, pos);
     }
 
-    private static float wheatEquivalentFertility(BlockGetter level, BlockPos cropPos, BlockState crop) {
+
+    /** Wild and cultivated rice use one growth-rate formula, with submerged
+     * ordinary dirt acting like irrigated farmland for the centre bonus. */
+    static boolean hasRiceGrowthLight(ServerLevel level, BlockPos pos) {
+        return hasSufficientLight(level, pos);
+    }
+
+    static float wheatEquivalentFertility(BlockGetter level, BlockPos cropPos, BlockState crop,
+                                         boolean submergedDirt) {
         BlockPos basePos = cropPos.below();
         float fertility = 1.0F;
         for (int dx = -1; dx <= 1; dx++) {
@@ -113,7 +121,8 @@ public final class RiceCropBlock extends CropBlock {
                 boolean farmland = field.is(Blocks.FARMLAND);
                 boolean shaped = field.getBlock() instanceof SoilShape soil
                         && soil.soilBase() == Blocks.FARMLAND;
-                if (farmland || shaped) {
+                if (submergedDirt && dx == 0 && dz == 0) bonus = 3.0F;
+                else if (farmland || shaped) {
                     boolean irrigated = SoilCropRules.hasInternalWater(field)
                             || (field.hasProperty(FarmlandBlock.MOISTURE)
                             && field.getValue(FarmlandBlock.MOISTURE) > 0);
@@ -147,7 +156,7 @@ public final class RiceCropBlock extends CropBlock {
 
         // Normal farmland needs twice as many random growth attempts.
         if (!waterField && random.nextBoolean()) return;
-        float fertility = wheatEquivalentFertility(level, pos, state);
+        float fertility = wheatEquivalentFertility(level, pos, state, false);
         if (random.nextInt((int)(25.0F / fertility) + 1) == 0)
             level.setBlockAndUpdate(pos, getStateForAge(getAge(state) + 1)
                     .setValue(WATER_ROOTS, state.getValue(WATER_ROOTS)));

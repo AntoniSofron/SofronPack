@@ -35,6 +35,13 @@ with zipfile.ZipFile(jar) as z:
         "assets/sofronpack/shaders/blocks/block_layer_opaque.fsh",
         "assets/sofronpack/blockstates/rice_crop.json",
         "data/sofronpack/structure/swamp_willow_5.nbt",
+        "pl/sofron/terralab/rice/WildRiceCropBlock.class",
+        "pl/sofron/terralab/rice/WildRiceFeature.class",
+        "assets/sofronpack/blockstates/wild_rice_crop.json",
+        "assets/sofronpack/items/wild_rice.json",
+        "data/sofronpack/worldgen/feature/swamp_wild_rice.json",
+        "data/sofronpack/worldgen/placed_feature/swamp_wild_rice.json",
+        "data/sofronpack/loot_table/blocks/wild_rice_crop.json",
         "data/minecraft/worldgen/noise_settings/overworld.json",
         "sofron.mixins.json", "sofron-soil.mixins.json", mod["icon"]
     ):
