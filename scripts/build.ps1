@@ -70,19 +70,23 @@ try {
         Where-Object { $_.Name -notmatch '(-sources|-dev)\.jar$' })
     if ($jars.Count -ne 1) { throw "Expected one distributable mod JAR, got $($jars.Count)." }
     $jar = $jars[0]
+    $distDir = Join-Path $root "dist"
+    if (-not (Test-Path $distDir)) { New-Item -Path $distDir -ItemType Directory -Force | Out-Null }
+    Copy-Item -LiteralPath $jar.FullName -Destination (Join-Path $distDir $jar.Name) -Force
     Write-Host "Build completed: $($jar.FullName)" -ForegroundColor Green
+    Write-Host "Version archived in dist/$($jar.Name)" -ForegroundColor Green
 
     if ($Install) {
         Write-Host "[4/4] Install to: $ModsDir" -ForegroundColor Cyan
         if (-not (Test-Path $ModsDir)) { New-Item -Path $ModsDir -ItemType Directory -Force | Out-Null }
         # Only our own previous generators are disabled; no unrelated mod is changed.
         $previous = @(Get-ChildItem -LiteralPath $ModsDir -Filter "*.jar" -File -ErrorAction Stop |
-            Where-Object { $_.Name -match '^(Sofron-Terra-Lab-|Sofron-Pack-Gen|sofron-pack|sofron_pack|26\.3-Sofron-Pack-Gen)' })
+            Where-Object { $_.Name -match '^(Sofron-Terra-Lab-|Sofron-Pack-Gen|sofron-pack|sofron_pack|26\.3-Sofron-Pack-Gen|SofronPackLight-|26\.3-SofronPack-)' })
         if ($previous.Count -gt 0) {
-            $backup = Join-Path $ModsDir ("sofron_terra_lab_backup_" + (Get-Date -Format "yyyyMMdd_HHmmss_fff"))
+            $backup = Join-Path $ModsDir ("sofronpack_backup_" + (Get-Date -Format "yyyyMMdd_HHmmss_fff"))
             New-Item -Path $backup -ItemType Directory -Force | Out-Null
             foreach ($previousJar in $previous) {
-                Write-Host ("Backing up older Sofron generator: " + $previousJar.Name)
+                Write-Host ("Backing up older Sofron mod: " + $previousJar.Name)
                 Move-Item -LiteralPath $previousJar.FullName -Destination $backup -ErrorAction Stop
             }
         }
@@ -90,7 +94,7 @@ try {
         Write-Host "Installed successfully. Fabric API must also be installed in this game profile." -ForegroundColor Green
     }
     else { Write-Host "[4/4] Install skipped (BUILD.bat). Run BUILD_AND_INSTALL.bat if desired." }
-    Write-Host "Active custom 26.3 worldgen is included. Create a NEW world and back up all old saves." -ForegroundColor Yellow
+    Write-Host "SofronPack Gen + Light are unified. Back up old saves before migrating custom block IDs." -ForegroundColor Yellow
     exit 0
 }
 catch {

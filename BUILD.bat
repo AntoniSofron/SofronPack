@@ -2,7 +2,7 @@
 setlocal
 cd /d "%~dp0"
 echo ==============================================
-echo   SOFRON TERRA LAB - BUILD
+echo   SOFRONPACK - BUILD
 echo ==============================================
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\build.ps1"
 set "result=%ERRORLEVEL%"

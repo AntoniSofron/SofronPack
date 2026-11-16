@@ -2,7 +2,7 @@
 setlocal
 cd /d "%~dp0"
 echo ===================================================
-echo  SOFRON TERRA LAB - BUILD AND INSTALL
+echo  SOFRONPACK - BUILD AND INSTALL
 echo ===================================================
 if "%~1"=="" (
   powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\build.ps1" -Install
