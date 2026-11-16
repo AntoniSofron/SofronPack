@@ -1,0 +1,14 @@
+.gradle/
+.build-tools/
+build/
+out/
+run/
+.idea/
+.vscode/
+*.iml
+*.log
+hs_err_pid*
+Thumbs.db
+.DS_Store
+worlds/
+saves/
