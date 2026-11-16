@@ -40,6 +40,14 @@ jobs:
           python3 scripts/check_grounded_mountains.py
       - name: Verify both components exist in one JAR
         run: python3 tools/verify_jar.py
+      - name: Runtime wild rice smoke on real Minecraft 26.3
+        timeout-minutes: 9
+        run: python3 scripts/wild_rice_smoke.py
+      - name: Show runtime log on failure
+        if: failure()
+        run: |
+          if [ -f wild-rice-smoke.log ]; then tail -n 150 wild-rice-smoke.log; fi
+          if [ -f run/logs/latest.log ]; then tail -n 150 run/logs/latest.log; fi
       - name: Read the build version for artifact labeling
         id: version
         run: echo "version=$(grep '^mod_version=' gradle.properties | cut -d= -f2-)" >> "$GITHUB_OUTPUT"
