@@ -11,6 +11,7 @@ on:
       - 'settings.gradle'
       - 'gradle.properties'
       - 'tools/verify_jar.py'
+      - '.github/workflows/build.yml'
   workflow_dispatch:
 permissions:
   contents: write
@@ -39,10 +40,13 @@ jobs:
           python3 scripts/check_grounded_mountains.py
       - name: Verify both components exist in one JAR
         run: python3 tools/verify_jar.py
+      - name: Read the build version for artifact labeling
+        id: version
+        run: echo "version=$(grep '^mod_version=' gradle.properties | cut -d= -f2-)" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v4
         with:
-          name: 26.3-SofronPack-v0.1.0
-          path: dist/26.3-SofronPack-v0.1.0.jar
+          name: 26.3-SofronPack-v${{ steps.version.outputs.version }}
+          path: dist/*.jar
           if-no-files-found: error
           retention-days: 30
       - name: Save the versioned .jar permanently to dist/
@@ -53,5 +57,5 @@ jobs:
           git add -- dist/*.jar
           if git diff --cached --quiet; then exit 0; fi
           git commit -m "Publish 26.3-SofronPack-v0.1.0.jar"
-          git pull --rebase origin main
+          git -c rebase.autoStash=true pull --rebase origin main
           git push origin HEAD:main
