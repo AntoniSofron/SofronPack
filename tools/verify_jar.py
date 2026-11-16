@@ -5,16 +5,23 @@ import pathlib
 import shutil
 import zipfile
 
+properties = {}
+for line in pathlib.Path("gradle.properties").read_text(encoding="utf-8").splitlines():
+    if "=" in line and not line.lstrip().startswith("#"):
+        key, value = line.split("=", 1)
+        properties[key.strip()] = value.strip()
+version = properties["mod_version"]
+expected_name = f'{properties["archives_base_name"]}-v{version}.jar'
 root = pathlib.Path("build/libs")
 jars = [p for p in root.glob("*.jar") if not p.name.endswith(("-dev.jar", "-sources.jar"))]
 assert len(jars) == 1, jars
 jar = jars[0]
-assert jar.name == "26.3-SofronPack-v0.1.0.jar", jar.name
+assert jar.name == expected_name, jar.name
 with zipfile.ZipFile(jar) as z:
     files = set(z.namelist())
     mod = json.loads(z.read("fabric.mod.json"))
     assert mod["id"] == "sofronpack" and mod["name"] == "SofronPack"
-    assert mod["version"] == "0.1.0"
+    assert mod["version"] == version
     assert len(mod["entrypoints"]["main"]) == 2
     assert len(mod["entrypoints"]["client"]) == 2
     assert len(mod["mixins"]) == 2
