@@ -38,7 +38,11 @@ public final class RiceContent {
 
     public static final WildRiceCropBlock WILD_RICE_CROP = Registry.register(
             BuiltInRegistries.BLOCK, WILD_RICE_CROP_ID, new WildRiceCropBlock(
-                    BlockBehaviour.Properties.ofFullCopy(net.minecraft.world.level.block.Blocks.WHEAT)
+                    // Wheat copies an age-dependent state predicate that is
+                    // evaluated before this new block's state definition exists.
+                    // Grass supplies harmless vegetation defaults instead.
+                    BlockBehaviour.Properties.ofFullCopy(net.minecraft.world.level.block.Blocks.SHORT_GRASS)
+                            .randomTicks()
                             .setId(ResourceKey.create(Registries.BLOCK, WILD_RICE_CROP_ID))));
 
     public static final Item WILD_RICE = Registry.register(
