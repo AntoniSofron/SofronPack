@@ -1,0 +1,148 @@
+{
+  "multipart": [
+    {
+      "when": {
+        "half": "lower",
+        "age": "0"
+      },
+      "apply": {
+        "model": "sofronpack:block/rice_stage_0"
+      }
+    },
+    {
+      "when": {
+        "half": "lower",
+        "age": "1"
+      },
+      "apply": {
+        "model": "sofronpack:block/rice_stage_1"
+      }
+    },
+    {
+      "when": {
+        "half": "lower",
+        "age": "2"
+      },
+      "apply": {
+        "model": "sofronpack:block/rice_stage_2"
+      }
+    },
+    {
+      "when": {
+        "half": "lower",
+        "age": "3"
+      },
+      "apply": {
+        "model": "sofronpack:block/rice_stage_3"
+      }
+    },
+    {
+      "when": {
+        "half": "lower",
+        "age": "4"
+      },
+      "apply": {
+        "model": "sofronpack:block/rice_stage_4"
+      }
+    },
+    {
+      "when": {
+        "half": "upper",
+        "age": "4"
+      },
+      "apply": {
+        "model": "sofronpack:block/rice_stage_0"
+      }
+    },
+    {
+      "when": {
+        "half": "lower",
+        "age": "5"
+      },
+      "apply": {
+        "model": "sofronpack:block/rice_stage_5"
+      }
+    },
+    {
+      "when": {
+        "half": "upper",
+        "age": "5"
+      },
+      "apply": {
+        "model": "sofronpack:block/rice_stage_1"
+      }
+    },
+    {
+      "when": {
+        "half": "lower",
+        "age": "6"
+      },
+      "apply": {
+        "model": "sofronpack:block/rice_stage_6"
+      }
+    },
+    {
+      "when": {
+        "half": "upper",
+        "age": "6"
+      },
+      "apply": {
+        "model": "sofronpack:block/rice_stage_3"
+      }
+    },
+    {
+      "when": {
+        "half": "lower",
+        "age": "7"
+      },
+      "apply": {
+        "model": "sofronpack:block/rice_stage_7"
+      }
+    },
+    {
+      "when": {
+        "half": "upper",
+        "age": "7"
+      },
+      "apply": {
+        "model": "sofronpack:block/rice_stage_7"
+      }
+    },
+    {
+      "when": {
+        "half": "upper",
+        "age": "0"
+      },
+      "apply": {
+        "model": "sofronpack:block/wild_rice_empty"
+      }
+    },
+    {
+      "when": {
+        "half": "upper",
+        "age": "1"
+      },
+      "apply": {
+        "model": "sofronpack:block/wild_rice_empty"
+      }
+    },
+    {
+      "when": {
+        "half": "upper",
+        "age": "2"
+      },
+      "apply": {
+        "model": "sofronpack:block/wild_rice_empty"
+      }
+    },
+    {
+      "when": {
+        "half": "upper",
+        "age": "3"
+      },
+      "apply": {
+        "model": "sofronpack:block/wild_rice_empty"
+      }
+    }
+  ]
+}
