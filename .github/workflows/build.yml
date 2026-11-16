@@ -1,0 +1,57 @@
+name: Build SofronPack (Minecraft 26.3)
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'gradle/**'
+      - 'libs/**'
+      - 'scripts/**'
+      - 'build.gradle'
+      - 'settings.gradle'
+      - 'gradle.properties'
+      - 'tools/verify_jar.py'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.5.0'
+      - name: Validate imported Gen world generation
+        run: |
+          python3 scripts/validate_design.py
+          python3 scripts/validate_implementation.py
+          python3 scripts/validate_willow_templates.py
+      - name: Compile one SofronPack JAR containing both components
+        run: |
+          gradle --no-daemon clean build --stacktrace
+          python3 scripts/check_grounded_mountains.py
+      - name: Verify both components exist in one JAR
+        run: python3 tools/verify_jar.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: 26.3-SofronPack-v0.1.0
+          path: dist/26.3-SofronPack-v0.1.0.jar
+          if-no-files-found: error
+          retention-days: 30
+      - name: Save the versioned .jar permanently to dist/
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- dist/*.jar
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "Publish 26.3-SofronPack-v0.1.0.jar"
+          git pull --rebase origin main
+          git push origin HEAD:main
