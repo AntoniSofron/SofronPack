@@ -1,0 +1,6 @@
+{
+  "parent": "sofronpack:block/rice_crop_raised",
+  "textures": {
+    "crop": "sofronpack:block/rice_stage_7"
+  }
+}

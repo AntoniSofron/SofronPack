@@ -1,0 +1,29 @@
+{
+  "type": "minecraft:add",
+  "left": {
+    "type": "minecraft:add",
+    "left": {
+      "type": "minecraft:add",
+      "left": {
+        "type": "minecraft:add",
+        "left": {
+          "type": "minecraft:add",
+          "left": {
+            "type": "minecraft:add",
+            "left": {
+              "type": "minecraft:add",
+              "left": 0,
+              "right": "sofronpack:terrain/upland_lift"
+            },
+            "right": "sofronpack:terrain/classic_valleys"
+          },
+          "right": "sofronpack:terrain/micro_hills"
+        },
+        "right": "sofronpack:terrain/beta_overhangs"
+      },
+      "right": "sofronpack:terrain/karst_spires"
+    },
+    "right": "sofronpack:terrain/alpha_coastal_islets"
+  },
+  "right": "sofronpack:terrain/ocean_trenches"
+}

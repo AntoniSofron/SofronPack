@@ -1,0 +1,13 @@
+{
+  "variants": {
+    "type=bottom": {
+      "model": "sofronpack:block/clay_slab_slab_bottom_normal"
+    },
+    "type=double": {
+      "model": "sofronpack:block/clay_slab_double_bottom_normal"
+    },
+    "type=top": {
+      "model": "sofronpack:block/clay_slab_slab_top_normal"
+    }
+  }
+}

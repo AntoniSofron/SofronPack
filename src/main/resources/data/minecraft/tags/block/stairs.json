@@ -1,0 +1,14 @@
+{
+  "values": [
+    "sofronpack:grass_block_stairs",
+    "sofronpack:dirt_stairs",
+    "sofronpack:coarse_dirt_stairs",
+    "sofronpack:rooted_dirt_stairs",
+    "sofronpack:dirt_path_stairs",
+    "sofronpack:mycelium_stairs",
+    "sofronpack:podzol_stairs",
+    "sofronpack:mud_stairs",
+    "sofronpack:clay_stairs",
+    "sofronpack:farmland_stairs"
+  ]
+}

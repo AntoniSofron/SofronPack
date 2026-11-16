@@ -1,0 +1,76 @@
+{
+  "multipart": [
+    {
+      "when": {
+        "age": "0"
+      },
+      "apply": {
+        "model": "sofronpack:block/rice_stage_0"
+      }
+    },
+    {
+      "when": {
+        "age": "1"
+      },
+      "apply": {
+        "model": "sofronpack:block/rice_stage_1"
+      }
+    },
+    {
+      "when": {
+        "age": "2"
+      },
+      "apply": {
+        "model": "sofronpack:block/rice_stage_2"
+      }
+    },
+    {
+      "when": {
+        "age": "3"
+      },
+      "apply": {
+        "model": "sofronpack:block/rice_stage_3"
+      }
+    },
+    {
+      "when": {
+        "age": "4"
+      },
+      "apply": {
+        "model": "sofronpack:block/rice_stage_4"
+      }
+    },
+    {
+      "when": {
+        "age": "5"
+      },
+      "apply": {
+        "model": "sofronpack:block/rice_stage_5"
+      }
+    },
+    {
+      "when": {
+        "age": "6"
+      },
+      "apply": {
+        "model": "sofronpack:block/rice_stage_6"
+      }
+    },
+    {
+      "when": {
+        "age": "7"
+      },
+      "apply": {
+        "model": "sofronpack:block/rice_stage_7"
+      }
+    },
+    {
+      "when": {
+        "water_roots": "true"
+      },
+      "apply": {
+        "model": "sofronpack:block/rice_root_extension"
+      }
+    }
+  ]
+}

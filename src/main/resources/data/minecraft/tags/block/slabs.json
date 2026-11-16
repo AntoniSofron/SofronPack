@@ -1,0 +1,14 @@
+{
+  "values": [
+    "sofronpack:grass_block_slab",
+    "sofronpack:dirt_slab",
+    "sofronpack:coarse_dirt_slab",
+    "sofronpack:rooted_dirt_slab",
+    "sofronpack:dirt_path_slab",
+    "sofronpack:mycelium_slab",
+    "sofronpack:podzol_slab",
+    "sofronpack:mud_slab",
+    "sofronpack:clay_slab",
+    "sofronpack:farmland_slab"
+  ]
+}
