@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:smoking",
+  "category": "food",
+  "ingredient": "sofronpack:rice_bowl",
+  "result": {
+    "id": "sofronpack:cooked_rice_bowl",
+    "count": 1
+  },
+  "experience": 0.35,
+  "cookingtime": 100
+}

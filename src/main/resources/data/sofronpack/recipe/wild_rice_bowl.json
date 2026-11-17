@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "RRR",
+    "RBR",
+    "RRR"
+  ],
+  "key": {
+    "R": "sofronpack:wild_rice",
+    "B": "minecraft:bowl"
+  },
+  "result": {
+    "id": "sofronpack:wild_rice_bowl",
+    "count": 1
+  }
+}

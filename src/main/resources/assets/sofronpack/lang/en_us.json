@@ -22,5 +22,9 @@
   "item.sofronpack.rice": "Rice",
   "block.sofronpack.rice_crop": "Rice Crop",
   "item.sofronpack.wild_rice": "Wild Rice Seeds",
-  "block.sofronpack.wild_rice_crop": "Wild Rice"
+  "block.sofronpack.wild_rice_crop": "Wild Rice",
+  "item.sofronpack.rice_bowl": "Rice Bowl",
+  "item.sofronpack.cooked_rice_bowl": "Cooked Rice Bowl",
+  "item.sofronpack.wild_rice_bowl": "Wild Rice Bowl",
+  "item.sofronpack.cooked_wild_rice_bowl": "Cooked Wild Rice Bowl"
 }

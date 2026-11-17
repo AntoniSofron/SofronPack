@@ -64,6 +64,26 @@ with zipfile.ZipFile(jar) as z:
     assert base["parent"] == "sofronpack:block/rice_crop_raised"
     assert base["textures"]["crop"] == "sofronpack:block/rice_bottom"
     assert "assets/sofronpack/textures/block/rice_bottom.png" in files
+
+    for rice in ("rice", "wild_rice"):
+        raw = f"{rice}_bowl"
+        cooked = f"cooked_{raw}"
+        for item in (raw, cooked):
+            assert f"assets/sofronpack/items/{item}.json" in files
+            assert f"assets/sofronpack/models/item/{item}.json" in files
+            assert f"assets/sofronpack/textures/item/{item}.png" in files
+        craft = json.loads(z.read(f"data/sofronpack/recipe/{raw}.json"))
+        assert craft["type"] == "minecraft:crafting_shaped"
+        assert craft["pattern"] == ["RRR", "RBR", "RRR"]
+        assert craft["key"] == {"R": f"sofronpack:{rice}", "B": "minecraft:bowl"}
+        assert craft["result"]["id"] == f"sofronpack:{raw}"
+        for method, duration in (("smelting", 200), ("smoking", 100)):
+            recipe = json.loads(z.read(f"data/sofronpack/recipe/{cooked}_from_{method}.json"))
+            assert recipe["type"] == f"minecraft:{method}"
+            assert recipe["ingredient"] == f"sofronpack:{raw}"
+            assert recipe["result"]["id"] == f"sofronpack:{cooked}"
+            assert recipe["cookingtime"] == duration
+
     wild_loot = json.loads(z.read("data/sofronpack/loot_table/blocks/wild_rice_crop.json"))
     assert len(wild_loot["pools"]) == 2
     bonus = wild_loot["pools"][1]

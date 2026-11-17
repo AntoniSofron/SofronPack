@@ -8,6 +8,8 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.food.FoodProperties;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import pl.sofron.terralab.TerraLabMod;
@@ -42,11 +44,37 @@ public final class RiceContent {
             BuiltInRegistries.ITEM, WILD_RICE_ID, new BlockItem(WILD_RICE_CROP,
                     new Item.Properties().setId(ResourceKey.create(Registries.ITEM, WILD_RICE_ID))));
 
+    public static final Item RICE_BOWL = bowl("rice_bowl", false);
+    public static final Item COOKED_RICE_BOWL = bowl("cooked_rice_bowl", true);
+    public static final Item WILD_RICE_BOWL = bowl("wild_rice_bowl", false);
+    public static final Item COOKED_WILD_RICE_BOWL = bowl("cooked_wild_rice_bowl", true);
+
+    private static Item bowl(String name, boolean cooked) {
+        Identifier id = Identifier.fromNamespaceAndPath(TerraLabMod.MOD_ID, name);
+        Item.Properties properties = new Item.Properties()
+                .setId(ResourceKey.create(Registries.ITEM, id))
+                .stacksTo(1);
+        if (cooked) {
+            properties.food(new FoodProperties.Builder().nutrition(8)
+                    .saturationModifier(name.contains("wild") ? 0.8F : 0.6F).build())
+                    .usingConvertsTo(Items.BOWL);
+        }
+        return Registry.register(BuiltInRegistries.ITEM, id, new Item(properties));
+    }
+
     private RiceContent() {}
 
     public static void register() {
         CreativeModeTabEvents.modifyOutputEvent(ResourceKey.create(Registries.CREATIVE_MODE_TAB,
                 Identifier.withDefaultNamespace("natural_blocks")))
                 .register(output -> { output.accept(RICE); output.accept(WILD_RICE); });
+        CreativeModeTabEvents.modifyOutputEvent(ResourceKey.create(Registries.CREATIVE_MODE_TAB,
+                Identifier.withDefaultNamespace("food_and_drinks")))
+                .register(output -> {
+                    output.accept(RICE_BOWL);
+                    output.accept(COOKED_RICE_BOWL);
+                    output.accept(WILD_RICE_BOWL);
+                    output.accept(COOKED_WILD_RICE_BOWL);
+                });
     }
 }

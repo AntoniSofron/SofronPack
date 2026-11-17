@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "sofronpack:item/cooked_wild_rice_bowl"
+  }
+}

@@ -22,5 +22,9 @@
   "item.sofronpack.rice": "Ryż",
   "block.sofronpack.rice_crop": "Ryż",
   "item.sofronpack.wild_rice": "Nasiona dzikiego ryżu",
-  "block.sofronpack.wild_rice_crop": "Dziki ryż"
+  "block.sofronpack.wild_rice_crop": "Dziki ryż",
+  "item.sofronpack.rice_bowl": "Miska z ryżem",
+  "item.sofronpack.cooked_rice_bowl": "Miska z ugotowanym ryżem",
+  "item.sofronpack.wild_rice_bowl": "Miska z dzikim ryżem",
+  "item.sofronpack.cooked_wild_rice_bowl": "Miska z ugotowanym dzikim ryżem"
 }
