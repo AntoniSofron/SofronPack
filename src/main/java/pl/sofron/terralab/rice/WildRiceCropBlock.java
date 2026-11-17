@@ -114,7 +114,7 @@ public final class WildRiceCropBlock extends DoublePlantBlock implements Bonemea
     protected void randomTick(BlockState state, ServerLevel level, BlockPos pos, RandomSource random) {
         if (state.getValue(HALF) != DoubleBlockHalf.LOWER || state.getValue(AGE) >= 7
                 || !RiceCropBlock.hasRiceGrowthLight(level, pos)) return;
-        if (random.nextBoolean()) return;
+        if (random.nextInt(3) != 0) return;
         float fertility = RiceCropBlock.wheatEquivalentFertility(level, pos, state, true);
         if (random.nextInt((int)(25.0F / fertility) + 1) == 0)
             grow(level, pos, state, state.getValue(AGE) + 1);
