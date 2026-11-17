@@ -9,14 +9,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-/** User rules in config/sofron-pack-light-blocks.properties.
- *  ID = #RRGGBB, intensity-percent[, vanilla-emission-0..15[, rgb-radius-blocks]]
- *  Missing entries are NEUTRAL. Missing third value preserves vanilla emission.
- *  When provided, the third value overrides vanilla emission on both logical sides.
- */
 public final class BlockLightRules {
     public record Rule(RgbLight color, float intensity, Integer emission, Float rgbRadius) {}
-    /** Exact RGB tint radius, or the old 0.9.40 visual radius when omitted. */
     public static float tintRadius(Rule rule, float defaultRadius, int actualEmission) {
         if (rule != null && rule.rgbRadius() != null) return rule.rgbRadius();
         return (float)(defaultRadius * actualEmission / 15.0 * 0.68);
@@ -69,7 +63,6 @@ public final class BlockLightRules {
     public static int ruleCount() { return rules.size(); }
     private static volatile long lastCheck = 0;
     private BlockLightRules() {}
-    /** Exact block-state ID takes precedence; wall variants inherit floor torch rules. */
     public static Rule rule(String id) {
         Rule exact = rules.get(id);
         if (exact != null) return exact;
@@ -87,7 +80,6 @@ public final class BlockLightRules {
     }
     public static boolean isTracked(String id) { return LightPalette.LUMINOUS.contains(id) || rule(id) != null; }
     public static RgbLight neutral() { return NEUTRAL; }
-    /** Null means retain vanilla emission. Read from the integrated server too. */
     public static Integer vanillaEmissionOverride(String id) {
         Rule r = rule(id);
         return r == null ? null : r.emission();

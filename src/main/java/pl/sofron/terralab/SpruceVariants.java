@@ -43,7 +43,6 @@ public record SpruceVariants(Holder<Feature> original) implements Feature {
         boolean pine = biome.is(Biomes.OLD_GROWTH_PINE_TAIGA);
         Feature vanilla = original.value();
         if (mixed) {
-            // Pick the species first so the 3:1 ratio also applies to vanilla trees.
             pine = random.nextInt(4) < 3;
             vanilla = level.registryAccess().lookupOrThrow(Registries.FEATURE)
                     .getOrThrow(pine ? VANILLA_PINE : VANILLA_SPRUCE).value();

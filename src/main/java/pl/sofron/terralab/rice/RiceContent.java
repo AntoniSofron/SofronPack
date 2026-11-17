@@ -12,10 +12,6 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import pl.sofron.terralab.TerraLabMod;
 
-/**
- * The very same rice item is a seed and the harvested crop. No food components
- * are assigned to it, so raw rice is not edible.
- */
 public final class RiceContent {
     public static final Identifier RICE_ID =
             Identifier.fromNamespaceAndPath(TerraLabMod.MOD_ID, "rice");
@@ -38,9 +34,6 @@ public final class RiceContent {
 
     public static final WildRiceCropBlock WILD_RICE_CROP = Registry.register(
             BuiltInRegistries.BLOCK, WILD_RICE_CROP_ID, new WildRiceCropBlock(
-                    // Wheat copies an age-dependent state predicate that is
-                    // evaluated before this new block's state definition exists.
-                    // Grass supplies harmless vegetation defaults instead.
                     BlockBehaviour.Properties.ofFullCopy(net.minecraft.world.level.block.Blocks.SHORT_GRASS)
                             .randomTicks()
                             .setId(ResourceKey.create(Registries.BLOCK, WILD_RICE_CROP_ID))));

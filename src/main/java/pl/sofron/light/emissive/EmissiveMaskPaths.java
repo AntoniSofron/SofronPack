@@ -2,7 +2,6 @@ package pl.sofron.light.emissive;
 
 import java.util.Optional;
 
-/** OptiFine-style _e texture naming, independent from GPU upload or resource IO. */
 public final class EmissiveMaskPaths {
     private EmissiveMaskPaths() {}
     public static Optional<String> baseForMask(String path, String suffix) {

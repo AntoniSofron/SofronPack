@@ -3,7 +3,6 @@ package pl.sofron.light.render;
 import java.util.List;
 import pl.sofron.light.engine.LightSource;
 
-/** A render-thread-owned frame snapshot (no access to client world on worker threads). */
 public final class LightFrame {
     private final GpuLightBuffer buffer = new GpuLightBuffer();
     private long frameSerial;

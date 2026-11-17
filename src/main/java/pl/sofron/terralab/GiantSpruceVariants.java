@@ -32,7 +32,6 @@ public record GiantSpruceVariants(Holder<Feature> original) implements Feature {
         if (!TreeTemplates.placeTwoByTwo(level, random, origin, tree, template, new BlockPos(root, 0, root),
                 Blocks.SPRUCE_LOG, Blocks.SPRUCE_WOOD, Blocks.SPRUCE_LEAVES)) return false;
 
-        // The vanilla giant-tree decorator spreads podzol. Restore the four grass footings.
         for (int x = 0; x < 2; x++) {
             for (int z = 0; z < 2; z++) level.setBlock(origin.offset(x, -1, z), Blocks.GRASS_BLOCK.defaultBlockState(), 19);
         }

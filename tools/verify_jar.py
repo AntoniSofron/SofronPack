@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-"""Verify that the output is one, playable Fabric JAR (not two nested mods)."""
 import json
 import pathlib
 import shutil

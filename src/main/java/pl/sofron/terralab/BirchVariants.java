@@ -14,7 +14,6 @@ import net.minecraft.world.level.levelgen.feature.Feature;
 import net.minecraft.world.level.levelgen.feature.TreeFeature;
 import net.minecraft.world.level.levelgen.feature.trunkplacers.StraightTrunkPlacer;
 
-/** The placed feature supplies the local vanilla birch, including its bee and litter decorators. */
 public record BirchVariants(Holder<Feature> original) implements Feature {
     public static final MapCodec<BirchVariants> CODEC = Feature.CODEC.fieldOf("original")
             .xmap(BirchVariants::new, BirchVariants::original);
@@ -27,7 +26,6 @@ public record BirchVariants(Holder<Feature> original) implements Feature {
     @Override
     public boolean place(WorldGenLevel level, ChunkGenerator generator, RandomSource random, BlockPos origin) {
         if (!(original.value() instanceof TreeFeature tree)) return false;
-        // Three short tickets, two tall tickets, and two per authored silhouette.
         int ticket = random.nextInt(15);
         boolean placed;
         if (ticket < 5) {
@@ -47,7 +45,6 @@ public record BirchVariants(Holder<Feature> original) implements Feature {
     }
 
     private void placeMushroom(WorldGenLevel level, RandomSource random, BlockPos origin) {
-        // Try all 16 faces in random order until one can support the mushroom.
         var faces = new java.util.ArrayList<BlockPos>();
         for (int y = 1; y <= 4; y++) faces.add(origin.above(y));
         net.minecraft.util.Util.shuffle(faces, random);

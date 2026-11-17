@@ -14,8 +14,6 @@ $launcher = Join-Path $gradleInstallDir "lib\gradle-launcher-$version.jar"
 $zip = Join-Path $toolDir "gradle-$version-bin.zip"
 $shaFile = "$zip.sha256"
 
-# PowerShell variable names are case-insensitive. A separate Gradle install
-# variable avoids assignment to the read-only automatic home-directory variable.
 if ($Preflight) {
     if (-not $gradleInstallDir -or -not $launcher -or -not $root) {
         throw "Build paths were not initialized"
@@ -62,7 +60,6 @@ try {
     }
 
     Write-Host "[3/4] Building source with Gradle..." -ForegroundColor Cyan
-    # Launch Gradle via Java: avoids Windows nested gradle.bat access-denied issues.
     & java '-Dorg.gradle.appname=gradle' '-classpath' $launcher 'org.gradle.launcher.GradleMain' '--no-daemon' 'clean' 'build'
     if ($LASTEXITCODE -ne 0) { throw "Gradle compilation failed. Installed mods were left untouched." }
 
@@ -79,7 +76,6 @@ try {
     if ($Install) {
         Write-Host "[4/4] Install to: $ModsDir" -ForegroundColor Cyan
         if (-not (Test-Path $ModsDir)) { New-Item -Path $ModsDir -ItemType Directory -Force | Out-Null }
-        # Only our own previous generators are disabled; no unrelated mod is changed.
         $previous = @(Get-ChildItem -LiteralPath $ModsDir -Filter "*.jar" -File -ErrorAction Stop |
             Where-Object { $_.Name -match '^(Sofron-Terra-Lab-|Sofron-Pack-Gen|sofron-pack|sofron_pack|26\.3-Sofron-Pack-Gen|SofronPackLight-|26\.3-SofronPack-)' })
         if ($previous.Count -gt 0) {

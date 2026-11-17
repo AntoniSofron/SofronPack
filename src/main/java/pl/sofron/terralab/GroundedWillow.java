@@ -12,7 +12,6 @@ import net.minecraft.world.level.chunk.ChunkGenerator;
 import net.minecraft.world.level.levelgen.feature.Feature;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructurePlaceSettings;
 
-/** Anchor swamp templates at the trunk, including when the template rotates in shallow water. */
 public final class GroundedWillow implements Feature {
     public static final MapCodec<GroundedWillow> CODEC = MapCodec.unit(new GroundedWillow());
     private static final List<BlockPos> ROOTS = List.of(new BlockPos(5, 0, 5), new BlockPos(5, 0, 3),

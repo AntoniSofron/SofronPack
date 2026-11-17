@@ -1,6 +1,5 @@
 package pl.sofron.light.engine;
 
-/** Renderer-independent sampling presets; does not modify the Minecraft renderer. */
 public enum LightQuality {
     FAST(2, 24), BALANCED(4, 48), QUALITY(8, 96);
     public final int samplesPerAxis;

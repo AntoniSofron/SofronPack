@@ -5,7 +5,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.regex.*;
 
-/** Lightweight JSON configuration; unknown keys are ignored. */
 public final class LightConfig {
     public boolean dynamicLighting = true;
     public boolean coloredLighting = true;

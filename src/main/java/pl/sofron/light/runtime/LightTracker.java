@@ -19,7 +19,6 @@ import pl.sofron.light.engine.BlockLightRules;
 import pl.sofron.light.engine.LightSource;
 import pl.sofron.light.engine.RgbLight;
 
-/** Client tick snapshot. Does not alter vanilla block states or network data. */
 public final class LightTracker {
     private volatile List<LightSource> sources = List.of();
     private volatile int movingCount = 0;
@@ -27,7 +26,6 @@ public final class LightTracker {
     private final ChunkLightIndex chunkIndex = new ChunkLightIndex();
     public ChunkLightIndex chunkIndex() { return chunkIndex; }
 
-    // Keep sources near the 256-light cutoff stable between adjacent ticks.
     private final Set<String> previousSelected = new HashSet<>();
 
     public List<LightSource> sources() { return sources; }
@@ -48,7 +46,6 @@ public final class LightTracker {
         var found = new ArrayList<LightSource>();
         double px = player.getX(), py = player.getY(), pz = player.getZ();
         double maxDistanceSquared = 48 * 48;
-        // Both hands of the local player are always included.
         if (cfg.heldItems) {
             addStack(found, player.getMainHandItem(), px, py + 1.1, pz, cfg);
             addStack(found, player.getOffhandItem(), px, py + 1.1, pz, cfg);
@@ -71,18 +68,11 @@ public final class LightTracker {
             }
         }
         int movingEnd = found.size();
-        // Vanilla lighting has brightness but no RGB channels. Stationary light blocks
-        // must be supplied separately to our RGB renderer, like held items.
         if (cfg.stationaryBlockLighting) {
             chunkIndex.tick(client, cfg);
         } else {
             chunkIndex.clear();
         }
-        // Stable selection: the previous frame's nearby lights get a small score
-        // advantage, preventing rapid swapping at the 256-source GPU limit.
-        // Keep the distance score dominant so old lights do not stay forever.
-        // Moving lights are prioritized: an abundance of stationary lights must never
-        // evict the torch held by the player from the 256-entry GPU buffer.
         Comparator<LightSource> priority = Comparator
             .comparingDouble((LightSource light) -> {
                 double distance = squared(light.x()-px, light.y()-py, light.z()-pz);
@@ -101,8 +91,6 @@ public final class LightTracker {
         sources = selected;
     }
     private static String sourceKey(LightSource source) {
-        // Block centres are exact half-integers; moving sources are bucketed
-        // to half-block positions to avoid retaining a stale moving coordinate.
         return Math.round(source.x()*2) + ":" + Math.round(source.y()*2) + ":" + Math.round(source.z()*2);
     }
     private static double squared(double x,double y,double z) { return x*x+y*y+z*z; }

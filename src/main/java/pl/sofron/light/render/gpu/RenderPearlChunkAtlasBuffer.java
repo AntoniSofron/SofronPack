@@ -7,9 +7,6 @@ import com.mojang.renderpearl.api.commands.CommandEncoder;
 import java.nio.ByteBuffer;
 import pl.sofron.light.runtime.ChunkLightAtlas;
 
-/** One immutable-per-upload R32_SINT atlas used by every terrain draw in a frame.
- * All GPU commands take place at GameRenderer.renderLevel HEAD (outside render pass).
- */
 public final class RenderPearlChunkAtlasBuffer implements AutoCloseable {
     private final GpuDevice device;
     private final String uniform;

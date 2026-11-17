@@ -17,7 +17,6 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import pl.sofron.light.render.gpu.SodiumGpuLightBridge;
 
-/** Sodium 0.9.2 for MC 26.3. Uploads RGB sources before the terrain draw. */
 @Mixin(value = DefaultChunkRenderer.class, remap = false)
 public abstract class SodiumChunkRendererMixin {
     @Inject(method = "render", at = @At("HEAD"), remap = false)
@@ -26,6 +25,5 @@ public abstract class SodiumChunkRendererMixin {
         FogParameters fog, boolean sort, RenderPass renderPass, GpuSampler sampler,
         GpuBufferSlice transforms, GpuBuffer uniformBuffer, OitStage oitStage,
         CallbackInfo ci) {
-        // Native RenderPearl path updates at the pre-draw hook; no competing GL uploads.
     }
 }

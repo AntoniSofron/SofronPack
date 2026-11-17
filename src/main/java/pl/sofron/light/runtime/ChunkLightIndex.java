@@ -16,12 +16,6 @@ import pl.sofron.light.engine.BlockLightRules;
 import pl.sofron.light.engine.LightSource;
 import pl.sofron.light.engine.RgbLight;
 
-/**
- * Persistent client-side chunk index, independent of the 256-element GPU uniform.
- * Scans a small bounded number of loaded chunks per tick; never loads chunks.
- * Removed/changed indexed light sources are validated every client tick.
- * This is an indexing foundation, NOT yet per-chunk GPU rendering.
- */
 public final class ChunkLightIndex {
     private record ChunkKey(int x, int z) {}
     private record Entry(List<LightSource> lights, long scannedTick) {}
@@ -58,12 +52,9 @@ public final class ChunkLightIndex {
         int cx = client.player.blockPosition().getX() >> 4;
         int cz = client.player.blockPosition().getZ() >> 4;
         int radius = Math.max(1, client.options.renderDistance().get());
-        // Chunk loads and luminous edits wake the index immediately. While idle,
-        // revisit the view once a second for unloads and periodic refreshes.
         if (ticks > 1 && ticks < nextDiscovery && dirty.isEmpty() && cx == previousX
                 && cz == previousZ && radius == previousRadius && !rulesChanged) return;
         previousX=cx; previousZ=cz; previousRadius=radius;
-        // Remove stale entries outside view distance, including previously visited regions.
         indexed.keySet().removeIf(k -> {
             boolean stale = Math.abs(k.x - cx) > radius + 1 || Math.abs(k.z - cz) > radius + 1
                 || !client.level.hasChunk(k.x, k.z);
@@ -81,8 +72,6 @@ public final class ChunkLightIndex {
                 if (old == null || dirty.contains(key) || ticks - old.scannedTick >= REFRESH_TICKS) candidates.add(key);
             }
         }
-        // Unscanned chunks always go first, otherwise nearby refreshes can starve
-        // distant chunks indefinitely. Refresh the oldest indexed chunks after that.
         candidates.sort(Comparator
             .comparingInt((ChunkKey k) -> dirty.contains(k) ? -1 : indexed.containsKey(k) ? 1 : 0)
             .thenComparingLong(k -> indexed.containsKey(k) ? indexed.get(k).scannedTick : -1L)
@@ -101,10 +90,8 @@ public final class ChunkLightIndex {
         }
     }
 
-    /** All indexed stationary sources, without imposing a GPU limit. */
     public List<LightSource> allLights() { return buckets.allLights(); }
 
-    /** CPU-side selection query, no GPU truncation. */
     public List<LightSource> lightsAffectingChunk(int chunkX, int chunkZ) {
         return buckets.affecting(chunkX, chunkZ);
     }
@@ -123,7 +110,6 @@ public final class ChunkLightIndex {
                 int x = (cx << 4) + dx, y = baseY + dy, z = (cz << 4) + dz;
                 String id = BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString();
                 var rule = BlockLightRules.rule(id);
-                // No rule means vanilla neutral light: no recoloring is necessary.
                 if (rule == null || !cfg.coloredLighting) continue;
                 int vanilla = state.getLightEmission(); // actual override now supplied by BlockStateEmissionMixin
                 int visual = rule.emission() == null ? vanilla : rule.emission();

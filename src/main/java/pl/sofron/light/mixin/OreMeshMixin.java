@@ -54,11 +54,9 @@ abstract class OreMeshMixin extends AbstractBlockRenderContext {
         if (base == null) return bits;
         var atlas = OreMasks.current();
         if (atlas.leafDetails().contains(base)) {
-            // Store the owning block's low X/Z bits even for overhanging leaf models.
             return bits | 0x80 | ((pos.getX() & 3) << 3) | ((pos.getZ() & 3) << 5);
         }
         if (!atlas.pairs().containsKey(base)) {
-            // With no intermediate alpha the sprite cannot contain the alpha-254 emissive marker.
             return base.transparency().hasTranslucent() ? bits : bits | 0x10;
         }
         if (sofron$lastOre != pos.asLong()) {
@@ -66,7 +64,6 @@ abstract class OreMeshMixin extends AbstractBlockRenderContext {
             pl.sofron.light.emissive.OreFades.observe(level.getLightEngine(),pos);
             sofron$lastOre = pos.asLong();
         }
-        // The three parity bits identify the block owning a vertex on a shared face.
         return bits | (1 << 3) | ((pos.getX() & 1) << 4)
             | ((pos.getY() & 1) << 5) | ((pos.getZ() & 1) << 6);
     }

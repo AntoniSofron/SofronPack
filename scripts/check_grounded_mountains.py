@@ -1,9 +1,4 @@
 #!/usr/bin/env python3
-"""Regression contract: peaks up to Y290 grow from land; no high-altitude slabs.
-
-Checks the active Minecraft 26.3 JSON graph and samples its deterministic
-mountain-column formula. Runtime chunk tests remain separately required.
-"""
 import json
 import math
 from pathlib import Path
@@ -85,8 +80,6 @@ for i in range(-200, 201):
 assert min(tops) == 255 and max(tops) == 289 and len(tops) == 35, tops
 assert abs(mountain(1 + extension["left"], 290)) < 1e-6
 
-# Other positive landforms must die away well before the peak ceiling:
-# they may roughen cliffs/karst but must not create an independent Y290 sky slab.
 beta = j("beta_overhangs")
 assert beta["right"]["right"]["right"]["left"]["right"]["to_coordinate"] <= 190
 karst = j("karst_spires")

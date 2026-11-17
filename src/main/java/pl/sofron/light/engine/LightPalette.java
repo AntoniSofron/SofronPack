@@ -1,7 +1,6 @@
 package pl.sofron.light.engine;
 
 import java.util.Set;
-/** Known vanilla luminous blocks/items. Their default output is NEUTRAL, not RGB. */
 public final class LightPalette {
     private LightPalette() {}
     public static final Set<String> LUMINOUS = Set.of(

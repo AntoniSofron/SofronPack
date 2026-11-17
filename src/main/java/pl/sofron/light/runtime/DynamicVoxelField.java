@@ -5,11 +5,6 @@ import java.nio.ByteOrder;
 import java.util.List;
 import pl.sofron.light.engine.LightOcclusion;
 
-/**
- * Experimental client-side voxel light solver. Independent from the stationary
- * source atlas; local brightness levels are propagated through non-opaque cells.
- * Coordinates are absolute integer block positions. No chunk loads are forced.
- */
 public final class DynamicVoxelField {
     public static final int SIZE = 33;
     public static final int CELLS = SIZE * SIZE * SIZE;
@@ -49,8 +44,6 @@ public final class DynamicVoxelField {
                 int vx=at%SIZE, vy=at/(SIZE*SIZE), vz=(at/SIZE)%SIZE;
                 int dist=sourceLevel - level;
                 if(dist<=Math.max(0,emitter.tintRange)) {
-                    // Preserve chromatic hue, distinct from the neutral brightness.
-                    // Max aggregation avoids turning same-color clusters white.
                     float tintWeight=1f-(float)dist/(Math.max(1,emitter.tintRange)+1f);
                     int vr=Math.round(Math.max(0,Math.min(255,emitter.red))*tintWeight);
                     int vg=Math.round(Math.max(0,Math.min(255,emitter.green))*tintWeight);
@@ -72,12 +65,10 @@ public final class DynamicVoxelField {
                     queue[tail++]=next;
                 }
             }
-            // Each cell enters the FIFO once per emitter in descending brightness order.
             for (int k=0; k<tail; k++) seen[queue[k]]=0;
         }
         return new Snapshot(x0,y0,z0,packed);
     }
-    /** header (x0,y0,z0,size) followed by packed RGBA voxels */
     public static void put(ByteBuffer buffer, Snapshot snapshot) {
         buffer.order(ByteOrder.nativeOrder());
         buffer.putInt(snapshot.x0).putInt(snapshot.y0).putInt(snapshot.z0).putInt(SIZE);

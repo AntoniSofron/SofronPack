@@ -5,10 +5,6 @@ import pl.sofron.light.config.LightConfig;
 import pl.sofron.light.engine.RgbLight;
 import pl.sofron.light.engine.RgbLightField;
 
-/**
- * Native-world sampling bridge. This is NOT a surface renderer: consumers can
- * query RGB at any world-space position without altering chunks or block light.
- */
 public final class LiveLightProbe {
     private volatile RgbLight eyeLight = RgbLight.BLACK;
     public RgbLight eyeLight() { return eyeLight; }

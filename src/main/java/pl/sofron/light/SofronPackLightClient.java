@@ -11,7 +11,6 @@ import pl.sofron.light.runtime.LightTracker;
 import pl.sofron.light.runtime.LiveLightProbe;
 import pl.sofron.light.runtime.LightDiagnostics;
 
-/** Tracks sources and publishes the local lighting field to the Sodium terrain renderer. */
 public final class SofronPackLightClient implements ClientModInitializer {
     public static final LightTracker LIGHTS = new LightTracker();
     public static final pl.sofron.light.runtime.DynamicVoxelController VOXELS = new pl.sofron.light.runtime.DynamicVoxelController();

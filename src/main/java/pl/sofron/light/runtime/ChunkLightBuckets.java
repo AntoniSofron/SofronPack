@@ -6,10 +6,6 @@ import java.util.List;
 import java.util.Map;
 import pl.sofron.light.engine.LightSource;
 
-/** Pure spatial look-up for stationary lights; one bucket per source chunk.
- * Client-tick owned (not thread safe). A query only examines buckets whose
- * bounds can intersect the destination chunk plus maximum light reach.
- */
 public final class ChunkLightBuckets {
     private final Map<Long, List<LightSource>> buckets = new HashMap<>();
     private float maxRadius;

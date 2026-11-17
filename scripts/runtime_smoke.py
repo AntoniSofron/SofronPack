@@ -1,10 +1,4 @@
 #!/usr/bin/env python3
-"""Minecraft 26.3 worldgen integration smoke test.
-
-Starts a Fabric development server and uses local RCON to assert that a naturally
-located deep ocean contains actual water blocks at sea level, not merely LOD.
-Requires Java 25, Gradle, network and a full Fabric Loom runtime.
-"""
 import os
 import pathlib
 import re
@@ -121,9 +115,6 @@ def main():
             if "sofronpack" not in packs.lower():
                 raise AssertionError("Sofron Terra Lab data pack is not enabled: the server is testing Vanilla, not our worldgen.")
 
-            # Rice crop regression: place a mature plant on ordinary farmland,
-            # and young plants on both waterlogged soil shapes. They must remain
-            # after the ordinary crop's four-second waterlogged ejection window.
             print("Testing rice registration and waterlogged farmland persistence...", flush=True)
             rcon("forceload add 32 32 47 47")
             rcon("fill 40 298 40 43 303 40 minecraft:air")
@@ -145,12 +136,7 @@ def main():
             print("PASS: rice on ordinary farmland and wet slab/stairs survives the crop ejection window", flush=True)
             rcon("fill 40 298 40 43 303 40 minecraft:air")
 
-            # Verify all five user-provided NBT structure templates actually
-            # load in Minecraft 26.3 and place their original oak-wood trunks.
-            # Test above world surface (Y280) to avoid collisions and false positives.
             if os.environ.get("TERRA_SEED", "3880636525852909587") == "3880636525852909587":
-                # Exercise the natural meadow birch placement. Each authored canopy
-                # has a unique number of branch-wood blocks in an empty plot.
                 rcon("forceload add 0 0 47 47")
                 def wait_condition(condition):
                     deadline = time.monotonic() + 20
@@ -163,8 +149,6 @@ def main():
                         time.sleep(0.2)
 
                 wait_condition("loaded 20 299 20")
-                # Cover a tilled stair, then verify the scheduled vanilla-style reversion
-                # keeps the upside-down orientation. A seed crop must survive on a bottom slab.
                 rcon("fill 20 298 20 23 301 20 minecraft:air")
                 rcon("setblock 20 299 20 sofronpack:farmland_stairs[half=top,facing=west,moisture=7]")
                 rcon("setblock 20 300 20 minecraft:stone")
@@ -180,7 +164,6 @@ def main():
                     rcon("setblock 16 279 16 minecraft:grass_block")
 
                 def verify_footprint(expected):
-                    # No other block on this layer is grass. Every base voxel must have support.
                     result = rcon("fill 12 279 12 20 279 20 minecraft:air replace minecraft:grass_block")
                     count = re.search(r"(\d+) block", result)
                     if not count or int(count.group(1)) != expected:
@@ -206,8 +189,6 @@ def main():
                     raise AssertionError(f"Birch feature: missing branch counts {missing_wood_counts}, "
                                          f"authored nest={saw_nest}, last placement={result}, wood={wood}")
                 print("PASS: all five birch shapes grow through a vanilla placement with bee nests", flush=True)
-                # Distinct branch counts identify the exact uploaded oak silhouettes.
-                # Use the same checked oak entry in both biomes to exercise the exclusion.
                 feature = ('place feature {type:"minecraft:simple_random_selector",'
                            'features:["minecraft:oak_checked"]} 16 280 16')
                 for biome in ("plains", "swamp", "mangrove_swamp"):
@@ -232,8 +213,6 @@ def main():
                         raise AssertionError(f"Missing authored oak shapes: {remaining}")
                 print("PASS: both authored oaks generated; swamp exclusions passed", flush=True)
                 mixed_shapes = {0, 7, 9, 12, 13, 16, 19, 21, 25}
-                # Run the autumn forest selector itself. Its rare conifer entry must
-                # reach an authored spruce (or pine), distinguishable by spruce_wood.
                 rcon("fillbiome 4 268 4 28 292 28 minecraft:dappled_forest")
                 rcon("fill 8 279 8 24 279 24 minecraft:dirt")
                 for attempt in range(500):
@@ -399,12 +378,10 @@ def main():
                         raise AssertionError(
                             f"Willow variant {index} NBT failed real placement: {result}; {probe}")
                 print("PASS: all five cleaned willow NBT templates place their trunks in Minecraft", flush=True)
-                # A willow on a cliff must fail atomically if one layer cannot bridge the gap.
                 rcon("fill 8 275 8 24 304 24 minecraft:air")
                 result = rcon("place feature sofronpack:swamp_willows 16 280 16")
                 if "placed " in result.lower():
                     raise AssertionError(f"Unsupported willow generated: {result}")
-                # One-block step: each log/wood block at the base needs a grass block.
                 rcon("fill 8 278 8 24 278 24 minecraft:dirt")
                 rcon("fill 8 279 8 15 279 24 minecraft:dirt")
                 result = rcon("place feature sofronpack:swamp_willows 16 280 16")
@@ -418,8 +395,6 @@ def main():
                             raise AssertionError(f"Willow has an unsupported root at {x}, {z}")
                 print("PASS: willow roots follow the step, and a deeper gap rejects placement", flush=True)
 
-                # Validate the *placed feature* registration in a naturally
-                # selected vanilla swamp, not only the raw template command.
                 located_swamp = rcon("locate biome minecraft:swamp")
                 print("Locate actual vanilla swamp:", located_swamp, flush=True)
                 swamp_match = re.search(r"\[\s*(-?\d+)\s*,\s*(?:~|-?\d+)\s*,\s*(-?\d+)\s*\]", located_swamp)
@@ -441,7 +416,6 @@ def main():
                         "sampled natural swamp locations; verify underwater roots / biome placement.")
                 print(f"PASS: native willow feature placed successfully in swamp ({successes}/5)", flush=True)
 
-            # Locate a real VANILLA deep-ocean biome, not a generated height-map.
             located = rcon("locate biome minecraft:deep_ocean")
             print("Locate deep ocean:", located, flush=True)
             match = re.search(r"\[\s*(-?\d+)\s*,\s*(?:~|-?\d+)\s*,\s*(-?\d+)\s*\]", located)
@@ -479,16 +453,12 @@ def main():
             if missing:
                 raise AssertionError(f"Sea level mismatch or dry deep ocean: {missing}. "
                                      "Expected water Y54/Y62 and air Y63 (sea_level=63).")
-            # Verify Vanilla depth routing never chooses the Deep Dark high above the surface.
             above_samples = ((0, 160, 0), (256, 160, 256), (-256, 160, -256))
             for lx, ly, lz in above_samples:
                 is_deep, answer = passes(f"execute if biome {lx} {ly} {lz} minecraft:deep_dark")
                 print(f"Deep Dark biome at open-sky Y={ly} ({lx},{lz}): {is_deep} ({answer})", flush=True)
                 if is_deep:
                     raise AssertionError(f"Deep Dark biome mapped to high sky / surface at {(lx,ly,lz)}")
-            # Smoke-test mountain geometry on actual chunks, not on LOD silhouettes.
-            # A single natural arch may have air directly below it; a WHOLE CLUSTER
-            # of high rocky columns with no lower support is an accidental sky island.
             peaks = rcon("locate biome minecraft:jagged_peaks")
             print("Locate Vanilla jagged_peaks:", peaks, flush=True)
             peak_match = re.search(r"\[\s*(-?\d+)\s*,\s*(?:~|-?\d+)\s*,\s*(-?\d+)\s*\]", peaks)
@@ -507,8 +477,6 @@ def main():
                     return yes
                 tall, unsupported, height_profiles = [], [], []
                 for sx, sz in spots:
-                    # Surface height estimate from *actual generated blocks*.
-                    # Unlike Distant Horizons, these are server block queries.
                     top = next((y for y in range(312, 79, -8)
                                 if is_solid(sx, y, sz)), None)
                     height_profiles.append((sx, sz, top))

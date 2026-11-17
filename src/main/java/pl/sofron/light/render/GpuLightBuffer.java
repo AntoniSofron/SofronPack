@@ -6,10 +6,6 @@ import java.nio.FloatBuffer;
 import java.util.List;
 import pl.sofron.light.engine.LightSource;
 
-/** Renderer-neutral per-frame light buffer. Interleaved xyz/radius + linear RGB/power.
- * Stable selection prevents changes in entity iteration order from causing flicker.
- * The camera-relative coordinates preserve precision at large world coordinates.
- */
 public final class GpuLightBuffer {
     public static final int FLOATS_PER_LIGHT = 8;
     public static final int MAX_GPU_LIGHTS = 256;
@@ -20,9 +16,6 @@ public final class GpuLightBuffer {
         if (sources == null) throw new IllegalArgumentException("sources");
         int n = Math.clamp(limit, 0, MAX_GPU_LIGHTS);
         data.clear();
-        // LightTracker already selects and orders a stable subset. A second sort
-        // around the interpolated camera caused the 96th light to swap between
-        // frames as the camera moved even when the client tick snapshot was fixed.
         var selected = sources.stream()
             .filter(s -> Double.isFinite(s.x()) && Double.isFinite(s.y()) && Double.isFinite(s.z()))
             .limit(n).toList();

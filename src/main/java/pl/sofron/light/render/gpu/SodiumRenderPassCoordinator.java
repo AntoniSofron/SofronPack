@@ -9,7 +9,6 @@ import pl.sofron.light.runtime.ChunkLightAtlas;
 import net.minecraft.client.Minecraft;
 import pl.sofron.light.emissive.OreMasks;
 
-/** Per-frame data upload followed by RenderPass binding. Render-thread only. */
 public final class SodiumRenderPassCoordinator {
     private static RenderPearlNativeLightBuffer nativeBuffer;
     private static RenderPearlChunkAtlasBuffer chunkAtlasBuffer;
@@ -35,7 +34,6 @@ public final class SodiumRenderPassCoordinator {
     public static long diagnosticDrawSubmissions() { return submissions; }
     private SodiumRenderPassCoordinator() {}
 
-    /** Upload only before the frame graph opens its render passes. Called from GameRenderer.renderLevel HEAD. */
     public static void prepareFrame(double x, double y, double z) {
         if (SofronPackLightClient.CONFIG == null) return;
         if (nativeBuffer == null) nativeBuffer = new RenderPearlNativeLightBuffer(RenderSystem.getDevice());
@@ -83,8 +81,6 @@ public final class SodiumRenderPassCoordinator {
                 diagnosticAtlasFailures++;
                 diagnosticAtlasReferences = 0;
                 diagnosticAtlasCells = 1;
-                // A very dense world must not crash the renderer. Disable this
-                // frame's stationary RGB rather than reuse a stale atlas.
                 chunkAtlasBuffer.upload(ChunkLightAtlas.empty());
             }
             lastRevision = index.revision();
@@ -96,7 +92,6 @@ public final class SodiumRenderPassCoordinator {
         nativeBuffer.upload(payload);
     }
 
-    /** Only binds an already uploaded buffer; never calls CommandEncoder while a render pass is open. */
     public static void beforeDraw(RenderPass pass, CameraTransform camera) {
         if (pass == null || camera == null || nativeBuffer == null || !nativeBuffer.isReady()) return;
         nativeBuffer.bind(pass);

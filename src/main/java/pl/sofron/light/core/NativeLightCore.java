@@ -7,10 +7,6 @@ import pl.sofron.light.engine.LightSource;
 import pl.sofron.light.engine.RgbLight;
 import pl.sofron.light.engine.RgbLightField;
 
-/**
- * Sofron-owned CPU lighting core. Does not contain classes or archives from other mods.
- * GPU upload and world surface rendering must be supplied by a separate renderer backend.
- */
 public final class NativeLightCore {
     private volatile List<LightSource> snapshot = List.of();
     private volatile float intensity = 0.85f;

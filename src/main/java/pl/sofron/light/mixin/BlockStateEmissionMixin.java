@@ -8,7 +8,6 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import pl.sofron.light.engine.BlockLightRules;
 
-/** Overriding block emission must happen in vanilla lighting, not in a post-process shader. */
 @Mixin(BlockBehaviour.BlockStateBase.class)
 public abstract class BlockStateEmissionMixin {
     @Inject(method = "getLightEmission", at = @At("HEAD"), cancellable = true)

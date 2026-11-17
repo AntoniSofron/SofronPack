@@ -3,10 +3,7 @@
   "id": "sofronpack",
   "version": "${version}",
   "name": "SofronPack",
-  "description": "World generation, new soil shapes and rice, dynamic lighting, emissive ores and optimized leaf rendering.",
-  "authors": [
-    "SofronPack contributors"
-  ],
+  "description": "Terrain, plants and lighting.",
   "environment": "*",
   "license": "All Rights Reserved",
   "entrypoints": {

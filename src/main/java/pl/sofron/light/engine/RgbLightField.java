@@ -2,10 +2,6 @@ package pl.sofron.light.engine;
 
 import java.util.Collection;
 
-/**
- * CPU reference renderer input: additive RGB illumination with voxel ray occlusion.
- * Samples can later be consumed by a native rendering backend; this class does not draw pixels.
- */
 public final class RgbLightField {
     private RgbLightField() {}
 
@@ -27,11 +23,9 @@ public final class RgbLightField {
             g += src.color().green()*amount;
             b += src.color().blue()*amount;
         }
-        // Saturation at final output (not per source) preserves proper additive mixing.
         return new RgbLight((float)r,(float)g,(float)b);
     }
 
-    /** 3D voxel traversal; endpoint cells aren't tested, so a source and surface may be solid. */
     static boolean blocked(double x0,double y0,double z0,double x1,double y1,double z1, LightOcclusion world) {
         int ix=floor(x0), iy=floor(y0), iz=floor(z0);
         int ex=floor(x1), ey=floor(y1), ez=floor(z1);
@@ -42,7 +36,6 @@ public final class RgbLightField {
         double ax=sx==0?Double.POSITIVE_INFINITY:Math.abs(1/dx);
         double ay=sy==0?Double.POSITIVE_INFINITY:Math.abs(1/dy);
         double az=sz==0?Double.POSITIVE_INFINITY:Math.abs(1/dz);
-        // Conservative tie handling visits cells crossed along edges simultaneously.
         for(int iterations=0;iterations<4096;iterations++) {
             double t=Math.min(tx,Math.min(ty,tz));
             if(t>1 || !Double.isFinite(t)) return false;

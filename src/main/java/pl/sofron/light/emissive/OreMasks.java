@@ -13,7 +13,6 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.client.renderer.texture.SpriteLoader;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 
-/** One immutable snapshot per block atlas, shared with Sodium's chunk mesh workers. */
 public record OreMasks(Map<TextureAtlasSprite, TextureAtlasSprite> pairs, Set<TextureAtlasSprite> leafDetails, ByteBuffer rectangles) {
     private static volatile OreMasks current = new OreMasks(Map.of(), Set.of(), allocate(16));
     public static OreMasks current() { return current; }
@@ -56,7 +55,6 @@ public record OreMasks(Map<TextureAtlasSprite, TextureAtlasSprite> pairs, Set<Te
         current = new OreMasks(Map.copyOf(pairs), Set.copyOf(leaves), tileIndex(atlas, pairs));
     }
 
-    // One RGBA texel per tile holds the UV transform. Only shared tiles need rectangle tests.
     private static ByteBuffer tileIndex(SpriteLoader.Preparations atlas, Map<TextureAtlasSprite, TextureAtlasSprite> pairs) {
         if (pairs.isEmpty()) return allocate(16);
         int tile = Math.max(16, Math.max(atlas.width(), atlas.height()) / 128);

@@ -21,18 +21,7 @@ import net.minecraft.world.level.block.state.properties.BooleanProperty;
 import pl.sofron.terralab.soil.SoilCropRules;
 import pl.sofron.terralab.soil.SoilShape;
 
-/**
- * Eight growth stages, like wheat. Growth probability follows wheat's
- * farmland-fertility formula (including neighbours and crop crowding).
- *
- * Ordinary farmland: half wheat's growth chance, regardless of moisture.
- * Waterlogged farmland slabs/stairs: wheat's normal growth chance.
- * Non-waterlogged shaped farmland: planting is forbidden.
- */
 public final class RiceCropBlock extends CropBlock {
-    // The rice above waterlogged shaped farmland carries additional visual
-    // geometry extending BELOW the crop block into the half-height water gap.
-    // This is a render-only blockstate property, not a separate collision block.
     public static final BooleanProperty WATER_ROOTS = BooleanProperty.create("water_roots");
 
     public RiceCropBlock(Properties properties) {
@@ -73,7 +62,6 @@ public final class RiceCropBlock extends CropBlock {
     protected void onPlace(BlockState state, Level level, BlockPos pos,
                            BlockState oldState, boolean moved) {
         super.onPlace(state, level, pos, oldState, moved);
-        // Also covers farmer-villager planting, which can bypass BlockItem.
         if (!level.isClientSide() && !oldState.is(this)) {
             boolean expected = needsWaterRoots(level.getBlockState(pos.below()));
             if (state.getValue(WATER_ROOTS) != expected)
@@ -85,7 +73,6 @@ public final class RiceCropBlock extends CropBlock {
     public void performBonemeal(ServerLevel level, RandomSource random,
                                 BlockPos pos, BlockState state, BonemealSource source) {
         super.performBonemeal(level, random, pos, state, source);
-        // Vanilla bonemeal creates a fresh age state; keep the visual roots.
         BlockState grown = level.getBlockState(pos);
         if (grown.is(this) && grown.getValue(WATER_ROOTS) != state.getValue(WATER_ROOTS))
             level.setBlockAndUpdate(pos, grown.setValue(WATER_ROOTS, state.getValue(WATER_ROOTS)));
@@ -102,7 +89,6 @@ public final class RiceCropBlock extends CropBlock {
             return SoilCropRules.hasInternalWater(soil);
         return super.mayPlaceOn(soil, level, pos);
     }
-
 
     /** Wild and cultivated rice use one growth-rate formula, with submerged
      * ordinary dirt acting like irrigated farmland for the centre bonus. */
@@ -154,7 +140,6 @@ public final class RiceCropBlock extends CropBlock {
                 && SoilCropRules.hasInternalWater(soil);
         if (!waterField && !soil.is(Blocks.FARMLAND)) return;
 
-        // Normal farmland needs twice as many random growth attempts.
         if (!waterField && random.nextBoolean()) return;
         float fertility = wheatEquivalentFertility(level, pos, state, false);
         if (random.nextInt((int)(25.0F / fertility) + 1) == 0)

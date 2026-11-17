@@ -5,7 +5,6 @@ import java.util.List;
 import net.minecraft.client.Minecraft;
 import pl.sofron.light.config.LightConfig;
 
-/** Manages many dynamic emitters and a client-only voxel-light volume. */
 public final class DynamicVoxelController {
     private final DynamicEmitterRegistry registry=new DynamicEmitterRegistry();
     private DynamicVoxelField.Snapshot field;
@@ -31,7 +30,6 @@ public final class DynamicVoxelController {
         age=0;
         previous=emitters;
         var next=DynamicVoxelField.propagate(x,y,z,emitters,new MinecraftOcclusion(client.level));
-        // A periodic occlusion refresh often reproduces the existing volume exactly.
         if (field == null || field.x0()!=next.x0() || field.y0()!=next.y0() || field.z0()!=next.z0()
                 || !java.util.Arrays.equals(field.voxels(), next.voxels())) field=next;
     }

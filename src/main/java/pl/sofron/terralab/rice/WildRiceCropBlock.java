@@ -26,13 +26,6 @@ import net.minecraft.world.level.material.Fluids;
 import net.minecraft.tags.FluidTags;
 import org.jetbrains.annotations.Nullable;
 
-/**
- * Wild rice has one waterlogged root block on ordinary dirt and one air-level
- * stalk block. Both halves share an age (0..7) and drop the same seed item.
- *
- * A planted seed may replace ONE source-water block only; the block above it
- * must be air. Unlike cultivated rice, no farmland is needed or accepted.
- */
 public final class WildRiceCropBlock extends DoublePlantBlock implements BonemealableBlock {
     public static final IntegerProperty AGE = IntegerProperty.create("age", 0, 7);
 
@@ -50,12 +43,10 @@ public final class WildRiceCropBlock extends DoublePlantBlock implements Bonemea
         builder.add(AGE, BlockStateProperties.WATERLOGGED);
     }
 
-    /** The only supported root is vanilla ordinary dirt under a full water source. */
     public static boolean validSite(LevelReader level, BlockPos lower) {
         if (!level.getBlockState(lower.below()).is(Blocks.DIRT)) return false;
         FluidState water = level.getFluidState(lower);
         if (!water.is(FluidTags.WATER) || !water.isSource()) return false;
-        // A second block of water, a lily, or any obstruction above rejects planting.
         return level.getBlockState(lower.above()).isAir();
     }
 
@@ -103,7 +94,6 @@ public final class WildRiceCropBlock extends DoublePlantBlock implements Bonemea
         return super.updateShape(state, level, ticks, pos, side, neighbour, adjacent, random);
     }
 
-    /** Worldgen places a mature two-block plant using the exact same site rule. */
     public static boolean placeMature(LevelAccessor level, BlockPos pos) {
         if (!validSite(level, pos)) return false;
         BlockState lower = RiceContent.WILD_RICE_CROP.defaultBlockState().setValue(AGE, 7);
@@ -116,7 +106,6 @@ public final class WildRiceCropBlock extends DoublePlantBlock implements Bonemea
         BlockState upper = level.getBlockState(lowerPos.above());
         if (!upper.is(this) || upper.getValue(HALF) != DoubleBlockHalf.UPPER) return;
         int newAge = Math.min(7, age);
-        // Keep the shared age on both halves; avoid a disconnected upper sprite.
         level.setBlockAndUpdate(lowerPos.above(), upper.setValue(AGE, newAge));
         level.setBlockAndUpdate(lowerPos, lower.setValue(AGE, newAge));
     }
@@ -125,9 +114,6 @@ public final class WildRiceCropBlock extends DoublePlantBlock implements Bonemea
     protected void randomTick(BlockState state, ServerLevel level, BlockPos pos, RandomSource random) {
         if (state.getValue(HALF) != DoubleBlockHalf.LOWER || state.getValue(AGE) >= 7
                 || !RiceCropBlock.hasRiceGrowthLight(level, pos)) return;
-        // Same 8 growth stages and normal irrigated-farmland rice formula:
-        // half the wheat growth attempts, with the wet dirt treated as a
-        // hydrated center fertility cell.
         if (random.nextBoolean()) return;
         float fertility = RiceCropBlock.wheatEquivalentFertility(level, pos, state, true);
         if (random.nextInt((int)(25.0F / fertility) + 1) == 0)

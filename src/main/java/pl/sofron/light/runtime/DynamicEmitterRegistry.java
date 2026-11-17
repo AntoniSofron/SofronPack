@@ -14,7 +14,6 @@ import pl.sofron.light.config.LightConfig;
 import pl.sofron.light.engine.BlockLightRules;
 import pl.sofron.light.engine.RgbLight;
 
-/** Client-only emitter discovery. Never places world blocks or changes server lighting. */
 public final class DynamicEmitterRegistry {
     public record Source(double x, double y, double z, int vanillaLevel,
                          int red, int green, int blue, int tintRadius) {}
@@ -45,7 +44,6 @@ public final class DynamicEmitterRegistry {
             }
         }
         collected.sort(Comparator.comparingDouble(s -> squared(s.x()-player.getX(),s.y()-player.getY(),s.z()-player.getZ())));
-        // Limit only emitters contributing to the local 33^3 voxel window.
         sources=List.copyOf(collected.subList(0,Math.min(collected.size(),Math.min(64, cfg.maximumDynamicLights))));
     }
     private static double squared(double x,double y,double z){return x*x+y*y+z*z;}

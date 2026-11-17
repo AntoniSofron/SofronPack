@@ -7,10 +7,6 @@ import com.mojang.renderpearl.api.device.GpuDevice;
 import java.nio.ByteBuffer;
 import java.util.Objects;
 
-/** Native RenderPearl uniform storage. All methods must run on the render thread.
- * Register the matching 'SofronLights' binding in the compiled pipeline BEFORE bind().
- * The std140 block contains light sources and the ore visibility frame data.
- */
 public final class RenderPearlNativeLightBuffer implements AutoCloseable {
     public static final String UNIFORM = "SofronLights";
     private final GpuDevice device;
@@ -42,7 +38,6 @@ public final class RenderPearlNativeLightBuffer implements AutoCloseable {
         uploads++;
     }
 
-    /** Must be called after RenderPass.setPipeline and before its draw submission. */
     public void bind(RenderPass pass) {
         if (closed || buffer == null) return;
         Objects.requireNonNull(pass, "pass").setUniform(UNIFORM, buffer.slice());

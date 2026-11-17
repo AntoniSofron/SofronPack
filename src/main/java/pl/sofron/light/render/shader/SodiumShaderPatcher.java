@@ -1,8 +1,5 @@
 package pl.sofron.light.render.shader;
 
-/** Deterministic patch for Sodium 0.9.2 block-layer shaders.
- * This is pure source transformation; pipeline registration is not yet wired.
- */
 public final class SodiumShaderPatcher {
   private SodiumShaderPatcher() {}
   private static String once(String shader, String needle, String replacement) {

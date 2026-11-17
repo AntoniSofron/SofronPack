@@ -17,10 +17,6 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.ModifyArg;
 
-/** Redirects Sodium 0.9.2 terrain shader IDs to resources owned by this mod.
- * Covers standard terrain and OIT terrain pipeline constructors.
- * This is a shader *selection* hook; sampler binding and validation are separate.
- */
 @Mixin(value = ShaderChunkRenderer.class, remap = false)
 public abstract class SodiumShaderLoadingMixin {
     private static final Identifier SOFRON_SHADER =

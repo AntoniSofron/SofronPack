@@ -1,9 +1,4 @@
 #!/usr/bin/env python3
-"""Validate the five user-authored Minecraft 26.3 swamp-willow templates.
-
-NBT was cleaned of *all recorded air/structure_void blocks*. Only solid wood,
-leaves and vines remain; foliage can coexist with water and vanilla lilies.
-"""
 import gzip
 import hashlib
 import struct

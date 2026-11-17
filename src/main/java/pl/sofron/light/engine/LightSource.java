@@ -1,6 +1,5 @@
 package pl.sofron.light.engine;
 
-/** Coordinates may be sub-block positions for moving entities. */
 public record LightSource(double x, double y, double z, float radius, float power, RgbLight color) {
     public LightSource {
         if (!Double.isFinite(x) || !Double.isFinite(y) || !Double.isFinite(z))

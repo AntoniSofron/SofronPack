@@ -29,7 +29,6 @@ final class TreeTemplates {
     static boolean placeTwoByTwo(WorldGenLevel level, RandomSource random, BlockPos origin, TreeFeature tree,
                                  String path, BlockPos root, Block log, Block wood, Block leaves) {
         var rotation = Rotation.getRandom(random);
-        // Anchor the rotated trunk to the four sapling cells.
         var diagonal = new BlockPos(1, 0, 1).rotate(rotation);
         var anchor = origin.offset(-Math.min(0, diagonal.getX()), 0, -Math.min(0, diagonal.getZ()));
         return place(level, random, anchor, tree, path, root, log, wood, leaves, rotation);
@@ -65,7 +64,6 @@ final class TreeTemplates {
             }
         }
         if (log == Blocks.JUNGLE_LOG) {
-            // Place the authored fruit and hanging vines after their supports, before random decorators.
             for (Block attachment : List.of(Blocks.COCOA, Blocks.VINE)) {
                 var blocks = template.filterBlocks(corner, settings, attachment);
                 blocks.sort(java.util.Comparator.comparingInt((StructureBlockInfo b) -> b.pos().getY()).reversed());
@@ -83,7 +81,6 @@ final class TreeTemplates {
         return true;
     }
 
-    /** Check the entire rotated footprint before changing any terrain. */
     static boolean supportRoots(WorldGenLevel level, BlockPos origin, List<StructureBlockInfo> wood) {
         var footprint = wood.stream().map(StructureBlockInfo::pos)
                 .filter(pos -> pos.getY() == origin.getY()).map(BlockPos::below).toList();

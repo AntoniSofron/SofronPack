@@ -6,13 +6,6 @@ import pl.sofron.light.engine.LightSource;
 import pl.sofron.light.engine.RgbLight;
 import pl.sofron.light.engine.RgbLightField;
 
-/**
- * Renderer-independent vertex/fragment lighting contract. The output is a linear RGB
- * light contribution, not a block light level. Consumers must apply it in their
- * terrain/entity fragment shader, with correct gamma and light mapping.
- *
- * This DOES NOT hook itself into Minecraft, Sodium, or Iris.
- */
 public final class SurfaceLighting {
     private SurfaceLighting() {}
 
@@ -21,7 +14,6 @@ public final class SurfaceLighting {
         return RgbLightField.sample(x, y, z, sources, intensity, occlusion);
     }
 
-    /** Linear-space additive illumination, combined with a baseline light level. */
     public static RgbLight litAlbedo(RgbLight albedo, RgbLight baseline,
                                      RgbLight dynamic, float maxExposure) {
         if (albedo == null || baseline == null || dynamic == null) throw new IllegalArgumentException("null color");

@@ -7,7 +7,6 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import pl.sofron.light.render.gpu.SodiumRenderPassCoordinator;
 
-/** At frame entry no RenderPearl render pass has been opened yet. */
 @Mixin(net.minecraft.client.renderer.GameRenderer.class)
 public abstract class MinecraftFramePrepareMixin {
     @Inject(method = "renderLevel", at = @At("HEAD"))

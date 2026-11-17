@@ -3,7 +3,6 @@ package pl.sofron.light.render.gpu;
 import java.nio.FloatBuffer;
 import pl.sofron.light.render.GpuLightBuffer;
 
-/** One OpenGL buffer/texture pair per renderer. Must only be used on the render thread. */
 public final class LightGpuManager implements AutoCloseable {
     public static final int FLOAT_CAPACITY = GpuLightBuffer.MAX_GPU_LIGHTS * GpuLightBuffer.FLOATS_PER_LIGHT;
     private final LightGpuBackend backend;
@@ -34,7 +33,6 @@ public final class LightGpuManager implements AutoCloseable {
         count = lightData.count();
     }
 
-    /** Call directly before terrain shader draw. Set uniform splLightData to textureUnit. */
     public void bind() {
         if (closed || textureId == 0) throw new IllegalStateException("GPU buffer not initialized");
         backend.bind(textureId, textureUnit);

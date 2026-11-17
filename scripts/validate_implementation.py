@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-"""Validate the owner's immutable 84-setting contract and the active 26.3 worldgen graph."""
 from pathlib import Path
 import json
 
@@ -52,9 +51,6 @@ def walk(node, path):
     elif isinstance(node, list):
         for value in node: walk(value, path)
     elif isinstance(node, str) and node.startswith("sofronpack:"):
-        # Only density-function JSON may reference the custom density graph.
-        # New Vanilla 26.3 worldgen/feature and placed_feature IDs are checked
-        # separately below; they are NOT density functions.
         if "worldgen/density_function" in path.as_posix() or "worldgen/noise_settings" in path.as_posix():
             check_ref(node, "density_function", path)
 for path, obj in data.items():
@@ -90,7 +86,6 @@ assert alt["right"]["right"] == "sofronpack:terrain/mountain_strength"
 assert core["right"]["type"] == "minecraft:gradient" and core["right"]["to_coordinate"] <= 64
 for key in ("surface_envelope", "beta_overhangs", "karst_spires", "upland_lift"):
     assert key in {p.stem for p in data}, key
-# Only these existing vanilla biomes have palette overrides.
 biome_files = {p.relative_to(ROOT).as_posix() for p in data
                if p.relative_to(ROOT).parts[1:-1] == ('worldgen', 'biome')}
 winter_biomes = set(data[ROOT / 'sofronpack/tags/worldgen/biome/winter_palette.json']['values'])

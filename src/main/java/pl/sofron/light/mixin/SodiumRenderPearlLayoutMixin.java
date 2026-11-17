@@ -7,10 +7,6 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.ModifyArg;
 
-/** Replaces the first Sodium bind group during shader pipeline construction.
- * Preserves all original bindings and appends the SofronLights std140 uniform buffer.
- * Only supports Sodium 0.9.2, whose layout was inspected in bytecode.
- */
 @Mixin(value = ShaderChunkRenderer.class, remap = false)
 public abstract class SodiumRenderPearlLayoutMixin {
     private static final BindGroupLayout SOFRON_BIND_GROUP = BindGroupLayout.builder()

@@ -10,11 +10,6 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import pl.sofron.light.render.gpu.SodiumRenderPassCoordinator;
 
-/**
- * Synchronization marker at Sodium 0.9.2's actual batch draw call.
- * Verified call site from the supplied sodium-fabric-0.9.2+mc26.3.jar.
- * Does not perform unsafe glUniform calls against a potentially deferred pipeline.
- */
 @Mixin(value = DefaultChunkRenderer.class, remap = false)
 public abstract class SodiumRenderPassSyncMixin {
     @Inject(method = "render", at = @At(value = "INVOKE", target =

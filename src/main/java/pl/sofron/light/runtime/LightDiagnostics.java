@@ -10,7 +10,6 @@ import pl.sofron.light.engine.BlockLightRules;
 import pl.sofron.light.engine.LightSource;
 import pl.sofron.light.render.gpu.SodiumRenderPassCoordinator;
 
-/** Lightweight client-side report; values represent snapshots, not GPU readback. */
 public final class LightDiagnostics {
     private final Path report;
     private int ticks;

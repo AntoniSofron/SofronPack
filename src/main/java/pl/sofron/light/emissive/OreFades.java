@@ -15,7 +15,6 @@ import net.minecraft.core.Direction;
 import net.minecraft.core.SectionPos;
 import net.minecraft.world.level.lighting.LevelLightEngine;
 
-/** Mesh workers identify ore positions. Only the client thread reads live light and owns the animation table. */
 public final class OreFades {
     private static final float DURATION = 0.65f;
     private static final Direction[] SIDES = Direction.values();
@@ -35,7 +34,6 @@ public final class OreFades {
     private ByteBuffer bytes = pack();
 
     private static final class Section {
-        // One bit per local block. Mesh workers may report the same position concurrently.
         final AtomicLongArray positions = new AtomicLongArray(64);
 
         boolean add(BlockPos pos) {
@@ -107,7 +105,6 @@ public final class OreFades {
         if (!pending && !prune && darken == lastDarken && px == lastX && py == lastY &&
                 pz == lastZ && now < nextExpiry) return;
         lastX = px; lastY = py; lastZ = pz;
-        // Enter/leave only on section boundaries. The shader performs the exact radial fade.
         for (var item : sections.entrySet()) {
             long key = item.getKey();
             var section = item.getValue();
@@ -162,8 +159,6 @@ public final class OreFades {
         return false;
     }
 
-    // Open-addressed coordinate table. Word 0 is the slot mask, each slot contains
-    // x/y/z, state (0 empty, 1 dimming, 2 brightening), start time and starting opacity.
     private ByteBuffer pack() {
         int slots = 1;
         while (slots < lit.size()*2) slots *= 2;

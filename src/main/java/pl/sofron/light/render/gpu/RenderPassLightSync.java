@@ -1,14 +1,7 @@
 package pl.sofron.light.render.gpu;
 
-/**
- * RenderPearl-safe ordering gate. Must be entered at actual terrain draw submission,
- * AFTER RenderPass.setPipeline, never when the pipeline is only constructed.
- * A legacy GL binding is deliberately NOT performed here: RenderPearl owns its
- * GPU command list and may defer program activation until submission.
- */
 public final class RenderPassLightSync {
     public interface DrawBinding {
-        /** Called after pipeline selection and immediately before queued draw. */
         boolean bindForDraw();
     }
     private boolean inside;

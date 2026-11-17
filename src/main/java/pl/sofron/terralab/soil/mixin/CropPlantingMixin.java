@@ -11,10 +11,6 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import pl.sofron.terralab.soil.SoilCropRules;
 
-/**
- * Blocks all vanilla farmland crops on shaped fields without internal water,
- * even when MOISTURE is 7 (nearby irrigation is not sufficient).
- */
 @Mixin(BlockBehaviour.BlockStateBase.class)
 abstract class CropPlantingMixin {
     @Inject(method = "canSurvive", at = @At("RETURN"), cancellable = true)

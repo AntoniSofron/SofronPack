@@ -1,9 +1,6 @@
 import groovy.json.JsonOutput
 import groovy.json.JsonSlurper
 
-// A real build-time bridge from the approved JSON to the active density functions.
-// Only the settings listed below are implemented by this task. Other 84-option
-// requirements are tracked in docs/TERRAIN_ARCHITECTURE.md.
 tasks.register("syncApprovedTerrain") {
     group = "sofron worldgen"
     description = "Recalculate implemented terrain controls from config/approved-worldgen-spec.json"
@@ -34,8 +31,6 @@ tasks.register("syncApprovedTerrain") {
         def limit = { Number x, Number lo, Number hi ->
             Math.max(lo.doubleValue(), Math.min(hi.doubleValue(), x.doubleValue()))
         }
-        // Build connected mountain mass FROM THE GROUND UP, never a high-altitude
-        // positive density pulse. Preserve the original lower slopes and lift only clipped summits.
         double slope = 0.005 * p.mountainSteepness / 70.0
         double shoulder = Math.min(256, p.peakHeight)
         double coefficient = 0.04 + slope * (shoulder - 80.0)
@@ -45,15 +40,11 @@ tasks.register("syncApprovedTerrain") {
             o.left.right.left = limit(coefficient, 0.04, 2.0)
         }
         modify("mountain_strength") { o ->
-            // The original raw erosion*ridge*region mask was too weak for actual
-            // mountain terrain at ordinary Minecraft biome coordinates.
-            // Vary the former flat ceiling with the existing horizontal relief field.
             o.input.right.right.left = slope * (p.peakHeight - shoulder) / coefficient
             o.input.left.left = limit(3.2 * p.mountainFrequency / 50.0
                 * (100.0 - p.mountainIsolation) / 65.0, 0.5, 4.6)
         }
         modify("upland_lift") { o ->
-            // Moderate biome-independent upland relief in addition to tall mountain cores.
             o.left = limit(0.20 * p.betaInfluence / 80.0
                 * p.erosionStrength / 50.0, 0.0, 0.32)
         }
@@ -70,7 +61,6 @@ tasks.register("syncApprovedTerrain") {
         }
         modify("beta_overhangs") { o ->
             o.left = limit(0.17 * p.betaInfluence / 80.0 * p.overhangFrequency / 50.0, 0, 0.40)
-            // 3D Beta overhang detail stays LOW: no positive sky-volume near Y256.
             o.right.right.right.left.right.from_coordinate = 116
             o.right.right.right.left.right.to_coordinate = (int) limit(
                 Math.round(95 + p.betaCliffHeight), 150, 190)

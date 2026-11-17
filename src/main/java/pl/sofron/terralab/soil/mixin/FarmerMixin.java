@@ -14,7 +14,6 @@ abstract class FarmerMixin {
             at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/block/state/BlockState;getBlock()Lnet/minecraft/world/level/block/Block;"))
     private Block recognizeField(BlockState state) {
         Block block = state.getBlock();
-        // Villagers must not plant on the dry (non-waterlogged) slab/stairs either.
         if (block instanceof SoilShape soil && soil.soilBase() == Blocks.FARMLAND)
             return SoilCropRules.hasInternalWater(state) ? Blocks.FARMLAND : Blocks.AIR;
         return block;

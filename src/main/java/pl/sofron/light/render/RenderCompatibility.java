@@ -1,8 +1,5 @@
 package pl.sofron.light.render;
 
-/** The choice of GPU backend must remain explicit: Iris shaderpacks can replace
- * Sodium render programs. Compatibility cannot be inferred from installed mods.
- */
 public final class RenderCompatibility {
     public enum Backend { VANILLA, SODIUM, IRIS_SHADERPACK, UNKNOWN }
     public record Environment(boolean sodiumLoaded, boolean irisLoaded, boolean irisShaderpackActive) {}

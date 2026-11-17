@@ -3,10 +3,6 @@ package pl.sofron.light.render.gpu;
 import pl.sofron.light.SofronPackLightClient;
 import pl.sofron.light.render.GpuLightBuffer;
 
-/** Uploads the tick snapshot to a real GL texture buffer at Sodium's terrain render entry.
- * Does not alter Sodium's shader pipelines: shader consumption is a separate integration.
- * Must execute on Minecraft's render thread with an active OpenGL context.
- */
 public final class SodiumGpuLightBridge {
     private static LightGpuManager manager;
     private static GpuLightBuffer frame;
@@ -29,16 +25,11 @@ public final class SodiumGpuLightBridge {
         } catch (RuntimeException | LinkageError exception) {
             failed = true;
             System.err.println("[Sofron Pack Light] Disabled GPU upload bridge after an error: " + exception);
-            // GL resources should be released during client shutdown on render thread.
         }
     }
 
-    /** Available to a future shader/pipeline injection on the same render thread. */
     public static LightGpuManager manager() { return manager; }
 
-    /** For an already-active, patched terrain shader. This does not install shader patches.
-     * Important: the RenderPearl pipeline may bind its program later than the terrain entry hook.
-     */
     public static boolean bindActiveShader() {
         if (failed || manager == null) return false;
         try {

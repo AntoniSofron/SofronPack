@@ -2,10 +2,6 @@ package pl.sofron.terralab;
 
 import net.fabricmc.api.ModInitializer;
 
-/**
- * Clean-room 26.3 Fabric entry point. Terrain is data-driven from the approved spec;
- * generated worldgen resources and Vanilla biome/structure data are the only inputs.
- */
 public final class TerraLabMod implements ModInitializer {
     public static final String MOD_ID = "sofronpack";
 
@@ -32,6 +28,6 @@ public final class TerraLabMod implements ModInitializer {
         net.minecraft.core.Registry.register(net.minecraft.core.registries.BuiltInRegistries.FEATURE_TYPE,
                 net.minecraft.resources.Identifier.fromNamespaceAndPath(MOD_ID, "wild_rice"),
                 pl.sofron.terralab.rice.WildRiceFeature.CODEC);
-        System.out.println("[SofronPack] Approved 84-parameter worldgen enabled; Vanilla biomes and structures preserved.");
+        System.out.println("[SofronPack] Worldgen ready.");
     }
 }

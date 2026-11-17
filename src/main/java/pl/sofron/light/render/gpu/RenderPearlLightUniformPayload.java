@@ -3,7 +3,6 @@ package pl.sofron.light.render.gpu;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
-/** Shared std140 frame parameters for the terrain vertex and fragment shaders. */
 public final class RenderPearlLightUniformPayload {
     public static final int BYTE_SIZE = 80;
     private final ByteBuffer data = ByteBuffer.allocateDirect(BYTE_SIZE).order(ByteOrder.nativeOrder());

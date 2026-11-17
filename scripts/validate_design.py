@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-"""Validate approved schema contract, not yet Minecraft worldgen."""
 import json
 from pathlib import Path
 

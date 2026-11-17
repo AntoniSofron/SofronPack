@@ -10,7 +10,6 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import pl.sofron.light.emissive.OreMasks;
 
-/** Atlas single entries can load a block from a directory outside textures/block or under an alias. */
 @Mixin(SingleFile.class)
 abstract class SingleOreSpriteMixin {
     @org.spongepowered.asm.mixin.injection.Redirect(method = "run", at = @At(value = "INVOKE", target =

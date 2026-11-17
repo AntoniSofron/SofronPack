@@ -6,7 +6,6 @@ import org.lwjgl.opengl.GL15;
 import org.lwjgl.opengl.GL30;
 import org.lwjgl.opengl.GL31;
 
-/** Real OpenGL 3.3 implementation; no use of GL4.3 SSBOs. */
 public final class Lwjgl33LightBackend implements LightGpuBackend {
     @Override public int createBuffer() { return GL15.glGenBuffers(); }
     @Override public int createTextureBuffer(int bufferId, int floatCapacity) {
