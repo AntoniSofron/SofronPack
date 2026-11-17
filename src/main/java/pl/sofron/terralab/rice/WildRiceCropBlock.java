@@ -23,11 +23,42 @@ import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 import net.minecraft.world.level.block.state.properties.IntegerProperty;
 import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.level.material.Fluids;
+import net.minecraft.world.phys.shapes.CollisionContext;
+import net.minecraft.world.phys.shapes.Shapes;
+import net.minecraft.world.phys.shapes.VoxelShape;
 import net.minecraft.tags.FluidTags;
 import org.jetbrains.annotations.Nullable;
 
 public final class WildRiceCropBlock extends DoublePlantBlock implements BonemealableBlock {
     public static final IntegerProperty AGE = IntegerProperty.create("age", 0, 7);
+
+    private static final VoxelShape[] LOWER_OUTLINE = {
+            Block.box(4, 0, 4, 13, 3, 13),
+            Block.box(2, 0, 2, 13, 8, 13),
+            Block.box(1, 0, 1, 13, 13, 13),
+            Block.box(1, 0, 1, 14, 16, 14),
+            Block.box(1, 0, 1, 14, 16, 14),
+            Block.box(1, 0, 1, 14, 16, 14),
+            Block.box(2, 0, 2, 14, 16, 14),
+            Block.box(1, 0, 1, 14, 16, 14)
+    };
+
+    private static final VoxelShape[] UPPER_OUTLINE = {
+            Shapes.empty(),
+            Shapes.empty(),
+            Shapes.empty(),
+            Block.box(4, 0, 4, 13, 4, 13),
+            Block.box(4, 0, 4, 13, 6, 13),
+            Block.box(1, 0, 1, 14, 7, 14),
+            Block.box(0, 0, 0, 14, 9, 14),
+            Block.box(0, 0, 0, 14, 10, 14)
+    };
+
+    @Override
+    protected VoxelShape getShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {
+        int age = state.getValue(AGE);
+        return state.getValue(HALF) == DoubleBlockHalf.LOWER ? LOWER_OUTLINE[age] : UPPER_OUTLINE[age];
+    }
 
     public WildRiceCropBlock(Properties properties) {
         super(properties);

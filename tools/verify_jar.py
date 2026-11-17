@@ -80,6 +80,33 @@ with zipfile.ZipFile(jar) as z:
 
     assert "assets/sofronpack/models/block/wild_rice_bottom.json" not in files
 
+    hitbox_source = pathlib.Path("src/main/java/pl/sofron/terralab/rice/WildRiceCropBlock.java").read_text(encoding="utf-8")
+    assert "protected VoxelShape getShape(" in hitbox_source
+    assert "LOWER_OUTLINE[age]" in hitbox_source and "UPPER_OUTLINE[age]" in hitbox_source
+    assert hitbox_source.count("Shapes.empty()") >= 3
+    for half, expected in (
+        ("LOWER_OUTLINE", [
+            (4, 0, 4, 13, 3, 13), (2, 0, 2, 13, 8, 13),
+            (1, 0, 1, 13, 13, 13), (1, 0, 1, 14, 16, 14),
+            (1, 0, 1, 14, 16, 14), (1, 0, 1, 14, 16, 14),
+            (2, 0, 2, 14, 16, 14), (1, 0, 1, 14, 16, 14),
+        ]),
+        ("UPPER_OUTLINE", [
+            None, None, None, (4, 0, 4, 13, 4, 13),
+            (4, 0, 4, 13, 6, 13), (1, 0, 1, 14, 7, 14),
+            (0, 0, 0, 14, 9, 14), (0, 0, 0, 14, 10, 14),
+        ]),
+    ):
+        import re
+        section = hitbox_source.split("private static final VoxelShape[] " + half + " = {", 1)[1].split("};", 1)[0]
+        actual = [
+            tuple(int(v.strip()) for v in coordinates.split(","))
+            if coordinates else None
+            for coordinates in re.findall(r"Block\\.box\\(([^)]*)\\)|Shapes\\.empty\\(\\)", section)
+        ]
+        assert actual == expected, (half, actual)
+
+
     for bowl in ("rice_bowl", "wild_rice_bowl", "cooked_rice_bowl",
                  "cooked_wild_rice_bowl", "mixed_rice_bowl"):
         path = f"assets/sofronpack/textures/item/{bowl}.png"
