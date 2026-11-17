@@ -64,6 +64,18 @@ with zipfile.ZipFile(jar) as z:
     assert base["parent"] == "sofronpack:block/rice_crop_raised"
     assert base["textures"]["crop"] == "sofronpack:block/rice_bottom"
     assert "assets/sofronpack/textures/block/rice_bottom.png" in files
+    for bowl in ("rice_bowl", "wild_rice_bowl", "cooked_rice_bowl",
+                 "cooked_wild_rice_bowl", "mixed_rice_bowl", "raw_mixed_rice_bowl"):
+        path = f"assets/sofronpack/textures/item/{bowl}.png"
+        assert path in files, path
+        tex = z.read(path)
+        assert tex[:8] == bytes((137, 80, 78, 71, 13, 10, 26, 10))
+        assert tex[12:16] == b"IHDR"
+        assert int.from_bytes(tex[16:20], "big") == 16
+        assert int.from_bytes(tex[20:24], "big") == 16
+        assert tex[24] == 8 and tex[25] == 6
+
+
 
     foods = {
         "raw_meat_pieces": (1, 1, False),
