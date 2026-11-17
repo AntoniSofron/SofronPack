@@ -2,10 +2,11 @@
   "multipart": [
     {
       "when": {
-        "half": "lower"
+        "half": "lower",
+        "age": "0"
       },
       "apply": {
-        "model": "sofronpack:block/wild_rice_bottom"
+        "model": "sofronpack:block/wild_rice_lower_stage_0"
       }
     },
     {
@@ -14,7 +15,16 @@
         "age": "0"
       },
       "apply": {
-        "model": "sofronpack:block/rice_stage_0"
+        "model": "sofronpack:block/wild_rice_upper_stage_0"
+      }
+    },
+    {
+      "when": {
+        "half": "lower",
+        "age": "1"
+      },
+      "apply": {
+        "model": "sofronpack:block/wild_rice_lower_stage_1"
       }
     },
     {
@@ -23,7 +33,16 @@
         "age": "1"
       },
       "apply": {
-        "model": "sofronpack:block/rice_stage_1"
+        "model": "sofronpack:block/wild_rice_upper_stage_1"
+      }
+    },
+    {
+      "when": {
+        "half": "lower",
+        "age": "2"
+      },
+      "apply": {
+        "model": "sofronpack:block/wild_rice_lower_stage_2"
       }
     },
     {
@@ -32,7 +51,16 @@
         "age": "2"
       },
       "apply": {
-        "model": "sofronpack:block/rice_stage_2"
+        "model": "sofronpack:block/wild_rice_upper_stage_2"
+      }
+    },
+    {
+      "when": {
+        "half": "lower",
+        "age": "3"
+      },
+      "apply": {
+        "model": "sofronpack:block/wild_rice_lower_stage_3"
       }
     },
     {
@@ -41,7 +69,16 @@
         "age": "3"
       },
       "apply": {
-        "model": "sofronpack:block/rice_stage_3"
+        "model": "sofronpack:block/wild_rice_upper_stage_3"
+      }
+    },
+    {
+      "when": {
+        "half": "lower",
+        "age": "4"
+      },
+      "apply": {
+        "model": "sofronpack:block/wild_rice_lower_stage_4"
       }
     },
     {
@@ -50,7 +87,16 @@
         "age": "4"
       },
       "apply": {
-        "model": "sofronpack:block/rice_stage_4"
+        "model": "sofronpack:block/wild_rice_upper_stage_4"
+      }
+    },
+    {
+      "when": {
+        "half": "lower",
+        "age": "5"
+      },
+      "apply": {
+        "model": "sofronpack:block/wild_rice_lower_stage_5"
       }
     },
     {
@@ -59,7 +105,16 @@
         "age": "5"
       },
       "apply": {
-        "model": "sofronpack:block/rice_stage_5"
+        "model": "sofronpack:block/wild_rice_upper_stage_5"
+      }
+    },
+    {
+      "when": {
+        "half": "lower",
+        "age": "6"
+      },
+      "apply": {
+        "model": "sofronpack:block/wild_rice_lower_stage_6"
       }
     },
     {
@@ -68,7 +123,16 @@
         "age": "6"
       },
       "apply": {
-        "model": "sofronpack:block/rice_stage_6"
+        "model": "sofronpack:block/wild_rice_upper_stage_6"
+      }
+    },
+    {
+      "when": {
+        "half": "lower",
+        "age": "7"
+      },
+      "apply": {
+        "model": "sofronpack:block/wild_rice_lower_stage_7"
       }
     },
     {
@@ -77,7 +141,7 @@
         "age": "7"
       },
       "apply": {
-        "model": "sofronpack:block/rice_stage_7"
+        "model": "sofronpack:block/wild_rice_upper_stage_7"
       }
     }
   ]

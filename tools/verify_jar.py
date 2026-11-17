@@ -49,23 +49,33 @@ with zipfile.ZipFile(jar) as z:
     assert "assets/sofron_terra_lab/lang/en_us.json" not in files
 
     states = json.loads(z.read("assets/sofronpack/blockstates/wild_rice_crop.json"))
-    parts = states["multipart"]
-    assert len(parts) == 9
-    assert parts[0] == {
-        "when": {"half": "lower"},
-        "apply": {"model": "sofronpack:block/wild_rice_bottom"}
-    }
-    for age in range(8):
-        assert parts[age + 1] == {
-            "when": {"half": "upper", "age": str(age)},
-            "apply": {"model": f"sofronpack:block/rice_stage_{age}"}
+    expected = [
+        {
+            "when": {"half": half, "age": str(age)},
+            "apply": {"model": f"sofronpack:block/wild_rice_{half}_stage_{age}"}
         }
-    base = json.loads(z.read("assets/sofronpack/models/block/wild_rice_bottom.json"))
-    assert base["parent"] == "sofronpack:block/rice_crop_raised"
-    assert base["textures"]["crop"] == "sofronpack:block/rice_bottom"
-    assert "assets/sofronpack/textures/block/rice_bottom.png" in files
+        for age in range(8) for half in ("lower", "upper")
+    ]
+    assert states["multipart"] == expected
+    for age in range(8):
+        for name in (f"rice_stage_{age}", f"wild_rice_lower_stage_{age}",
+                     f"wild_rice_upper_stage_{age}"):
+            model_path = f"assets/sofronpack/models/block/{name}.json"
+            png_path = f"assets/sofronpack/textures/block/{name}.png"
+            assert model_path in files and png_path in files, name
+            model = json.loads(z.read(model_path))
+            assert model["parent"] == "sofronpack:block/rice_crop_raised"
+            assert model["textures"]["crop"] == f"sofronpack:block/{name}"
+            png = z.read(png_path)
+            assert png[:8] == bytes((137, 80, 78, 71, 13, 10, 26, 10))
+            assert png[12:16] == b"IHDR"
+            assert int.from_bytes(png[16:20], "big") == 16
+            assert int.from_bytes(png[20:24], "big") == 16
+            assert png[24] == 8 and png[25] == 6
+    assert "assets/sofronpack/models/block/wild_rice_bottom.json" not in files
+
     for bowl in ("rice_bowl", "wild_rice_bowl", "cooked_rice_bowl",
-                 "cooked_wild_rice_bowl", "mixed_rice_bowl", "raw_mixed_rice_bowl"):
+                 "cooked_wild_rice_bowl", "mixed_rice_bowl"):
         path = f"assets/sofronpack/textures/item/{bowl}.png"
         assert path in files, path
         tex = z.read(path)
@@ -76,6 +86,8 @@ with zipfile.ZipFile(jar) as z:
         assert tex[24] == 8 and tex[25] == 6
 
 
+
+    assert "assets/sofronpack/textures/item/raw_mixed_rice_bowl.png" not in files
 
     foods = {
         "raw_meat_pieces": (1, 1, False),
