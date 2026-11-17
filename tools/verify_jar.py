@@ -47,6 +47,24 @@ with zipfile.ZipFile(jar) as z:
         assert required in files, required
     assert "assets/sofron_pack_light/icon.png" not in files
     assert "assets/sofron_terra_lab/lang/en_us.json" not in files
+
+    states = json.loads(z.read("assets/sofronpack/blockstates/wild_rice_crop.json"))
+    parts = states["multipart"]
+    assert len(parts) == 9
+    assert parts[0] == {
+        "when": {"half": "lower"},
+        "apply": {"model": "sofronpack:block/wild_rice_bottom"}
+    }
+    for age in range(8):
+        assert parts[age + 1] == {
+            "when": {"half": "upper", "age": str(age)},
+            "apply": {"model": f"sofronpack:block/rice_stage_{age}"}
+        }
+    base = json.loads(z.read("assets/sofronpack/models/block/wild_rice_bottom.json"))
+    assert base["parent"] == "sofronpack:block/rice_crop_raised"
+    assert base["textures"]["crop"] == "sofronpack:block/rice_bottom"
+    assert "assets/sofronpack/textures/block/rice_bottom.png" in files
+
 pathlib.Path("dist").mkdir(exist_ok=True)
 shutil.copy2(jar, pathlib.Path("dist") / jar.name)
 print("PASS: one SofronPack Fabric JAR, both mod components and all main resources", jar)
