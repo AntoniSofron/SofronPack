@@ -64,6 +64,16 @@ with zipfile.ZipFile(jar) as z:
     assert base["parent"] == "sofronpack:block/rice_crop_raised"
     assert base["textures"]["crop"] == "sofronpack:block/rice_bottom"
     assert "assets/sofronpack/textures/block/rice_bottom.png" in files
+    wild_loot = json.loads(z.read("data/sofronpack/loot_table/blocks/wild_rice_crop.json"))
+    assert len(wild_loot["pools"]) == 2
+    bonus = wild_loot["pools"][1]
+    assert bonus["entries"] == [{"type": "minecraft:item", "name": "sofronpack:rice"}]
+    terms = bonus["condition"]["terms"]
+    assert bonus["condition"]["type"] == "minecraft:all_of"
+    assert {"type": "minecraft:match_tool", "predicate": {"items": "#minecraft:hoes"}} in terms
+    assert {"type": "minecraft:random_chance", "chance": 0.2} in terms
+    assert {"type": "minecraft:match_block", "blocks": "sofronpack:wild_rice_crop", "state": {"age": "7"}} in terms
+
 
 pathlib.Path("dist").mkdir(exist_ok=True)
 shutil.copy2(jar, pathlib.Path("dist") / jar.name)
