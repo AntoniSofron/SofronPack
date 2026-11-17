@@ -54,9 +54,9 @@ public final class RiceContent {
         Item.Properties properties = new Item.Properties()
                 .setId(ResourceKey.create(Registries.ITEM, id))
                 .stacksTo(1);
-        {
-            int nutrition = cooked ? 8 : (name.equals("wild_rice_bowl") ? 4 : 3);
-            float saturation = cooked ? (name.contains("wild") ? 0.8F : 0.6F) : 0.3F;
+        if (cooked) {
+            int nutrition = name.contains("wild") ? 4 : 3;
+            float saturation = name.contains("wild") ? 0.8F : 0.6F;
             properties.food(new FoodProperties.Builder().nutrition(nutrition)
                     .saturationModifier(saturation).build())
                     .usingConvertsTo(Items.BOWL);
