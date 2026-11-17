@@ -77,7 +77,7 @@ with zipfile.ZipFile(jar) as z:
         assert craft["pattern"] == ["RRR", "RBR", "RRR"]
         assert craft["key"] == {"R": f"sofronpack:{rice}", "B": "minecraft:bowl"}
         assert craft["result"]["id"] == f"sofronpack:{raw}"
-        for method, duration in (("smelting", 200), ("smoking", 100)):
+        for method, duration in (("smelting", 300 if rice == "wild_rice" else 200), ("smoking", 150 if rice == "wild_rice" else 100)):
             recipe = json.loads(z.read(f"data/sofronpack/recipe/{cooked}_from_{method}.json"))
             assert recipe["type"] == f"minecraft:{method}"
             assert recipe["ingredient"] == f"sofronpack:{raw}"
