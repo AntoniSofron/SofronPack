@@ -80,6 +80,20 @@ with zipfile.ZipFile(jar) as z:
 
     assert "assets/sofronpack/models/block/wild_rice_bottom.json" not in files
 
+    wild_item = json.loads(z.read("assets/sofronpack/items/wild_rice.json"))
+    assert wild_item["model"]["model"] == "sofronpack:item/wild_rice"
+    wild_model = json.loads(z.read("assets/sofronpack/models/item/wild_rice.json"))
+    assert wild_model["parent"] == "minecraft:item/generated"
+    assert wild_model["textures"]["layer0"] == "sofronpack:item/wild_rice"
+    import hashlib
+    image = z.read("assets/sofronpack/textures/item/wild_rice.png")
+    assert image[:8] == bytes((137, 80, 78, 71, 13, 10, 26, 10))
+    assert int.from_bytes(image[16:20], "big") == 16
+    assert int.from_bytes(image[20:24], "big") == 16
+    assert hashlib.sha256(image).hexdigest() == "93aff8fa814e91e3fb73f7a40f69611ecf729c471e9b26e3dd54da419dd672a9"
+
+
+
     hitbox_source = pathlib.Path("src/main/java/pl/sofron/terralab/rice/WildRiceCropBlock.java").read_text(encoding="utf-8")
     assert "protected VoxelShape getShape(" in hitbox_source
     assert "LOWER_OUTLINE[age]" in hitbox_source and "UPPER_OUTLINE[age]" in hitbox_source
