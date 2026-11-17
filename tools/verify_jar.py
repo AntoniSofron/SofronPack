@@ -102,7 +102,7 @@ with zipfile.ZipFile(jar) as z:
         actual = [
             tuple(int(v.strip()) for v in coordinates.split(","))
             if coordinates else None
-            for coordinates in re.findall(r"Block\\.box\\(([^)]*)\\)|Shapes\\.empty\\(\\)", section)
+            for coordinates in re.findall(r"Block\.box\(([^)]*)\)|Shapes\.empty\(\)", section)
         ]
         assert actual == expected, (half, actual)
 
