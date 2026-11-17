@@ -11,7 +11,8 @@
     "DripstoneSoilMixin",
     "FarmerMixin",
     "GrazingMixin",
-    "GrassBonemealMixin"
+    "GrassBonemealMixin",
+    "FoodCraftingMixin"
   ],
   "client": [
     "CropRenderMixin"

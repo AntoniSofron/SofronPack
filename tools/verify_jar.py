@@ -65,6 +65,67 @@ with zipfile.ZipFile(jar) as z:
     assert base["textures"]["crop"] == "sofronpack:block/rice_bottom"
     assert "assets/sofronpack/textures/block/rice_bottom.png" in files
 
+    foods = {
+        "raw_meat_pieces": (1, 1, False),
+        "cooked_meat_pieces": (4, 4, False),
+        "raw_fish_pieces": (1, 1, False),
+        "cooked_fish_pieces": (3, 4, False),
+        "raw_poultry_pieces": (1, 1, False),
+        "cooked_poultry_pieces": (3, 4, False),
+        "mixed_rice_bowl": (8, 10, True),
+        "rice_meat_bowl": (12, 14, True),
+        "rice_fish_bowl": (10, 14, True),
+        "rice_poultry_bowl": (12, 12, True),
+        "mashed_potatoes_bowl": (4, 4, True),
+        "mashed_potatoes_meat_bowl": (12, 14, True),
+        "mashed_potatoes_fish_bowl": (10, 14, True),
+        "mashed_potatoes_poultry_bowl": (12, 12, True),
+    }
+    assert "pl/sofron/terralab/food/FoodContent.class" in files
+    assert "pl/sofron/terralab/soil/mixin/FoodCraftingMixin.class" in files
+    mixins = json.loads(z.read("sofron-soil.mixins.json"))
+    assert "FoodCraftingMixin" in mixins["mixins"]
+    for name in foods:
+        for path in (
+            f"assets/sofronpack/items/{name}.json",
+            f"assets/sofronpack/models/item/{name}.json",
+            f"assets/sofronpack/textures/item/{name}.png",
+        ):
+            assert path in files, path
+    pieces = {
+        "meat": ["minecraft:beef", "minecraft:porkchop", "minecraft:mutton", "minecraft:rabbit"],
+        "fish": ["minecraft:cod", "minecraft:salmon", "minecraft:tropical_fish", "minecraft:pufferfish"],
+        "poultry": ["minecraft:chicken"],
+    }
+    for kind, allowed in pieces.items():
+        name = f"raw_{kind}_pieces"
+        recipe = json.loads(z.read(f"data/sofronpack/recipe/{name}.json"))
+        assert recipe["type"] == "minecraft:crafting_shaped"
+        assert recipe["pattern"] == ["MMM", "MAM", "MMM"]
+        assert recipe["key"] == {"M": allowed, "A": "#minecraft:axes"}
+        assert recipe["result"] == {"id": "sofronpack:" + name, "count": 4}
+        for method, ticks in (("smelting", 200), ("smoking", 100)):
+            cooked = f"cooked_{kind}_pieces"
+            heat = json.loads(z.read(f"data/sofronpack/recipe/{cooked}_from_{method}.json"))
+            assert heat["ingredient"] == "sofronpack:" + name
+            assert heat["result"]["id"] == "sofronpack:" + cooked
+            assert heat["cookingtime"] == ticks
+    output_ingredients = {
+        "mixed_rice_bowl": ["sofronpack:cooked_rice_bowl", "sofronpack:cooked_wild_rice_bowl", "minecraft:bowl"],
+        "mashed_potatoes_bowl": ["minecraft:baked_potato", "minecraft:milk_bucket", "minecraft:bowl"],
+    }
+    for kind in ("meat", "fish", "poultry"):
+        pieces = ["sofronpack:cooked_" + kind + "_pieces"] * 2
+        output_ingredients["rice_" + kind + "_bowl"] = ["sofronpack:cooked_rice_bowl"] + pieces
+        output_ingredients["mashed_potatoes_" + kind + "_bowl"] = ["sofronpack:mashed_potatoes_bowl"] + pieces
+    for result, ingredients in output_ingredients.items():
+        recipe = json.loads(z.read(f"data/sofronpack/recipe/{result}.json"))
+        assert recipe["type"] == "minecraft:crafting_shapeless"
+        assert recipe["ingredients"] == ingredients
+        assert recipe["result"]["id"] == "sofronpack:" + result
+    assert foods["mashed_potatoes_fish_bowl"] == (10, 14, True)
+
+
     for rice in ("rice", "wild_rice"):
         raw = f"{rice}_bowl"
         cooked = f"cooked_{raw}"

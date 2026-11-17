@@ -26,5 +26,19 @@
   "item.sofronpack.rice_bowl": "Rice Bowl",
   "item.sofronpack.cooked_rice_bowl": "Cooked Rice Bowl",
   "item.sofronpack.wild_rice_bowl": "Wild Rice Bowl",
-  "item.sofronpack.cooked_wild_rice_bowl": "Cooked Wild Rice Bowl"
+  "item.sofronpack.cooked_wild_rice_bowl": "Cooked Wild Rice Bowl",
+  "item.sofronpack.raw_meat_pieces": "Raw Meat Pieces",
+  "item.sofronpack.cooked_meat_pieces": "Cooked Meat Pieces",
+  "item.sofronpack.raw_fish_pieces": "Raw Fish Pieces",
+  "item.sofronpack.cooked_fish_pieces": "Cooked Fish Pieces",
+  "item.sofronpack.raw_poultry_pieces": "Raw Poultry Pieces",
+  "item.sofronpack.cooked_poultry_pieces": "Cooked Poultry Pieces",
+  "item.sofronpack.mixed_rice_bowl": "Mixed Rice Bowl",
+  "item.sofronpack.rice_meat_bowl": "Rice and Meat Bowl",
+  "item.sofronpack.rice_fish_bowl": "Rice and Fish Bowl",
+  "item.sofronpack.rice_poultry_bowl": "Rice and Poultry Bowl",
+  "item.sofronpack.mashed_potatoes_bowl": "Mashed Potatoes Bowl",
+  "item.sofronpack.mashed_potatoes_meat_bowl": "Mashed Potatoes and Meat",
+  "item.sofronpack.mashed_potatoes_fish_bowl": "Mashed Potatoes and Fish",
+  "item.sofronpack.mashed_potatoes_poultry_bowl": "Mashed Potatoes and Poultry"
 }

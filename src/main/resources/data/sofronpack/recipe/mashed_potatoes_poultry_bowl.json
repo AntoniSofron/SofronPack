@@ -1,0 +1,13 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    "sofronpack:mashed_potatoes_bowl",
+    "sofronpack:cooked_poultry_pieces",
+    "sofronpack:cooked_poultry_pieces"
+  ],
+  "result": {
+    "id": "sofronpack:mashed_potatoes_poultry_bowl",
+    "count": 1
+  }
+}

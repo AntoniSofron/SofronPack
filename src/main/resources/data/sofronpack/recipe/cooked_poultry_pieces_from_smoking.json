@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:smoking",
+  "category": "food",
+  "ingredient": "sofronpack:raw_poultry_pieces",
+  "result": {
+    "id": "sofronpack:cooked_poultry_pieces",
+    "count": 1
+  },
+  "experience": 0.35,
+  "cookingtime": 100
+}

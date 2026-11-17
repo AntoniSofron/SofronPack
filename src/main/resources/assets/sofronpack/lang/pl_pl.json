@@ -26,5 +26,19 @@
   "item.sofronpack.rice_bowl": "Miska z ryżem",
   "item.sofronpack.cooked_rice_bowl": "Miska z ugotowanym ryżem",
   "item.sofronpack.wild_rice_bowl": "Miska z dzikim ryżem",
-  "item.sofronpack.cooked_wild_rice_bowl": "Miska z ugotowanym dzikim ryżem"
+  "item.sofronpack.cooked_wild_rice_bowl": "Miska z ugotowanym dzikim ryżem",
+  "item.sofronpack.raw_meat_pieces": "Surowe kawałki mięsa",
+  "item.sofronpack.cooked_meat_pieces": "Pieczone kawałki mięsa",
+  "item.sofronpack.raw_fish_pieces": "Surowe kawałki ryby",
+  "item.sofronpack.cooked_fish_pieces": "Pieczone kawałki ryby",
+  "item.sofronpack.raw_poultry_pieces": "Surowe kawałki drobiu",
+  "item.sofronpack.cooked_poultry_pieces": "Pieczone kawałki drobiu",
+  "item.sofronpack.mixed_rice_bowl": "Miska ryżu mieszanego",
+  "item.sofronpack.rice_meat_bowl": "Miska ryżu z mięsem",
+  "item.sofronpack.rice_fish_bowl": "Miska ryżu z rybą",
+  "item.sofronpack.rice_poultry_bowl": "Miska ryżu z drobiem",
+  "item.sofronpack.mashed_potatoes_bowl": "Miska purée ziemniaczanego",
+  "item.sofronpack.mashed_potatoes_meat_bowl": "Miska purée z mięsem",
+  "item.sofronpack.mashed_potatoes_fish_bowl": "Miska purée z rybą",
+  "item.sofronpack.mashed_potatoes_poultry_bowl": "Miska purée z drobiem"
 }

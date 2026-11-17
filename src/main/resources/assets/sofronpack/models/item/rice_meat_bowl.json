@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "sofronpack:item/rice_meat_bowl"
+  }
+}

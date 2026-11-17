@@ -1,0 +1,13 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    "sofronpack:cooked_rice_bowl",
+    "sofronpack:cooked_meat_pieces",
+    "sofronpack:cooked_meat_pieces"
+  ],
+  "result": {
+    "id": "sofronpack:rice_meat_bowl",
+    "count": 1
+  }
+}

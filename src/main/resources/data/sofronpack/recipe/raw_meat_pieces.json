@@ -1,0 +1,22 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "MMM",
+    "MAM",
+    "MMM"
+  ],
+  "key": {
+    "M": [
+      "minecraft:beef",
+      "minecraft:porkchop",
+      "minecraft:mutton",
+      "minecraft:rabbit"
+    ],
+    "A": "#minecraft:axes"
+  },
+  "result": {
+    "id": "sofronpack:raw_meat_pieces",
+    "count": 4
+  }
+}
