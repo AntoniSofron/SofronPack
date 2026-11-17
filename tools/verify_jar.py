@@ -92,6 +92,12 @@ with zipfile.ZipFile(jar) as z:
             f"assets/sofronpack/textures/item/{name}.png",
         ):
             assert path in files, path
+        texture = z.read(f"assets/sofronpack/textures/item/{name}.png")
+        assert texture[:8] == b"\x89PNG\r\n\x1a\n", name
+        assert texture[12:16] == b"IHDR", name
+        assert (int.from_bytes(texture[16:20], "big"),
+                int.from_bytes(texture[20:24], "big")) == (16, 16), name
+        assert texture[24:26] == bytes((8, 6)), name
     pieces = {
         "meat": ["minecraft:beef", "minecraft:porkchop", "minecraft:mutton", "minecraft:rabbit"],
         "fish": ["minecraft:cod", "minecraft:salmon", "minecraft:tropical_fish", "minecraft:pufferfish"],
