@@ -72,6 +72,12 @@ with zipfile.ZipFile(jar) as z:
             assert int.from_bytes(png[16:20], "big") == 16
             assert int.from_bytes(png[20:24], "big") == 16
             assert png[24] == 8 and png[25] == 6
+    bottom = z.read("assets/sofronpack/textures/block/rice_bottom.png")
+    assert bottom[:8] == bytes((137, 80, 78, 71, 13, 10, 26, 10))
+    assert bottom[12:16] == b"IHDR"
+    assert int.from_bytes(bottom[16:20], "big") == 16
+    assert int.from_bytes(bottom[20:24], "big") == 16
+
     assert "assets/sofronpack/models/block/wild_rice_bottom.json" not in files
 
     for bowl in ("rice_bowl", "wild_rice_bowl", "cooked_rice_bowl",
