@@ -18,6 +18,7 @@ public final class SofronPackLightClient implements ClientModInitializer {
     public static LightConfig CONFIG;
     private static LightDiagnostics diagnostics;
     @Override public void onInitializeClient() {
+        pl.sofron.atmosphere.AtmosphereResourceLoader.register();
         if (!FabricLoader.getInstance().isModLoaded("sodium")) {
             System.out.println("[SofronPack] Sodium missing: client lighting disabled.");
             return;

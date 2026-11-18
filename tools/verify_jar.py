@@ -45,6 +45,10 @@ with zipfile.ZipFile(jar) as z:
         "sofron.mixins.json", "sofron-soil.mixins.json", mod["icon"]
     ):
         assert required in files, required
+    assert "pl/sofron/atmosphere/AtmospherePackDecoder.class" in files
+    assert "pl/sofron/atmosphere/AtmosphereResourceLoader.class" in files
+    assert "pl.sofron.atmosphere.AtmosphereResourceLoader.register();" in pathlib.Path(
+        "src/main/java/pl/sofron/light/SofronPackLightClient.java").read_text(encoding="utf-8")
     assert "sofron-atmosphere.mixins.json" in files
     assert "sofron-atmosphere.mixins.json" in mod["mixins"]
     atmosphere_mixins = json.loads(z.read("sofron-atmosphere.mixins.json"))
