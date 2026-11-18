@@ -1,0 +1,61 @@
+name: Client bootstrap
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/client-bootstrap.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  client:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.5.0'
+      - name: Prepare virtual display
+        run: |
+          if ! command -v xvfb-run >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq xvfb
+          fi
+          command -v xvfb-run
+      - name: Start client
+        run: |
+          set +e
+          timeout -s TERM 105s xvfb-run -a env LIBGL_ALWAYS_SOFTWARE=1 gradle --no-daemon --console=plain runClient > client-startup.log 2>&1
+          result=$?
+          set -e
+          echo "Client exit status: $result"
+          tail -n 130 client-startup.log
+          if grep -Ei 'Mixin apply failed|InvalidMixinException|ClassNotFoundException.*Atmosphere|ClassNotFoundException.*Mixin|Critical injection failure|Failed to apply mixin' client-startup.log; then
+            echo 'Client mixin error detected'
+            exit 1
+          fi
+          if grep -Ei 'Could not create window|NoClassDefFoundError|FATAL EXCEPTION|Crash Report' client-startup.log; then
+            echo 'Client startup failure detected'
+            exit 1
+          fi
+          if [ "$result" != 124 ] && [ "$result" != 0 ]; then
+            echo 'Client exited before timeout'
+            exit 1
+          fi
+          if ! grep -Eiq 'SofronPack|minecraft|lwjgl|OpenGL' client-startup.log; then
+            echo 'No Minecraft startup detected'
+            exit 1
+          fi
+      - name: Upload startup log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: client-startup-log
+          path: client-startup.log
+          if-no-files-found: ignore
