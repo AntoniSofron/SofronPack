@@ -130,8 +130,7 @@
       },
       "modifier": "overlay"
     },
-    "minecraft:visual/sky_color": "#8FDE96",
-    "minecraft:visual/fog_color": "#D0EFC2"
+    "minecraft:visual/sky_color": "#75B3FC"
   },
   "carvers": [
     "minecraft:cave",
