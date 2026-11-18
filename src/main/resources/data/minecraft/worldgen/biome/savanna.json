@@ -123,14 +123,15 @@
       "modifier": "overlay"
     },
     "minecraft:gameplay/snow_golem_melts": true,
-    "minecraft:visual/sky_color": "#75B3FC"
+    "minecraft:visual/sky_color": "#7DA3CC",
+    "minecraft:visual/fog_color": "#DAD2D3"
   },
   "carvers": [
     "minecraft:cave",
     "minecraft:cave_extra_underground",
     "minecraft:canyon"
   ],
-  "downfall": 0.0,
+  "downfall": 0,
   "effects": {
     "water_color": "#43D5EE",
     "grass_color": "#CEAB42"
@@ -203,5 +204,5 @@
     ]
   ],
   "has_precipitation": false,
-  "temperature": 2.0
+  "temperature": 2
 }

@@ -151,6 +151,19 @@ with zipfile.ZipFile(jar) as z:
 
 
 
+
+    for biome, fog, sky in (
+        ("swamp", "#A8B494", "#8B9C72"),
+        ("savanna", "#DAD2D3", "#7DA3CC"),
+        ("jungle", "#D0EFC2", "#97D7A6"),
+        ("birch_forest", "#E1DEF0", "#F1D6EC"),
+    ):
+        file_name = f"data/minecraft/worldgen/biome/{biome}.json"
+        assert file_name in files, file_name
+        cfg = json.loads(z.read(file_name))
+        assert cfg["attributes"]["minecraft:visual/fog_color"] == fog
+        assert cfg["attributes"]["minecraft:visual/sky_color"] == sky
+
     assert "assets/sofronpack/textures/item/raw_mixed_rice_bowl.png" not in files
 
     foods = {
