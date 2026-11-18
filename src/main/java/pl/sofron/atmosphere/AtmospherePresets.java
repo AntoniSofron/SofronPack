@@ -95,7 +95,7 @@ public final class AtmospherePresets {
         float partialTick = deltaTracker.getGameTimeDeltaPartialTick(false);
         int skyLight = level.getBrightness(LightLayer.SKY, pos);
         double rain = level.getRainLevel(partialTick);
-        long time = level.getDayTime();
+        long time = level.getGameTime();
         try {
             float start = (float)AtmosphereMath.evaluate(rule.start(), time, rain, skyLight);
             float endRatio = (float)AtmosphereMath.evaluate(rule.end(), time, rain, skyLight);
