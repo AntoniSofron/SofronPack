@@ -14,9 +14,7 @@
     "SingleOreSpriteMixin",
     "LightIndexMixin",
     "LevelSliceAccessor",
-    "OreLightUpdateMixin",
-    "pl.sofron.atmosphere.mixin.AtmosphereBuilderMixin",
-    "pl.sofron.atmosphere.mixin.AtmosphericFogMixin"
+    "OreLightUpdateMixin"
   ],
   "injectors": {
     "defaultRequire": 1

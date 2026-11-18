@@ -27,7 +27,8 @@
   },
   "mixins": [
     "sofron-soil.mixins.json",
-    "sofron.mixins.json"
+    "sofron.mixins.json",
+    "sofron-atmosphere.mixins.json"
   ],
   "icon": "assets/sofronpack/icon.png"
 }

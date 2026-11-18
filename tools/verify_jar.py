@@ -23,7 +23,7 @@ with zipfile.ZipFile(jar) as z:
     assert mod["version"] == version
     assert len(mod["entrypoints"]["main"]) == 2
     assert len(mod["entrypoints"]["client"]) == 2
-    assert len(mod["mixins"]) == 2
+    assert len(mod["mixins"]) == 3
     for required in (
         "pl/sofron/terralab/TerraLabMod.class",
         "pl/sofron/terralab/rice/RiceCropBlock.class",
@@ -45,6 +45,19 @@ with zipfile.ZipFile(jar) as z:
         "sofron.mixins.json", "sofron-soil.mixins.json", mod["icon"]
     ):
         assert required in files, required
+    assert "sofron-atmosphere.mixins.json" in files
+    assert "sofron-atmosphere.mixins.json" in mod["mixins"]
+    atmosphere_mixins = json.loads(z.read("sofron-atmosphere.mixins.json"))
+    assert atmosphere_mixins["package"] == "pl.sofron.atmosphere.mixin"
+    assert atmosphere_mixins["client"] == ["AtmosphereBuilderMixin", "AtmosphericFogMixin"]
+    for mixin in atmosphere_mixins["client"]:
+        path = "pl/sofron/atmosphere/mixin/" + mixin + ".class"
+        assert path in files, path
+    original_mixins = json.loads(z.read("sofron.mixins.json"))
+    assert not any("atmosphere" in name for name in original_mixins["client"])
+    atmosphere_source = pathlib.Path("src/main/java/pl/sofron/atmosphere/AtmospherePresets.java").read_text(encoding="utf-8")
+    assert "level.getOverworldClockTime()" in atmosphere_source
+
     assert "assets/sofron_pack_light/icon.png" not in files
     assert "assets/sofron_terra_lab/lang/en_us.json" not in files
 

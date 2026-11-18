@@ -1,0 +1,13 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "pl.sofron.atmosphere.mixin",
+  "compatibilityLevel": "JAVA_25",
+  "client": [
+    "AtmosphereBuilderMixin",
+    "AtmosphericFogMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
