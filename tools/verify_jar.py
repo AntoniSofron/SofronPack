@@ -49,6 +49,14 @@ with zipfile.ZipFile(jar) as z:
     assert "pl/sofron/atmosphere/AtmosphereResourceLoader.class" in files
     assert "pl.sofron.atmosphere.AtmosphereResourceLoader.register();" in pathlib.Path(
         "src/main/java/pl/sofron/light/SofronPackLightClient.java").read_text(encoding="utf-8")
+    import zlib
+    atmosphere = json.loads(zlib.decompress(
+        z.read("assets/sofronpack/atmosphere/earth_sky.zlib")))
+    assert len(atmosphere["colors"]) == 63
+    assert len(atmosphere["fog"]) == 10
+    assert atmosphere["colors"]["minecraft:swamp"] == [11056276, 9149554]
+    assert atmosphere["colors"]["minecraft:plains"] == [11521022, 7512319]
+
     assert "sofron-atmosphere.mixins.json" in files
     assert "sofron-atmosphere.mixins.json" in mod["mixins"]
     atmosphere_mixins = json.loads(z.read("sofron-atmosphere.mixins.json"))
