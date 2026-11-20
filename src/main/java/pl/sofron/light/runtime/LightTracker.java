@@ -29,7 +29,15 @@ public final class LightTracker {
     private final ChunkLightIndex chunkIndex = new ChunkLightIndex();
     public ChunkLightIndex chunkIndex() { return chunkIndex; }
 
-    private final Set<String> previousSelected = new HashSet<>();
+    private record SourceKey(long x, long y, long z) {}
+    private record Ranked(LightSource source, SourceKey key, double priority) {}
+    private static final Comparator<Ranked> ORDER = Comparator
+            .comparingDouble(Ranked::priority)
+            .thenComparingDouble(entry -> entry.source().x())
+            .thenComparingDouble(entry -> entry.source().y())
+            .thenComparingDouble(entry -> entry.source().z());
+
+    private final Set<SourceKey> previousSelected = new HashSet<>();
 
     public List<LightSource> sources() { return sources; }
     public void reset() {
@@ -79,25 +87,30 @@ public final class LightTracker {
         } else {
             chunkIndex.clear();
         }
-        Comparator<LightSource> priority = Comparator
-            .comparingDouble((LightSource light) -> {
-                double distance = squared(light.x()-px, light.y()-py, light.z()-pz);
-                return distance - (previousSelected.contains(sourceKey(light)) ? 9.0 : 0.0);
-            })
-            .thenComparingDouble(LightSource::x)
-            .thenComparingDouble(LightSource::y)
-            .thenComparingDouble(LightSource::z);
-        found.subList(0, movingEnd).sort(priority);
+        // Compute hysteresis keys and distances once, rather than repeatedly
+        // constructing strings during every comparison in TimSort.
+        List<Ranked> ranked = new ArrayList<>(movingEnd);
+        for (LightSource light : found) {
+            SourceKey key = sourceKey(light);
+            double distance = squared(light.x()-px, light.y()-py, light.z()-pz);
+            ranked.add(new Ranked(light, key,
+                    distance - (previousSelected.contains(key) ? 9.0 : 0.0)));
+        }
+        ranked.sort(ORDER);
 
-        int count = Math.min(found.size(), Math.min(cfg.maximumDynamicLights, 256));
+        int count = Math.min(ranked.size(), Math.min(cfg.maximumDynamicLights, 256));
         movingCount = Math.min(movingEnd, count);
-        List<LightSource> selected = List.copyOf(found.subList(0, count));
+        List<LightSource> selected = new ArrayList<>(count);
         previousSelected.clear();
-        for (LightSource light : selected) previousSelected.add(sourceKey(light));
-        sources = selected;
+        for (int i=0;i<count;i++) {
+            Ranked entry = ranked.get(i);
+            selected.add(entry.source());
+            previousSelected.add(entry.key());
+        }
+        sources = List.copyOf(selected);
     }
-    private static String sourceKey(LightSource source) {
-        return Math.round(source.x()*2) + ":" + Math.round(source.y()*2) + ":" + Math.round(source.z()*2);
+    private static SourceKey sourceKey(LightSource source) {
+        return new SourceKey(Math.round(source.x()*2), Math.round(source.y()*2), Math.round(source.z()*2));
     }
     private static double squared(double x,double y,double z) { return x*x+y*y+z*z; }
     private static void addStack(List<LightSource> list, ItemStack stack,
