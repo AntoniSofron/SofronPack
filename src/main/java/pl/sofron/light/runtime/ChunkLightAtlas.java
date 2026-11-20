@@ -17,8 +17,14 @@ public final class ChunkLightAtlas {
     private static final int MAX_WORDS = 16 * 1024 * 1024;
     private record Column(List<LightSource> lights, int[] words) {}
     private final Map<Long,Column> cached = new HashMap<>();
+    // Reuse off-heap staging memory. Repeated reallocations of multi-megabyte
+    // direct buffers on every atlas revision trigger expensive native cleanup.
+    private ByteBuffer staging;
     public record Snapshot(ByteBuffer bytes, int chunkCount, int lightReferences) {}
-    public void clear() { cached.clear(); }
+    public void clear() {
+        cached.clear();
+        staging = null;
+    }
 
     public Snapshot build(ChunkLightIndex index, int originX, int originZ, int width) {
         if (width < 1 || width > 129) throw new IllegalArgumentException("Invalid light atlas width");
@@ -45,8 +51,20 @@ public final class ChunkLightAtlas {
             size += column.words.length;
             if (size > MAX_WORDS) throw new IllegalStateException("Light atlas exceeds 64 MiB");
         }
-        ByteBuffer out = ByteBuffer.allocateDirect(size*4).order(ByteOrder.nativeOrder());
-        var words = out.asIntBuffer();
+        int requiredBytes = Math.multiplyExact(size, Integer.BYTES);
+        if (staging == null || staging.capacity() < requiredBytes) {
+            int capacity = Math.max(4096, staging == null ? 0 : staging.capacity());
+            while (capacity < requiredBytes) {
+                // Grow geometrically to avoid repeated GPU-sized allocations
+                // while colored light sources are discovered in loaded chunks.
+                int grown = capacity + capacity / 2;
+                capacity = Math.max(requiredBytes, grown);
+            }
+            staging = ByteBuffer.allocateDirect(capacity).order(ByteOrder.nativeOrder());
+        }
+        staging.clear();
+        staging.limit(requiredBytes);
+        var words = staging.asIntBuffer();
         words.put(width);
         int next = 1+cells;
         for (Column column : columns) {
@@ -54,7 +72,7 @@ public final class ChunkLightAtlas {
             if (column != null) next += column.words.length;
         }
         for (Column column : columns) if (column != null) words.put(column.words);
-        return new Snapshot(out,cells,references);
+        return new Snapshot(staging.asReadOnlyBuffer().order(ByteOrder.nativeOrder()),cells,references);
     }
 
     private static int[] encode(List<LightSource> lights, int x0, int z0) {

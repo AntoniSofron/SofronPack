@@ -21,7 +21,16 @@ public final class RenderPearlChunkAtlasBuffer implements AutoCloseable {
         int size=data.remaining();
         if (buffer == null || size > capacityBytes) {
             if (buffer != null) buffer.close();
-            capacityBytes=size;
+            if (size <= 4 * 1024 * 1024) {
+                // Chunk scanning grows the atlas incrementally. Allocate in
+                // geometric steps instead of recreating GPU storage each tick.
+                int next = Math.max(256, capacityBytes);
+                while (next < size) next = Math.max(size, next + next / 2);
+                capacityBytes = next;
+            } else {
+                // Large worlds should not retain excessive unused VRAM.
+                capacityBytes = size;
+            }
             buffer=device.createBuffer(() -> uniform,
                 GpuBuffer.USAGE_UNIFORM_TEXEL_BUFFER | GpuBuffer.USAGE_COPY_DST, capacityBytes);
         }
