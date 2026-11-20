@@ -31,6 +31,7 @@ public final class OreFades {
     public float shaderTime() { return Math.min(seconds(), animationEnd); }
     private int age;
     private int lastDarken = -1;
+    private ByteBuffer staging;
     private ByteBuffer bytes = pack();
 
     private static final class Section {
@@ -162,7 +163,18 @@ public final class OreFades {
     private ByteBuffer pack() {
         int slots = 1;
         while (slots < lit.size()*2) slots *= 2;
-        ByteBuffer out = ByteBuffer.allocateDirect((1+slots*6)*4).order(ByteOrder.nativeOrder());
+        int byteCount = (1+slots*6)*Integer.BYTES;
+        if (staging == null || staging.capacity() < byteCount) {
+            int capacity = Math.max(256, staging == null ? 0 : staging.capacity());
+            while (capacity < byteCount) capacity = Math.max(byteCount, capacity + capacity / 2);
+            staging = ByteBuffer.allocateDirect(capacity).order(ByteOrder.nativeOrder());
+        }
+        staging.clear();
+        staging.limit(byteCount);
+        // Reused hash-table storage must clear vacant slots.
+        for (int offset=0; offset<byteCount; offset+=Integer.BYTES)
+            staging.putInt(offset,0);
+        ByteBuffer out = staging;
         final int mask = slots-1;
         out.putInt(0,mask);
         lit.forEach((key,fade) -> {
@@ -176,6 +188,7 @@ public final class OreFades {
             out.putInt(offset,x).putInt(offset+4,y).putInt(offset+8,z);
             out.putInt(offset+12,fade.on ? 2 : 1).putFloat(offset+16,fade.start).putFloat(offset+20,fade.from);
         });
-        return out;
+        // A new lightweight view signals a changed payload to the renderer.
+        return out.asReadOnlyBuffer().order(ByteOrder.nativeOrder());
     }
 }
