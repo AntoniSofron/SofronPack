@@ -36,8 +36,12 @@ public final class DynamicVoxelController {
     public DynamicEmitterRegistry registry(){return registry;}
     public void clear(){field=null;previous=List.of();age=0;environmentDirty=true;registry.clear();}
     public void tick(Minecraft client,LightConfig config){
+        tick(client, config, client.level == null ? List.of() : client.level.entitiesForRendering());
+    }
+
+    public void tick(Minecraft client,LightConfig config, Iterable<net.minecraft.world.entity.Entity> nearbyEntities){
         if(client.level==null || client.player==null || !config.dynamicLighting){clear();return;}
-        registry.update(client,config);
+        registry.update(client,config,nearbyEntities);
         int x=client.player.blockPosition().getX(), y=client.player.blockPosition().getY()+1,
             z=client.player.blockPosition().getZ();
         if (registry.sources().isEmpty()) { field=null; previous=List.of(); age=0; environmentDirty=true; return; }

@@ -22,6 +22,9 @@ import pl.sofron.light.engine.RgbLight;
 public final class LightTracker {
     private volatile List<LightSource> sources = List.of();
     private volatile int movingCount = 0;
+    // Shared per-tick entity snapshot for both moving light systems.
+    private final ArrayList<Entity> nearbyEntities = new ArrayList<>();
+    public List<Entity> nearbyEntities() { return nearbyEntities; }
     public int movingCount() { return movingCount; }
     private final ChunkLightIndex chunkIndex = new ChunkLightIndex();
     public ChunkLightIndex chunkIndex() { return chunkIndex; }
@@ -32,6 +35,7 @@ public final class LightTracker {
     public void reset() {
         sources = List.of();
         movingCount = 0;
+        nearbyEntities.clear();
         chunkIndex.clear();
         previousSelected.clear();
 
@@ -50,10 +54,12 @@ public final class LightTracker {
             addStack(found, player.getMainHandItem(), px, py + 1.1, pz, cfg);
             addStack(found, player.getOffhandItem(), px, py + 1.1, pz, cfg);
         }
+        nearbyEntities.clear();
         if (cfg.entityAndItemLighting) {
             for (Entity entity : client.level.entitiesForRendering()) {
                 double x = entity.getX(), y = entity.getY(), z = entity.getZ();
                 if (entity.distanceToSqr(px, py, pz) > maxDistanceSquared) continue;
+                nearbyEntities.add(entity);
                 if (cfg.burningEntities && entity.isOnFire()) {
                     found.add(new LightSource(x, y + entity.getBbHeight() * .5, z,
                         (float)cfg.dynamicLightRadius, .9f, new RgbLight(1f,.42f,.12f)));

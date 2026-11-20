@@ -22,6 +22,10 @@ public final class DynamicEmitterRegistry {
     public void clear() { sources = List.of(); }
 
     public void update(Minecraft client, LightConfig cfg) {
+        update(client, cfg, client.level == null ? List.of() : client.level.entitiesForRendering());
+    }
+
+    public void update(Minecraft client, LightConfig cfg, Iterable<Entity> nearbyEntities) {
         if (client.player == null || client.level == null || !cfg.dynamicLighting) {clear();return;}
         var player=client.player;
         List<Source> collected=new ArrayList<>();
@@ -30,7 +34,7 @@ public final class DynamicEmitterRegistry {
             add(collected,player.getOffhandItem(),player.getX(),player.getY()+1.1,player.getZ(),cfg);
         }
         if(cfg.entityAndItemLighting) {
-            for(Entity entity:client.level.entitiesForRendering()) {
+            for(Entity entity:nearbyEntities) {
                 if(entity.distanceToSqr(player.getX(),player.getY(),player.getZ())>28*28)continue;
                 double x=entity.getX(), y=entity.getY()+entity.getBbHeight()*.55, z=entity.getZ();
                 if(cfg.burningEntities && entity.isOnFire())
