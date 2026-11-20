@@ -122,6 +122,7 @@ public final class AtmospherePresets {
             }
         }
 
+        cache = null;
         resourcePackColors = Map.copyOf(palettes);
         resourcePackFog = Map.copyOf(fogs);
         System.out.println("[SofronPack] Atmosphere loaded: "
@@ -129,51 +130,82 @@ public final class AtmospherePresets {
                 + (FOG_RULES.size() + fogs.size()) + " fog overrides");
     }
 
-    private static String biomeAt(ClientLevel level, Vec3 pos) {
-        var biome = level.getBiomeManager().getBiome(
-                (int)Math.floor(pos.x), (int)Math.floor(pos.y), (int)Math.floor(pos.z));
-        return biome.unwrapKey().map(key -> key.identifier().toString()).orElse("");
+    private static volatile AtmosphereBiomeBlend cache;
+    private static volatile ClientLevel cachedLevel;
+    private static volatile long cachedTick = Long.MIN_VALUE;
+    private static volatile double cachedX, cachedZ;
+
+    private static AtmosphereBiomeBlend blendedBiomes(ClientLevel level, Vec3 pos) {
+        long tick = level.getGameTime();
+        AtmosphereBiomeBlend current = cache;
+        if (current != null && cachedLevel == level && cachedTick == tick
+                && cachedX == pos.x && cachedZ == pos.z) {
+            return current;
+        }
+        // Sky and atmospheric fog describe the land below the camera, not the
+        // three-dimensional biome at the player's flight altitude.
+        current = AtmosphereBiomeBlend.sampleSurface(level, pos.x, pos.z);
+        cache = current;
+        cachedLevel = level;
+        cachedTick = tick;
+        cachedX = pos.x;
+        cachedZ = pos.z;
+        return current;
+    }
+
+    private static Vector3fc colorForBiome(String biome, boolean sky) {
+        Palette palette = resourcePackColors.get(biome);
+        Vector3fc override = palette == null ? null : (sky ? palette.sky() : palette.fog());
+        if (override != null) return override;
+        palette = COLORS.get(biome);
+        return palette == null ? null : (sky ? palette.sky() : palette.fog());
+    }
+
+    private static Vector3fc mixColor(ClientLevel level, Vec3 position, Vector3fc vanilla,
+                                     boolean sky) {
+        return blendedBiomes(level, position).blendColors(vanilla,
+                biome -> colorForBiome(biome, sky));
     }
 
     public static void addLayers(EnvironmentAttributeSystem.Builder builder, ClientLevel level) {
-        if (!ENABLED) return;
-        builder.addPositionalLayer(EnvironmentAttributes.FOG_COLOR, (base, pos, weights) -> {
-            String biome = biomeAt(level, pos);
-            Palette palette = resourcePackColors.get(biome);
-            if (palette != null && palette.fog() != null) return palette.fog();
-            palette = COLORS.get(biome);
-            return palette == null ? base : palette.fog();
-        });
-        builder.addPositionalLayer(EnvironmentAttributes.SKY_COLOR, (base, pos, weights) -> {
-            String biome = biomeAt(level, pos);
-            Palette palette = resourcePackColors.get(biome);
-            if (palette != null && palette.sky() != null) return palette.sky();
-            palette = COLORS.get(biome);
-            return palette == null ? base : palette.sky();
-        });
+        if (!ENABLED || !level.dimension().equals(net.minecraft.world.level.Level.OVERWORLD)) return;
+        builder.addPositionalLayer(EnvironmentAttributes.FOG_COLOR,
+                (base, pos, weights) -> mixColor(level, pos, base, false));
+        builder.addPositionalLayer(EnvironmentAttributes.SKY_COLOR,
+                (base, pos, weights) -> mixColor(level, pos, base, true));
     }
 
     public static void applyFog(FogData fog, Camera camera, ClientLevel level,
                                 float renderDistance, DeltaTracker deltaTracker) {
         if (!ENABLED || !level.dimension().equals(net.minecraft.world.level.Level.OVERWORLD)) return;
+        var blend = blendedBiomes(level, camera.position());
         BlockPos pos = camera.blockPosition();
-        String biome = level.getBiome(pos).unwrapKey()
-                .map(key -> key.identifier().toString()).orElse("");
-        FogRule rule = resourcePackFog.getOrDefault(biome, FOG_RULES.get(biome));
-        if (rule == null) return;
-
         float partialTick = deltaTracker.getGameTimeDeltaPartialTick(false);
         int skyLight = level.getBrightness(LightLayer.SKY, pos);
         double rain = level.getRainLevel(partialTick);
         long time = level.getOverworldClockTime();
-        try {
-            float start = (float)AtmosphereMath.evaluate(rule.start(), time, rain, skyLight);
-            float endRatio = (float)AtmosphereMath.evaluate(rule.end(), time, rain, skyLight);
-            fog.environmentalStart = Math.max(0.0F, start);
-            fog.environmentalEnd = Math.max(fog.environmentalStart + 2.0F,
-                    renderDistance * Math.max(0.05F, endRatio));
-        } catch (IllegalArgumentException e) {
-            // Invalid user-defined expressions should not break the renderer.
+        double start = 0, end = 0;
+        double baseStart = fog.environmentalStart;
+        double baseEnd = fog.environmentalEnd;
+        for (var entry : blend.weights().entrySet()) {
+            FogRule rule = resourcePackFog.getOrDefault(entry.getKey(), FOG_RULES.get(entry.getKey()));
+            double sampledStart = baseStart;
+            double sampledEnd = baseEnd;
+            if (rule != null) {
+                try {
+                    sampledStart = Math.max(0, AtmosphereMath.evaluate(rule.start(), time, rain, skyLight));
+                    sampledEnd = Math.max(sampledStart + 2,
+                            renderDistance * Math.max(0.05,
+                                    AtmosphereMath.evaluate(rule.end(), time, rain, skyLight)));
+                } catch (IllegalArgumentException ignored) {
+                    sampledStart = baseStart;
+                    sampledEnd = baseEnd;
+                }
+            }
+            start += sampledStart * entry.getValue();
+            end += sampledEnd * entry.getValue();
         }
+        fog.environmentalStart = (float) start;
+        fog.environmentalEnd = (float) Math.max(start + 2, end);
     }
 }
