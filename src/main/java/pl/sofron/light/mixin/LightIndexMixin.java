@@ -16,6 +16,7 @@ abstract class LightIndexMixin {
     private void sofron$changed(BlockPos pos, BlockState old, BlockState state, int flags, CallbackInfo ci) {
         if (old != state) {
             SofronPackLightClient.VOXELS.invalidate(pos);
+            SofronPackLightClient.PROBE.invalidate(pos);
             if (old.getLightEmission() > 0 || state.getLightEmission() > 0)
                 SofronPackLightClient.LIGHTS.chunkIndex().invalidate(pos.getX() >> 4, pos.getZ() >> 4);
         }
@@ -24,5 +25,6 @@ abstract class LightIndexMixin {
     private void sofron$loaded(ChunkPos pos, CallbackInfo ci) {
         SofronPackLightClient.LIGHTS.chunkIndex().invalidate(pos.x(), pos.z());
         SofronPackLightClient.VOXELS.invalidateChunk(pos.x(),pos.z());
+        SofronPackLightClient.PROBE.invalidateChunk(pos.x(),pos.z());
     }
 }
