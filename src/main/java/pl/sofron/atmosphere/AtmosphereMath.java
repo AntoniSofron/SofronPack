@@ -1,29 +1,52 @@
 package pl.sofron.atmosphere;
 
+import java.util.concurrent.ConcurrentHashMap;
+
 final class AtmosphereMath {
     private AtmosphereMath() {}
 
+    @FunctionalInterface
+    private interface Expression {
+        double apply(long time, double rain, int skylight);
+    }
+
+    // Formulas come from resource packs and normally never change between reloads.
+    // Parse once rather than allocating strings and parser state every frame.
+    private static final ConcurrentHashMap<String, Expression> COMPILED = new ConcurrentHashMap<>();
+
     static double evaluate(String input, long dayTime, double rain, int skyLight) {
-        Parser parser = new Parser(input, dayTime, rain, skyLight);
-        double value = parser.expression();
-        parser.spaces();
-        if (parser.index != input.length() || !Double.isFinite(value))
+        Expression expression = COMPILED.get(input);
+        if (expression == null) {
+            Expression parsed = compile(input);
+            if (COMPILED.size() > 512) COMPILED.clear();
+            expression = COMPILED.putIfAbsent(input, parsed);
+            if (expression == null) expression = parsed;
+        }
+        double value = expression.apply(dayTime, rain, skyLight);
+        if (!Double.isFinite(value))
             throw new IllegalArgumentException("Invalid atmospheric expression: " + input);
         return value;
     }
 
+    static void clearCache() {
+        COMPILED.clear();
+    }
+
+    private static Expression compile(String source) {
+        Parser parser = new Parser(source);
+        Expression expression = parser.expression();
+        parser.spaces();
+        if (parser.index != source.length())
+            throw new IllegalArgumentException("Unexpected token in: " + source);
+        return expression;
+    }
+
     private static final class Parser {
         private final String text;
-        private final long dayTime;
-        private final double rain;
-        private final int skyLight;
         private int index;
 
-        Parser(String text, long dayTime, double rain, int skyLight) {
+        Parser(String text) {
             this.text = text;
-            this.dayTime = dayTime;
-            this.rain = rain;
-            this.skyLight = skyLight;
         }
 
         void spaces() {
@@ -43,80 +66,103 @@ final class AtmosphereMath {
             if (!accept(symbol)) throw new IllegalArgumentException("Expected " + symbol + " in " + text);
         }
 
-        double expression() {
-            double result = sum();
+        Expression expression() {
+            Expression result = sum();
             while (true) {
-                if (accept(">=")) result = result >= sum() ? 1 : 0;
-                else if (accept("<=")) result = result <= sum() ? 1 : 0;
-                else if (accept("==")) result = result == sum() ? 1 : 0;
-                else if (accept(">")) result = result > sum() ? 1 : 0;
-                else if (accept("<")) result = result < sum() ? 1 : 0;
-                else return result;
+                if (accept(">=")) {
+                    Expression a=result,b=sum();
+                    result=(t,r,s)->a.apply(t,r,s)>=b.apply(t,r,s)?1:0;
+                } else if (accept("<=")) {
+                    Expression a=result,b=sum();
+                    result=(t,r,s)->a.apply(t,r,s)<=b.apply(t,r,s)?1:0;
+                } else if (accept("==")) {
+                    Expression a=result,b=sum();
+                    result=(t,r,s)->a.apply(t,r,s)==b.apply(t,r,s)?1:0;
+                } else if (accept(">")) {
+                    Expression a=result,b=sum();
+                    result=(t,r,s)->a.apply(t,r,s)>b.apply(t,r,s)?1:0;
+                } else if (accept("<")) {
+                    Expression a=result,b=sum();
+                    result=(t,r,s)->a.apply(t,r,s)<b.apply(t,r,s)?1:0;
+                } else return result;
             }
         }
 
-        double sum() {
-            double value = product();
+        Expression sum() {
+            Expression result = product();
             while (true) {
-                if (accept("+")) value += product();
-                else if (accept("-")) value -= product();
-                else return value;
+                if (accept("+")) {
+                    Expression a=result,b=product();
+                    result=(t,r,s)->a.apply(t,r,s)+b.apply(t,r,s);
+                } else if (accept("-")) {
+                    Expression a=result,b=product();
+                    result=(t,r,s)->a.apply(t,r,s)-b.apply(t,r,s);
+                } else return result;
             }
         }
 
-        double product() {
-            double value = unary();
+        Expression product() {
+            Expression result = unary();
             while (true) {
-                if (accept("*")) value *= unary();
-                else if (accept("/")) value /= unary();
-                else if (accept("%")) value %= unary();
-                else return value;
+                if (accept("*")) {
+                    Expression a=result,b=unary();
+                    result=(t,r,s)->a.apply(t,r,s)*b.apply(t,r,s);
+                } else if (accept("/")) {
+                    Expression a=result,b=unary();
+                    result=(t,r,s)->a.apply(t,r,s)/b.apply(t,r,s);
+                } else if (accept("%")) {
+                    Expression a=result,b=unary();
+                    result=(t,r,s)->a.apply(t,r,s)%b.apply(t,r,s);
+                } else return result;
             }
         }
 
-        double unary() {
-            if (accept("-")) return -unary();
+        Expression unary() {
+            if (accept("-")) {
+                Expression arg=unary();
+                return (t,r,s)->-arg.apply(t,r,s);
+            }
             if (accept("+")) return unary();
             return atom();
         }
 
-        double atom() {
+        Expression atom() {
             spaces();
             if (accept("(")) {
-                double value = expression();
+                Expression value = expression();
                 require(")");
                 return value;
             }
-            if (index >= text.length()) throw new IllegalArgumentException("Unexpected end: " + text);
+            if (index >= text.length())
+                throw new IllegalArgumentException("Unexpected end: " + text);
             char ch = text.charAt(index);
             if (Character.isDigit(ch) || ch == '.') {
                 int start = index;
                 while (index < text.length() &&
-                        (Character.isDigit(text.charAt(index)) || text.charAt(index) == '.'))
-                    index++;
-                return Double.parseDouble(text.substring(start, index));
+                        (Character.isDigit(text.charAt(index)) || text.charAt(index) == '.')) index++;
+                double value = Double.parseDouble(text.substring(start, index));
+                return (t,r,s) -> value;
             }
             if (Character.isLetter(ch) || ch == '_') {
                 int start = index;
                 while (index < text.length() &&
-                        (Character.isLetterOrDigit(text.charAt(index)) || text.charAt(index) == '_'))
-                    index++;
+                        (Character.isLetterOrDigit(text.charAt(index)) || text.charAt(index) == '_')) index++;
                 String word = text.substring(start, index);
                 if (accept("(")) {
-                    double first = expression();
+                    Expression a = expression();
                     require(",");
-                    double second = expression();
+                    Expression b = expression();
                     require(")");
                     return switch (word) {
-                        case "max" -> Math.max(first, second);
-                        case "min" -> Math.min(first, second);
+                        case "max" -> (t,r,s)->Math.max(a.apply(t,r,s), b.apply(t,r,s));
+                        case "min" -> (t,r,s)->Math.min(a.apply(t,r,s), b.apply(t,r,s));
                         default -> throw new IllegalArgumentException("Unsupported function: " + word);
                     };
                 }
                 return switch (word) {
-                    case "DAY_TIME" -> dayTime;
-                    case "RAIN" -> rain;
-                    case "SKY_LIGHT" -> skyLight;
+                    case "DAY_TIME" -> (t,r,s)->t;
+                    case "RAIN" -> (t,r,s)->r;
+                    case "SKY_LIGHT" -> (t,r,s)->s;
                     default -> throw new IllegalArgumentException("Unsupported variable: " + word);
                 };
             }

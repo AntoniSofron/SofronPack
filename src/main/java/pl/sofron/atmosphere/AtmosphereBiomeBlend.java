@@ -10,6 +10,7 @@ import org.joml.Vector3f;
 import org.joml.Vector3fc;
 
 final class AtmosphereBiomeBlend {
+    private static final SurfaceBiomeCache BIOMES = new SurfaceBiomeCache(1024, 200);
     private static final double[] KERNEL = {0.0, 1.0, 4.0, 6.0, 4.0, 1.0, 0.0};
     private final Map<String, Double> weights;
 
@@ -32,23 +33,28 @@ final class AtmosphereBiomeBlend {
         int integralZ = (int)Math.floor(sampleZ);
         double fractionX = sampleX - integralX;
         double fractionZ = sampleZ - integralZ;
+        // Cache noise biome lookups at quart-column coordinates. A single camera
+        // movement previously requested the same 36 heightmap/biome lookups
+        // again even if the queried columns had not changed.
+        BIOMES.prepare(level, level.getGameTime());
+        SurfaceBiomeCache.Resolver resolver = (quartX, quartZ) -> {
+            int bx = quartX * 4 + 2;
+            int bz = quartZ * 4 + 2;
+            int surface = level.getHeight(Heightmap.Types.WORLD_SURFACE, bx, bz);
+            return level.getBiomeManager().getNoiseBiomeAtPosition(bx, surface, bz)
+                    .unwrapKey().map(key -> key.identifier().toString()).orElse("");
+        };
         Map<String, Double> totals = new HashMap<>();
         double weightSum = 0;
 
         for (int zi = 0; zi < 6; zi++) {
             double wz = axisWeight(fractionZ, zi);
             if (wz <= 0) continue;
-            int blockZ = 4 * (integralZ - 2 + zi) + 2;
             for (int xi = 0; xi < 6; xi++) {
                 double wx = axisWeight(fractionX, xi);
                 if (wx <= 0) continue;
-                int blockX = 4 * (integralX - 2 + xi) + 2;
                 double weight = wx * wz;
-                int surfaceY = level.getHeight(Heightmap.Types.WORLD_SURFACE, blockX, blockZ);
-                var biome = level.getBiomeManager().getNoiseBiomeAtPosition(
-                        blockX, surfaceY, blockZ);
-                String id = biome.unwrapKey()
-                        .map(key -> key.identifier().toString()).orElse("");
+                String id = BIOMES.get(integralX - 2 + xi, integralZ - 2 + zi, resolver);
                 totals.merge(id, weight, Double::sum);
                 weightSum += weight;
             }
