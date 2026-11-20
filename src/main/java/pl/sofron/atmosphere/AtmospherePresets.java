@@ -175,6 +175,15 @@ public final class AtmospherePresets {
                 (base, pos, weights) -> mixColor(level, pos, base, true));
     }
 
+    private static boolean isCaveBiome(String id) {
+        return id.equals("minecraft:dripstone_caves")
+                || id.equals("minecraft:lush_caves")
+                || id.equals("minecraft:deep_dark")
+                || id.equals("abundant_atmosphere:geothermal_garden")
+                || id.equals("nomansland:caves")
+                || id.equals("nomansland:cave_depths");
+    }
+
     public static void applyFog(FogData fog, Camera camera, ClientLevel level,
                                 float renderDistance, DeltaTracker deltaTracker) {
         if (!ENABLED || !level.dimension().equals(net.minecraft.world.level.Level.OVERWORLD)) return;
@@ -182,21 +191,26 @@ public final class AtmospherePresets {
         BlockPos pos = camera.blockPosition();
         float partialTick = deltaTracker.getGameTimeDeltaPartialTick(false);
         int skyLight = level.getBrightness(LightLayer.SKY, pos);
-        double rain = level.getRainLevel(partialTick);
+        // Weather strength is global, including in dry biomes where raindrops
+        // are not rendered. A thunderstorm can therefore produce desert haze.
+        double weather = AtmosphereFogMath.stormStrength(
+                level.getRainLevel(partialTick), level.getThunderLevel(partialTick));
         long time = level.getOverworldClockTime();
         double start = 0, end = 0;
         double baseStart = fog.environmentalStart;
         double baseEnd = fog.environmentalEnd;
+
+        // Keep the existing smooth surface-biome transition for outdoor fog.
         for (var entry : blend.weights().entrySet()) {
             FogRule rule = resourcePackFog.getOrDefault(entry.getKey(), FOG_RULES.get(entry.getKey()));
             double sampledStart = baseStart;
             double sampledEnd = baseEnd;
             if (rule != null) {
                 try {
-                    sampledStart = Math.max(0, AtmosphereMath.evaluate(rule.start(), time, rain, skyLight));
+                    sampledStart = Math.max(0, AtmosphereMath.evaluate(rule.start(), time, weather, skyLight));
                     sampledEnd = Math.max(sampledStart + 2,
                             renderDistance * Math.max(0.05,
-                                    AtmosphereMath.evaluate(rule.end(), time, rain, skyLight)));
+                                    AtmosphereMath.evaluate(rule.end(), time, weather, skyLight)));
                 } catch (IllegalArgumentException ignored) {
                     sampledStart = baseStart;
                     sampledEnd = baseEnd;
@@ -205,7 +219,46 @@ public final class AtmospherePresets {
             start += sampledStart * entry.getValue();
             end += sampledEnd * entry.getValue();
         }
-        fog.environmentalStart = (float) start;
+        if (blend.weights().isEmpty()) {
+            start = baseStart;
+            end = baseEnd;
+        }
+
+        // A cave may lie below an ordinary plains, forest or mountain biome.
+        // Surface sampling alone would never select the cave fog preset.
+        int surfaceY = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE,
+                pos.getX(), pos.getZ());
+        double caveWeight = AtmosphereFogMath.caveWeight(surfaceY - pos.getY(), skyLight);
+        if (caveWeight > 0) {
+            String currentBiome = level.getBiome(pos).unwrapKey()
+                    .map(key -> key.identifier().toString()).orElse("");
+            FogRule caveRule = isCaveBiome(currentBiome)
+                    ? resourcePackFog.getOrDefault(currentBiome, FOG_RULES.get(currentBiome))
+                    : null;
+            if (caveRule == null) {
+                caveRule = resourcePackFog.getOrDefault("minecraft:dripstone_caves",
+                        FOG_RULES.get("minecraft:dripstone_caves"));
+            }
+            // The source pack's cave default is a start distance of 10
+            // and an end distance of 50% of the render distance.
+            double caveStart = 10.0;
+            double caveEnd = Math.max(caveStart + 2, renderDistance * 0.5);
+            if (caveRule != null) {
+                try {
+                    caveStart = Math.max(0,
+                            AtmosphereMath.evaluate(caveRule.start(), time, weather, skyLight));
+                    caveEnd = Math.max(caveStart + 2,
+                            renderDistance * Math.max(0.05,
+                                    AtmosphereMath.evaluate(caveRule.end(), time, weather, skyLight)));
+                } catch (IllegalArgumentException ignored) {
+                    // Use the source pack's cave defaults.
+                }
+            }
+            start = AtmosphereFogMath.interpolate(start, caveStart, caveWeight);
+            end = AtmosphereFogMath.interpolate(end, caveEnd, caveWeight);
+        }
+
+        fog.environmentalStart = (float) Math.max(0, start);
         fog.environmentalEnd = (float) Math.max(start + 2, end);
     }
 }

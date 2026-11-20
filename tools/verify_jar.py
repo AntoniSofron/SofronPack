@@ -160,6 +160,9 @@ with zipfile.ZipFile(jar) as z:
 
 
     assert "pl/sofron/atmosphere/AtmosphereBiomeBlend.class" in files
+    assert "pl/sofron/atmosphere/AtmosphereFogMath.class" in files
+    assert "caveWeight" in pathlib.Path("src/main/java/pl/sofron/atmosphere/AtmospherePresets.java").read_text(encoding="utf-8")
+
     for biome, sky in (
         ("swamp", "#78a7ff"),
         ("taiga", "#7da3ff"),
