@@ -39,6 +39,7 @@ class ChunkLightBucketsTest {
         ChunkLightBuckets buckets = new ChunkLightBuckets();
         for (int i=0;i<20000;i++) buckets.affecting(i,10);
         assertEquals(0,buckets.chunkCount());
+        assertEquals(17000,buckets.cachedColumns());
         assertTrue(buckets.affecting(10000,10).isEmpty());
         // The query cache itself remains bounded even after visiting 20000
         // empty columns. The unit test only exercises its public semantics.

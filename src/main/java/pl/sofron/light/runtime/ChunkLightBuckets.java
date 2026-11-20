@@ -55,6 +55,7 @@ public final class ChunkLightBuckets {
     }
 
     public int chunkCount() { return buckets.size(); }
+    int cachedColumns() { return affectingCache.size(); }
     public int sourceCount() { return buckets.values().stream().mapToInt(List::size).sum(); }
     public List<LightSource> allLights() {
         ArrayList<LightSource> result = new ArrayList<>();
