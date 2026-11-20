@@ -41,10 +41,23 @@ jobs:
             echo 'Client mixin error detected'
             exit 1
           fi
-          if grep -Ei 'Failed to create backend OpenGL|Vulkan is not supported|Couldn.t find matching GLX visual' client-startup.log; then
+          if grep -Eiq 'Using graphics backend (Vulkan|OpenGL)' client-startup.log; then
+            echo 'Minecraft graphics backend started successfully'
+          elif grep -Eiq 'Failed to create backend OpenGL|Vulkan is not supported|Couldn.t find matching GLX visual' client-startup.log; then
             echo '::warning title=Graphics backend unavailable::Headless runner cannot validate client rendering'
             echo 'Client render test is INCONCLUSIVE (graphics backend unavailable)'
             exit 0
+          else
+            echo 'No successful graphics backend initialization detected'
+            exit 1
+          fi
+          if ! grep -q '\[SofronPack\] Atmosphere loaded:' client-startup.log; then
+            echo 'Atmosphere module did not finish loading'
+            exit 1
+          fi
+          if ! grep -q 'Sodium terrain lighting initialized' client-startup.log; then
+            echo 'Sodium lighting integration did not initialize'
+            exit 1
           fi
           if grep -Ei 'Could not create window|NoClassDefFoundError|FATAL EXCEPTION|Crash Report' client-startup.log; then
             echo 'Client startup failure detected'
