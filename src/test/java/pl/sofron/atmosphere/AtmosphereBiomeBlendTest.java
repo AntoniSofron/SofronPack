@@ -15,9 +15,9 @@ class AtmosphereBiomeBlendTest {
             }
             assertEquals(16, sum, 0.0000001);
         }
-        assertEquals(1, AtmosphereBiomeBlend.axisWeight(0.0, 1));
-        assertEquals(4, AtmosphereBiomeBlend.axisWeight(1.0, 1));
-        assertEquals(4, AtmosphereBiomeBlend.axisWeight(0.0, 2));
-        assertEquals(6, AtmosphereBiomeBlend.axisWeight(1.0, 2));
+        assertEquals(4, AtmosphereBiomeBlend.axisWeight(0.0, 1));
+        assertEquals(1, AtmosphereBiomeBlend.axisWeight(1.0, 1));
+        assertEquals(6, AtmosphereBiomeBlend.axisWeight(0.0, 2));
+        assertEquals(4, AtmosphereBiomeBlend.axisWeight(1.0, 2));
     }
 }
