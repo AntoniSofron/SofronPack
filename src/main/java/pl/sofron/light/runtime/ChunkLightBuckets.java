@@ -2,6 +2,7 @@ package pl.sofron.light.runtime;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -11,7 +12,15 @@ public final class ChunkLightBuckets {
     private final Map<Long, List<LightSource>> buckets = new HashMap<>();
     // Store the result for each queried target column, not just its emitters.
     // When a source changes, only its nearby columns need rebuilding.
-    private final Map<Long, List<LightSource>> affectingCache = new HashMap<>();
+    // Upper bound covers the largest supported 129x129 atlas. Without an LRU
+    // limit, even empty visited chunks would accumulate for entire play sessions.
+    private static final int MAX_CACHED_COLUMNS = 17000;
+    private final Map<Long, List<LightSource>> affectingCache = new LinkedHashMap<>(
+            512, 0.75f, true) {
+        @Override protected boolean removeEldestEntry(Map.Entry<Long, List<LightSource>> eldest) {
+            return size() > MAX_CACHED_COLUMNS;
+        }
+    };
     private float maxRadius;
 
     public void clear() {

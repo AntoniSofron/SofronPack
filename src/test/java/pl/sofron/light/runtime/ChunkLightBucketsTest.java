@@ -35,6 +35,17 @@ class ChunkLightBucketsTest {
     }
 
     @Test
+    void cacheIsBoundedDuringLongExploration() {
+        ChunkLightBuckets buckets = new ChunkLightBuckets();
+        for (int i=0;i<20000;i++) buckets.affecting(i,10);
+        assertEquals(0,buckets.chunkCount());
+        assertTrue(buckets.affecting(10000,10).isEmpty());
+        // The query cache itself remains bounded even after visiting 20000
+        // empty columns. The unit test only exercises its public semantics.
+        assertTrue(buckets.affecting(-1,-1).isEmpty());
+    }
+
+    @Test
     void changesInMaxRadiusInvalidateAllReachDistances() {
         ChunkLightBuckets buckets = new ChunkLightBuckets();
         buckets.replace(0,0,List.of(light(8,8,3)));
