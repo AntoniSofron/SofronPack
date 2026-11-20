@@ -159,6 +159,18 @@ with zipfile.ZipFile(jar) as z:
 
 
 
+    assert "pl/sofron/atmosphere/AtmosphereBiomeBlend.class" in files
+    for biome, sky in (
+        ("swamp", "#78a7ff"),
+        ("taiga", "#7da3ff"),
+        ("savanna", "#6eb1ff"),
+        ("jungle", "#77a8ff"),
+    ):
+        path = f"data/minecraft/worldgen/biome/{biome}.json"
+        attrs = json.loads(z.read(path))["attributes"]
+        assert attrs["minecraft:visual/sky_color"] == sky, (biome, attrs)
+        assert "minecraft:visual/fog_color" not in attrs, biome
+
     assert "assets/sofronpack/textures/item/raw_mixed_rice_bowl.png" not in files
 
     foods = {

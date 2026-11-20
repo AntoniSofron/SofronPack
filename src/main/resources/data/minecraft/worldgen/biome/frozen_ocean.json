@@ -115,7 +115,7 @@
       },
       "modifier": "overlay"
     },
-    "minecraft:visual/sky_color": "#9AAEDC"
+    "minecraft:visual/sky_color": "#7fa1ff"
   },
   "carvers": [
     "minecraft:cave",
@@ -198,6 +198,6 @@
     ]
   ],
   "has_precipitation": true,
-  "temperature": 0.0,
+  "temperature": 0,
   "temperature_modifier": "frozen"
 }

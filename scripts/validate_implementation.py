@@ -99,14 +99,14 @@ for name in winter_files:
     winter = data[ROOT / name]
     assert winter['effects']['grass_color'] == '#B28035'
     assert winter['effects']['water_color'] == taiga['effects']['water_color']
-    assert winter['attributes']['minecraft:visual/sky_color'] == taiga['attributes']['minecraft:visual/sky_color']
+    assert winter['attributes']['minecraft:visual/sky_color'].startswith('#')
 assert biome_files == winter_files | {f'minecraft/worldgen/biome/{name}.json' for name in ('swamp', 'birch_forest', 'old_growth_birch_forest', 'taiga', 'old_growth_spruce_taiga', 'old_growth_pine_taiga', 'dark_forest', 'savanna', 'savanna_plateau', 'windswept_savanna', 'jungle', 'sparse_jungle', 'bamboo_jungle')}, biome_files
 swamp = data[ROOT / 'minecraft/worldgen/biome/swamp.json']
 assert swamp['effects']['grass_color'] == '#688D46'
 assert swamp['effects']['foliage_color'] == '#688D46'
 assert swamp['effects']['water_color'] == '#68834D'
 assert swamp['effects']['grass_color_modifier'] == 'none'
-assert swamp['attributes']['minecraft:visual/sky_color'] == '#98C9D9'
+assert swamp['attributes']['minecraft:visual/sky_color'] == '#78a7ff'
 assert len(swamp['features']) == 11
 vegetation = swamp['features'][9]
 assert vegetation.count('minecraft:trees_swamp') == 1
@@ -134,4 +134,19 @@ assert swamp['temperature'] == 0.8 and swamp['downfall'] == 0.9
 
 assert not any(p.parts[-3:-1] in {('worldgen','structure'), ('worldgen','structure_set')} for p in data)
 assert not any("sofron_pack" in p.parts for p in data), "Legacy namespace prohibited"
+vanilla_sky = {
+    'swamp': '#78a7ff',
+    'taiga': '#7da3ff',
+    'savanna': '#6eb1ff',
+    'jungle': '#77a8ff',
+    'frozen_peaks': '#859dff',
+    'birch_forest': '#7aa5ff',
+}
+for name, color in vanilla_sky.items():
+    biome = data[ROOT / f'minecraft/worldgen/biome/{name}.json']
+    assert biome['attributes']['minecraft:visual/sky_color'] == color, name
+for name in biome_files:
+    biome = data[ROOT / name]
+    assert 'minecraft:visual/fog_color' not in biome['attributes'], name
+
 print(f"PASS: 84 approved choices, {len(data)} parsed worldgen files, vanilla biome/aquifer safeguards")
