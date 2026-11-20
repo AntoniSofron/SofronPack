@@ -6,6 +6,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.world.level.block.Block;
 import java.util.Map;
 import java.util.regex.Pattern;
 
@@ -54,6 +57,7 @@ public final class BlockLightRules {
     private static final Pattern HEX = Pattern.compile("#[0-9a-fA-F]{6}");
     private static final RgbLight NEUTRAL = new RgbLight(1,1,1);
     private static volatile Map<String, Rule> rules = Map.of();
+    private static volatile Map<Block, Integer> emissionByBlock = Map.of();
     private static volatile Path path;
     private static volatile long stamp = Long.MIN_VALUE;
     private static volatile boolean emissionOverrides;
@@ -83,6 +87,12 @@ public final class BlockLightRules {
     public static Integer vanillaEmissionOverride(String id) {
         Rule r = rule(id);
         return r == null ? null : r.emission();
+    }
+
+    // Called by Minecraft for extremely many block states. Resolve identifiers
+    // once after a rule reload instead of constructing strings per block lookup.
+    public static Integer vanillaEmissionOverride(Block block) {
+        return emissionByBlock.get(block);
     }
     public static synchronized void initialize(Path file) {
         path = file;
@@ -144,8 +154,20 @@ public final class BlockLightRules {
             }
             Map<String, Rule> next=Collections.unmodifiableMap(parsed);
             if (!next.equals(rules)) revision++;
+            Map<Block, Integer> emissions = new IdentityHashMap<>();
+            if (next.values().stream().anyMatch(rule -> rule.emission() != null)) {
+                for (Block block : BuiltInRegistries.BLOCK) {
+                    String id = BuiltInRegistries.BLOCK.getKey(block).toString();
+                    Rule value = next.get(id);
+                    if (value == null) value = next.get(canonicalTorchId(id));
+                    if (value != null && value.emission() != null)
+                        emissions.put(block, value.emission());
+                }
+            }
+            // Publish fully initialized immutable snapshots to rendering threads.
+            emissionByBlock = Collections.unmodifiableMap(emissions);
             rules=next;
-            emissionOverrides = next.values().stream().anyMatch(rule -> rule.emission() != null);
+            emissionOverrides = !emissions.isEmpty();
             stamp=modified;
             System.out.println("[Sofron Light] Loaded "+rules.size()+" block light color rules");
         } catch (IOException ex) { System.err.println("[Sofron Light] Cannot read light rules: "+ex.getMessage()); }

@@ -4,20 +4,47 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import pl.sofron.light.engine.LightSource;
 
 public final class ChunkLightBuckets {
     private final Map<Long, List<LightSource>> buckets = new HashMap<>();
+    // Store the result for each queried target column, not just its emitters.
+    // When a source changes, only its nearby columns need rebuilding.
+    private final Map<Long, List<LightSource>> affectingCache = new HashMap<>();
     private float maxRadius;
 
-    public void clear() { buckets.clear(); maxRadius = 0f; }
+    public void clear() {
+        buckets.clear();
+        affectingCache.clear();
+        maxRadius = 0f;
+    }
+
     public void replace(int cx, int cz, List<LightSource> sources) {
         long key = key(cx, cz);
-        if (sources.isEmpty()) buckets.remove(key);
-        else buckets.put(key, List.copyOf(sources));
-        recomputeMaxRadius();
+        List<LightSource> next = sources.isEmpty() ? null : List.copyOf(sources);
+        List<LightSource> old = next == null ? buckets.remove(key) : buckets.put(key, next);
+        if (Objects.equals(old, next)) return;
+        updateRadiusAndInvalidate(cx, cz);
     }
-    public void remove(int cx, int cz) { buckets.remove(key(cx, cz)); recomputeMaxRadius(); }
+
+    public void remove(int cx, int cz) {
+        if (buckets.remove(key(cx, cz)) != null) updateRadiusAndInvalidate(cx, cz);
+    }
+
+    private void updateRadiusAndInvalidate(int cx, int cz) {
+        float previousRadius = maxRadius;
+        recomputeMaxRadius();
+        if (Float.compare(previousRadius, maxRadius) != 0) {
+            affectingCache.clear();
+        } else {
+            int reach = (int)Math.ceil(maxRadius / 16.0);
+            for (int x = cx - reach; x <= cx + reach; x++)
+                for (int z = cz - reach; z <= cz + reach; z++)
+                    affectingCache.remove(key(x,z));
+        }
+    }
+
     public int chunkCount() { return buckets.size(); }
     public int sourceCount() { return buckets.values().stream().mapToInt(List::size).sum(); }
     public List<LightSource> allLights() {
@@ -25,7 +52,12 @@ public final class ChunkLightBuckets {
         buckets.values().forEach(result::addAll);
         return result;
     }
+
     public List<LightSource> affecting(int cx, int cz) {
+        long targetKey = key(cx,cz);
+        List<LightSource> existing = affectingCache.get(targetKey);
+        if (existing != null) return existing;
+
         ArrayList<LightSource> found = new ArrayList<>();
         int reach = (int)Math.ceil(maxRadius / 16.0);
         double minX = cx * 16.0, maxX = minX + 16.0;
@@ -42,13 +74,17 @@ public final class ChunkLightBuckets {
                 }
             }
         }
-        return found;
+        List<LightSource> result = List.copyOf(found);
+        affectingCache.put(targetKey, result);
+        return result;
     }
+
     private void recomputeMaxRadius() {
         maxRadius = 0f;
         for (List<LightSource> sources : buckets.values())
             for (LightSource light : sources) maxRadius = Math.max(maxRadius, light.radius());
     }
+
     private static long key(int x, int z) {
         return ((long)x << 32) | (z & 0xffffffffL);
     }
