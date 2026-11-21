@@ -8,6 +8,8 @@ uniform sampler2D Sampler0;
 layout(location = 0) in vec2 texCoord0;
 layout(location = 1) in vec4 vertexColor;
 layout(location = 2) in float horizontalChunks;
+layout(location = 3) in float sphericalBlocks;
+layout(location = 4) in float atmosphereBlend;
 
 layout(location = 0) out vec4 fragColor;
 
@@ -35,21 +37,21 @@ void main() {
 
     float baseFog = sofronLodFog(horizontalChunks);
 
-    // Vanilla environmental fog follows the ordinary view distance. It
-    // cannot simply be applied at full strength to 128-chunk LOD terrain:
-    // that would erase the entire extended world. Only the *additional*
-    // shortening of environmental fog activates the weather/biome layer.
-    float normalEnd = max(FogRenderDistanceEnd, 1.0);
-    float condensation = clamp(1.0 - FogEnvironmentalEnd / normalEnd, 0.0, 1.0);
-    float weatherStrength = smoothstep(0.08, 0.68, condensation);
-    float startChunks = mix(16.0, 8.0, weatherStrength);
-    float envelope = smoothstep(startChunks, 128.0, horizontalChunks);
-    float envEnd = max(FogEnvironmentalEnd, FogEnvironmentalStart + 2.0);
-    float environmentalFog = smoothstep(
-        FogEnvironmentalStart, envEnd, horizontalChunks * 16.0
+    // Use the SAME environmental start/end distances as normal Minecraft
+    // terrain. In thick biome/weather/cave fog, a 100% fogged normal chunk
+    // must not be followed by a fully visible distant LOD tile.
+    //
+    // Render-distance clipping is NOT carried into the distant world: only
+    // the custom environment is shared. This preserves 128-chunk visibility
+    // in clear weather. The atmosphereBlend signal comes from the CPU's
+    // actual biome/cave/weather fog selection, never distance heuristics.
+    float environmentFog = clamp(
+        (sphericalBlocks - FogEnvironmentalStart)
+            / max(FogEnvironmentalEnd - FogEnvironmentalStart, 0.001),
+        0.0, 1.0
     );
-    float customFog = weatherStrength * envelope * environmentalFog;
-    float fog = 1.0 - (1.0 - baseFog) * (1.0 - customFog);
+    float unifiedEnvironment = environmentFog * clamp(atmosphereBlend, 0.0, 1.0);
+    float fog = max(baseFog, unifiedEnvironment);
     // FogColor comes from the live blended biome/environment, not a fixed hue.
     sampled.rgb = mix(sampled.rgb, FogColor.rgb, fog);
     // At 128 chunks even semi-transparent water must disappear completely

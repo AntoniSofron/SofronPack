@@ -225,7 +225,8 @@ public final class ExtendedWorldLodRenderer {
                         (float)-camera.y,
                         (float)((long)tz * TILE * 16 - camera.z));
                 var transform = RenderSystem.getDynamicUniforms().writeTransform(
-                        relative, new Vector4f(1f, 1f, 1f, 1f),
+                        relative, new Vector4f(1f, 1f, 1f,
+                                pl.sofron.atmosphere.AtmospherePresets.distantFogBlend()),
                         new Vector3f(
                                 (float)((long)tx * TILE * 16 - camera.x),
                                 (float)-camera.y,

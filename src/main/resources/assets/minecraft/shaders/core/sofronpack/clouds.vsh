@@ -124,11 +124,13 @@ void main() {
     // Blending toward white keeps the cloud distinguishable from the sky.
     float underside = direction == 0 ? 1.0
         : direction == 1 ? 0.0
-        : 0.62 * (1.0 - faceVertex.y);
+        : 0.80 * (1.0 - faceVertex.y);
     vec3 sky = clamp(ColorModulator.rgb, vec3(0.0), vec3(1.0));
-    vec3 skyWhite = mix(sky, vec3(1.0), 0.50);
+    // A small white component keeps edges cloud-like while 80% of their
+    // underside hue follows the smoothly blended camera biome sky.
+    vec3 skyWhite = mix(sky, vec3(1.0), 0.20);
     undersideTint = ColorModulator.a < 0.0
-        ? mix(vec3(1.0), skyWhite, 0.82 * underside)
+        ? mix(vec3(1.0), skyWhite, 0.96 * underside)
         : vec3(1.0);
     PlayerPos = pos;
 

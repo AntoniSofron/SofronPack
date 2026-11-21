@@ -11,14 +11,21 @@ layout(location = 2) in vec4 Color;
 layout(location = 0) out vec2 texCoord0;
 layout(location = 1) out vec4 vertexColor;
 layout(location = 2) out float horizontalChunks;
+layout(location = 3) out float sphericalBlocks;
+layout(location = 4) out float atmosphereBlend;
 
 void main() {
     gl_Position = ProjMat * ModelViewMat * vec4(Position, 1.0);
     texCoord0 = UV0;
-    vertexColor = Color * ColorModulator;
+    // Repurpose ColorModulator.a for the shared environment fog strength.
+    // Source texture alpha stays intact, including leaves and water.
+    vertexColor = vec4(Color.rgb * ColorModulator.rgb, Color.a);
+    atmosphereBlend = ColorModulator.a;
 
     // ModelOffset is the *unrotated camera-relative tile origin* (world X/Z).
     // It is independent of pitch, so fog bands remain at the requested
     // horizontal distances even during high-altitude flight.
-    horizontalChunks = length((Position + ModelOffset).xz) * (1.0 / 16.0);
+    vec3 relative = Position + ModelOffset;
+    horizontalChunks = length(relative.xz) * (1.0 / 16.0);
+    sphericalBlocks = length(relative);
 }
