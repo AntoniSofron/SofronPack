@@ -46,7 +46,12 @@ public final class ExtendedVoxelStore {
             Inflater inflater = new Inflater();
             inflater.setInput(deflated);
             try {
-                int got = inflater.inflate(bytes);
+                int got = 0;
+                while (got < expected && !inflater.finished()) {
+                    int count = inflater.inflate(bytes, got, expected - got);
+                    if (count == 0) throw new IllegalArgumentException("Incomplete block LOD data");
+                    got += count;
+                }
                 if (got != expected || !inflater.finished()) {
                     throw new IllegalArgumentException("Corrupted block LOD data");
                 }
@@ -244,6 +249,12 @@ public final class ExtendedVoxelStore {
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
         int index = 0;
         for (int yi = 0; yi < count; yi++) {
+            // Most upper-world sections are pure air: skip all 64 samples in
+            // those sections without calling getBlockState.
+            if (chunk.getSections()[(yi * CELL) / 16].hasOnlyAir()) {
+                index += GRID * GRID;
+                continue;
+            }
             int y = minimum + yi * CELL;
             for (int z = 0; z < GRID; z++) {
                 for (int x = 0; x < GRID; x++) {
