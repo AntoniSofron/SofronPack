@@ -122,6 +122,10 @@ with zipfile.ZipFile(jar) as z:
     lod_vertex = z.read("assets/minecraft/shaders/core/sofronpack/extended_voxel.vsh")
     assert b"horizontalChunks" in lod_vertex
     assert b"cylindricalBlocks" in lod_vertex
+    lod_renderer = pathlib.Path(
+        "src/main/java/pl/sofron/extended/client/ExtendedWorldLodRenderer.java").read_text()
+    assert "relative, new Vector4f(1f, 1f, 1f, 1f)" in lod_renderer
+    assert "AtmospherePresets.distantFogBlend()" not in lod_renderer
     fog_mixin_source = pathlib.Path(
         "src/main/java/pl/sofron/extended/mixin/ExtendedWorldFogMixin.java").read_text()
     assert "fog.renderDistanceStart = start" in fog_mixin_source
