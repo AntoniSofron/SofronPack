@@ -1,0 +1,8 @@
+{
+  "parent": "sofronpack:block/near_leaves_template",
+  "textures": {
+    "all": "minecraft:block/yellow_poplar_leaves",
+    "top": "sofronpack:block/yellow_poplar_leaves_top",
+    "bottom": "sofronpack:block/yellow_poplar_leaves_bottom"
+  }
+}

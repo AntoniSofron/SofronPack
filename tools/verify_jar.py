@@ -269,6 +269,46 @@ with zipfile.ZipFile(jar) as z:
         assert attrs["minecraft:visual/sky_color"] == sky, (biome, attrs)
         assert "minecraft:visual/fog_color" not in attrs, biome
 
+    # The shipped JAR must include the user's exact near-leaf geometry and
+    # 26 original PNGs. Vanilla base leaf textures stay untouched.
+    import hashlib
+    foliage = (
+        "acacia", "azalea", "birch", "cherry", "dark_oak", "jungle",
+        "mangrove", "oak", "orange_poplar", "pale_oak", "red_poplar",
+        "spruce", "yellow_poplar",
+    )
+    template_path = "assets/sofronpack/models/block/near_leaves_template.json"
+    template = json.loads(z.read(template_path))
+    assert len(template["elements"]) == 5
+    assert template["elements"][0]["from"] == [0, 0, 0]
+    assert template["elements"][0]["to"] == [16, 16, 16]
+    assert all(not part.get("shade", True) for part in template["elements"][1:])
+    for foliage_type in foliage:
+        for suffix in ("top", "bottom"):
+            texture = f"assets/sofronpack/textures/block/{foliage_type}_leaves_{suffix}.png"
+            png = z.read(texture)
+            assert png[:8] == bytes((137, 80, 78, 71, 13, 10, 26, 10))  # 32x32 RGBA
+            assert png[12:16] == b"IHDR"
+            assert (int.from_bytes(png[16:20], "big"), int.from_bytes(png[20:24], "big")) == (32, 32)
+            assert png[24:26] == bytes((8, 6))
+            assert f"assets/minecraft/textures/block/{foliage_type}_leaves.png" not in files
+        name = f"{foliage_type}_leaves"
+        namespace = "sofronpack" if "poplar" in foliage_type else "minecraft"
+        model = json.loads(z.read(f"assets/{namespace}/models/block/{name}.json"))
+        assert model["parent"] == "sofronpack:block/near_leaves_template"
+        assert model["textures"]["all"] == f"minecraft:block/{name}"
+        assert model["textures"]["top"] == f"sofronpack:block/{name}_top"
+        assert model["textures"]["bottom"] == f"sofronpack:block/{name}_bottom"
+    flower = json.loads(z.read("assets/minecraft/models/block/flowering_azalea_leaves.json"))
+    assert flower["textures"]["top"] == "sofronpack:block/azalea_leaves_top"
+    assert flower["textures"]["bottom"] == "sofronpack:block/azalea_leaves_bottom"
+    leaf_policy = pathlib.Path(
+        "src/main/java/pl/sofron/extended/client/ExtendedVoxelAtlas.java").read_text()
+    assert '!baseName.endsWith("_leaves")' in leaf_policy
+    leaf_quad_shader = z.read("assets/sofronpack/shaders/blocks/block_layer_opaque.vsh")
+    assert b"(_material_params & 128u)" in leaf_quad_shader
+    assert b"128.0 * 128.0" in leaf_quad_shader
+
     assert "assets/sofronpack/textures/item/raw_mixed_rice_bowl.png" not in files
 
     foods = {

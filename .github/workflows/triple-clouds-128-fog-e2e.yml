@@ -1,7 +1,7 @@
 name: Triple clouds and 128-chunk fog — in-world smoke
 on:
   push:
-    branches: ['fix/extended-128-clouds-triple', 'fix/lod-fog-clouds-night-20261121', 'fix/lod-progressive-fog-cloud-gradient', 'fix/shared-four-stage-fog-v0138', 'fix/streamed-lod-v0139']
+    branches: ['fix/extended-128-clouds-triple', 'fix/lod-fog-clouds-night-20261121', 'fix/lod-progressive-fog-cloud-gradient', 'fix/shared-four-stage-fog-v0138', 'fix/streamed-lod-v0139', 'feature/near-leaf-models-vanilla-far-lod-20261121']
     paths:
       - 'src/**'
       - '.github/workflows/triple-clouds-128-fog-e2e.yml'
@@ -48,6 +48,14 @@ jobs:
           fi
           if ! grep -q '\[SofronPack\] Voxel LOD: restored' triple-clouds-128-fog.log; then
             echo 'Integrated single-player world was not loaded, or voxel cache failed to initialize'
+            exit 1
+          fi
+          if ! grep -Eq 'Near-leaf top/bottom sprites: ([1-9][0-9]*)' triple-clouds-128-fog.log; then
+            echo 'Bundled near-leaf detail textures were not resolved in the block atlas'
+            exit 1
+          fi
+          if grep -Ei 'Unable to load model .*leaves|Could not load model .*leaves|Unable to load texture .*leaves_(top|bottom)' triple-clouds-128-fog.log; then
+            echo 'One or more near-leaf models or textures were rejected'
             exit 1
           fi
           if ! grep -q 'Textured Extended World GPU draw issued' triple-clouds-128-fog.log; then

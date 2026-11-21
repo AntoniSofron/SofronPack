@@ -116,7 +116,12 @@ public final class ExtendedVoxelAtlas implements ExtendedVoxelMesher.MaterialRes
                 var faces = parts.getFirst().getQuads(dir);
                 if (faces.size() != 1 || !wholeFace(faces.getFirst(), dir)) { simple = false; break; }
             }
-            if (!simple) {
+            // Near-only leaf models contain the vanilla cube plus four
+            // decorative top/bottom planes. LODs MUST always render the
+            // original six cube faces; never bake the decorative planes
+            // into a distant mesh, even when the active texture pack has
+            // replaced the normal leaf block model.
+            if (!simple && !baseName.endsWith("_leaves")) {
                 List<ExtendedVoxelMesher.ModelFace> baked = new ArrayList<>();
                 for (var part : parts) {
                     for (Direction dir : FACES)
