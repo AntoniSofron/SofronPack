@@ -26,9 +26,14 @@ with zipfile.ZipFile(jar) as z:
     assert len(mod["mixins"]) == 5
     assert "sofron-extended.mixins.json" in mod["mixins"]
     assert "sofron-extended-client.mixins.json" in mod["mixins"]
+    assert "pl/sofron/extended/ExtendedWorldVoxyBridge.class" not in files
     for class_name in (
         "pl/sofron/extended/ExtendedWorldConfig.class",
         "pl/sofron/extended/ExtendedWorldPrefetch.class",
+        "pl/sofron/extended/ExtendedWorldStorage.class",
+        "pl/sofron/extended/ExtendedWorldMeshBuilder.class",
+        "pl/sofron/extended/client/ExtendedWorldLodRenderer.class",
+        "pl/sofron/extended/mixin/ExtendedWorldSodiumRenderMixin.class",
         "pl/sofron/extended/mixin/ExtendedWorldSodiumOptionsMixin.class",
     ):
         assert class_name in files, class_name
