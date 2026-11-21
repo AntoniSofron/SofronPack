@@ -1,8 +1,6 @@
 package pl.sofron.extended;
 
 import net.minecraft.core.Direction;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.RotatedPillarBlock;
 import org.junit.jupiter.api.Test;
 import java.util.Arrays;
 import static org.junit.jupiter.api.Assertions.*;
@@ -28,17 +26,18 @@ class ExtendedVoxelLodTest {
         assertEquals(0x256db1, restored.waterTint());
     }
 
-    @Test void materialPaletteKeepsLogOrientationRatherThanJustBlockId() {
-        var oakX = Blocks.OAK_LOG.defaultBlockState()
-                .setValue(RotatedPillarBlock.AXIS, Direction.Axis.X);
-        var oakZ = Blocks.OAK_LOG.defaultBlockState()
-                .setValue(RotatedPillarBlock.AXIS, Direction.Axis.Z);
-        var x = ExtendedVoxelStore.serializeState(oakX);
-        var z = ExtendedVoxelStore.serializeState(oakZ);
-        assertTrue(x.startsWith("minecraft:oak_log["));
-        assertTrue(x.contains("axis=x"));
-        assertTrue(z.contains("axis=z"));
-        assertNotEquals(x, z, "Real block-state variants must not collapse");
+    @Test void blockStatePaletteKeepsDistinctLogOrientationsAfterReload() throws Exception {
+        short[] cells = new short[ExtendedVoxelStore.GRID * ExtendedVoxelStore.GRID];
+        cells[0] = 1;
+        cells[1] = 2;
+        var original = ExtendedVoxelStore.encode(0, 0, 0, 1,
+                new String[] {"minecraft:air", "minecraft:oak_log[axis=x]",
+                        "minecraft:oak_log[axis=z]"}, cells);
+        var copy = ExtendedVoxelStore.readPayload(ExtendedVoxelStore.payload(original));
+        assertNotEquals(copy.palette()[1], copy.palette()[2]);
+        assertEquals("minecraft:oak_log[axis=x]", copy.palette()[1]);
+        assertEquals("minecraft:oak_log[axis=z]", copy.palette()[2]);
+        assertArrayEquals(cells, copy.unpack());
     }
 
     @Test void independentStoneVoxelHasSixSquareTexturedFaces() {
