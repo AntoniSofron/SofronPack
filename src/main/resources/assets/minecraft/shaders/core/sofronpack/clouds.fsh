@@ -8,7 +8,7 @@ layout(location = 0) in float vertexDistance;
 layout(location = 1) in vec4 vertexColor;
 layout(location = 2) in vec3 Pos;
 layout(location = 3) in vec3 PlayerPos;
-layout(location = 4) in vec3 undersideTint;
+layout(location = 4) in vec4 undersideTint;
 
 #ifndef OIT_ALPHA_ONLY
 layout(location = 0) out vec4 fragColor;
@@ -83,7 +83,7 @@ vec4 sofronCloudColor() {
         fadeFinal
     );
 
-    color.rgb *= undersideTint;
+    color.rgb = mix(color.rgb, undersideTint.rgb, undersideTint.a);
     return color;
 }
 

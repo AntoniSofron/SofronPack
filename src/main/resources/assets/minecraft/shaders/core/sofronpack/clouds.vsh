@@ -23,7 +23,7 @@ layout(location = 0) out float vertexDistance;
 layout(location = 1) out vec4 vertexColor;
 layout(location = 2) out vec3 Pos;
 layout(location = 3) out vec3 PlayerPos;
-layout(location = 4) out vec3 undersideTint;
+layout(location = 4) out vec4 undersideTint;
 
 const vec3[] vertices = vec3[](
     vec3(1, 0, 0),
@@ -121,9 +121,13 @@ void main() {
 
     // Use the same camera sky sample as the sky disc, including biome transitions.
     float underside = (useTopColor && CloudOffset.y < 0.0) ? 0.0 : 1.0 - faceVertex.y;
-    undersideTint = ColorModulator.a < 0.0
-        ? mix(vec3(1.0), clamp(ColorModulator.rgb, 0.0, 1.0), 0.55 * underside)
-        : vec3(1.0);
+    vec3 sky = clamp(ColorModulator.rgb, 0.0, 1.0);
+    float peak = max(max(sky.r, sky.g), sky.b);
+    float chroma = peak - min(min(sky.r, sky.g), sky.b);
+    // Scale HSV saturation without clipping individual channels and shifting hue.
+    float gain = min(1.15, peak / max(chroma, 1e-6));
+    vec3 shadedSky = 0.92 * (vec3(peak) + (sky - vec3(peak)) * gain);
+    undersideTint = vec4(shadedSky, ColorModulator.a < 0.0 ? underside : 0.0);
     PlayerPos = pos;
 
     Pos =
