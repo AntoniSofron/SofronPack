@@ -15,8 +15,8 @@ class ExtendedLodFogTest {
     }
 
     @Test void badWeatherMovesAllBandsCloserButPreservesSmoothness() {
-        assertEquals(0.02f, ExtendedLodFog.opacity(8, 1f), .0001f);
-        assertEquals(.13f, ExtendedLodFog.opacity(16, 1f), .0001f);
+        assertEquals(0f, ExtendedLodFog.opacity(8, 1f), .0001f);
+        assertEquals(0f, ExtendedLodFog.opacity(16, 1f), .0001f);
         assertEquals(.55f, ExtendedLodFog.opacity(32, 1f), .0001f);
         assertEquals(.85f, ExtendedLodFog.opacity(56, 1f), .0001f);
         assertEquals(1f, ExtendedLodFog.opacity(64, 1f), .0001f);

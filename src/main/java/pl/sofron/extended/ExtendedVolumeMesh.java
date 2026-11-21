@@ -42,19 +42,18 @@ public final class ExtendedVolumeMesh {
             if (cells[level] != null) return;
             prepare(level - 1);
             int w = 16 >> level, previous = w * 2;
-            int height = (top + (1 << level) - 1) >> level;
+            int height = top;
             short[] small = new short[w * w * height], large = cells[level - 1];
             for (int y = 0; y < height; y++) for (int z = 0; z < w; z++) for (int x = 0; x < w; x++) {
-                int base = ((y * previous + z) * previous + x) * 2;
+                int base = (y * previous + z * 2) * previous + x * 2;
                 int rank = 0;
                 short representative = 0;
-                // Voxy Mipper ranks non-air children by opacity then octant.
-                for (int octant = 0; octant < 8; octant++) {
-                    int at = base + (octant >> 2) + (octant & 1) * previous
-                            + ((octant >> 1) & 1) * previous * previous;
+                // Reduce the horizontal footprint only. Fluid boundaries retain their exact Y.
+                for (int child = 0; child < 4; child++) {
+                    int at = base + (child & 1) + (child >> 1) * previous;
                     if (at >= large.length) continue;
                     short id = large[at];
-                    int score = (opacity[id] << 4) + octant;
+                    int score = (opacity[id] << 4) + child;
                     if (id != 0 && opacity[id] != 0 && score >= rank) {
                         rank = score;
                         representative = id;
@@ -66,9 +65,9 @@ public final class ExtendedVolumeMesh {
         }
 
         short get(int x, int y, int z, int level) {
-            if (y < 0 || y >= ((top + (1 << level) - 1) & -(1 << level))) return 0;
+            if (y < 0 || y >= top) return 0;
             int w = 16 >> level;
-            return cells[level][((y >> level) * w + ((z & 15) >> level)) * w + ((x & 15) >> level)];
+            return cells[level][(y * w + ((z & 15) >> level)) * w + ((x & 15) >> level)];
         }
     }
 
@@ -94,23 +93,23 @@ public final class ExtendedVolumeMesh {
             Volume v = data[owner];
             if (v == null) continue;
             int level = levels[owner], step = 1 << level, width = 16 / step;
-            int height = (v.top + step - 1) / step;
+            int height = v.top;
             for (int face = 0; face < 6; face++) {
                 int planes = face < 2 ? height : width;
                 int rows = face < 2 ? width : height;
                 var scan = new Plane(v, materials, face, cx * 16, cz * 16, step);
                 for (int slice = 0; slice < planes; slice++) {
-                    scan.slice = slice * step;
+                    scan.slice = face < 2 ? slice : slice * step;
                     for (int row = 0; row < rows; row++) {
                         for (int col = 0; col < width; col++) {
                             int x = (face < 4 ? col : slice) * step;
-                            int y = (face < 2 ? slice : row) * step;
+                            int y = face < 2 ? slice : row;
                             int z = (face < 2 ? row : face < 4 ? slice : col) * step;
                             short id = v.get(x, y, z, level);
                             if (id == 0 || v.opacity[id] == 0) { scan.putNext(0); continue; }
                             int nx = x, ny = y, nz = z;
                             switch (face) {
-                                case 0 -> ny += step;
+                                case 0 -> ny++;
                                 case 1 -> ny--;
                                 case 2 -> nz--;
                                 case 3 -> nz += step;
@@ -124,10 +123,9 @@ public final class ExtendedVolumeMesh {
                                 int adjacent = levels[neighbor];
                                 if (face >= 2 && adjacent < level) {
                                     int fine = 1 << adjacent;
-                                    for (int h = 0; !visible && h < step; h += fine)
-                                        for (int t = 0; !visible && t < step; t += fine)
+                                    for (int t = 0; !visible && t < step; t += fine)
                                             visible = exposed(v, id, other, other.get(nx + (face < 4 ? t : 0),
-                                                    ny + h, nz + (face >= 4 ? t : 0), adjacent));
+                                                    ny, nz + (face >= 4 ? t : 0), adjacent));
                                 } else {
                                     visible = exposed(v, id, other, other.get(nx, ny, nz, adjacent));
                                 }
@@ -173,10 +171,10 @@ public final class ExtendedVolumeMesh {
             int tint = ExtendedSurfaceMesh.color(v.source.grassTint(), v.source.foliageTint(), v.source.waterTint(), name, uv.tint());
             int shade = SHADE[face];
             float u = ExtendedSurfaceMesh.packUv(uv.u0(), uv.u1()), t = ExtendedSurfaceMesh.packUv(uv.v0(), uv.v1());
-            int plane = slice + (face == 0 || face == 3 || face == 5 ? step : 0);
+            int plane = slice + (face == 0 ? 1 : face == 3 || face == 5 ? step : 0);
             for (int corner = 0; corner < 4; corner++) {
                 int a = (col + 1 - (corner < 2 ? width : 0)) * step;
-                int b = (row + 1 - (corner == 0 || corner == 3 ? height : 0)) * step;
+                int b = (row + 1 - (corner == 0 || corner == 3 ? height : 0)) * (face < 2 ? step : 1);
                 staging.putFloat(ox + (face < 4 ? a : plane))
                         .putFloat(v.source.minY() + (face < 2 ? plane : b) - (face == 0 ? ExtendedSurfaceMesh.surfaceInset(name) : 0f))
                         .putFloat(oz + (face < 2 ? b : face < 4 ? plane : a))

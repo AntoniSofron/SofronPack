@@ -145,7 +145,8 @@ public final class ExtendedVoxelAtlas implements ExtendedVoxelMesher.MaterialRes
             // -1 requests the stored, actual biome tint for each chunk.
             // No fixed "fake grass/leaf colour" survives in the material table.
             int tint = quad.materialInfo().isTinted() ? -1 : 0xffffff;
-            boolean translucent = quad.materialInfo().layer() != ChunkSectionLayer.SOLID;
+            boolean translucent = !state.canOcclude()
+                    || quad.materialInfo().layer() != ChunkSectionLayer.SOLID;
             result[i] = new ExtendedVoxelMesher.MaterialUV(
                     u0 + eU, v0 + eV, u1 - eU, v1 - eV, tint, translucent, state.getLightEmission());
         }

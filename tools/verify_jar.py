@@ -110,19 +110,19 @@ with zipfile.ZipFile(jar) as z:
     assert b"cylindricalBlocks" in extended_shader
     assert b"FogRenderDistanceStart" in extended_shader
     assert b"linear_fog_value" in extended_shader
-    assert b"sofronExtendedFog" in extended_shader
+    assert b"sofronVolumeFog" in extended_shader
     assert b"horizontalChunks < FogRenderDistanceStart / 16.0" in extended_shader
     shared_shader = z.read("assets/sofronpack/shaders/include/extended_fog.glsl")
     assert b"sofronExtendedFog" in shared_shader
-    assert b"16.0,  8.0" in shared_shader
+    assert b"float a = 16.0" in shared_shader
     native_shader = z.read("assets/sofronpack/shaders/blocks/block_layer_opaque.fsh")
-    assert b"sofronExtendedFog" in native_shader
+    assert b"sofronVolumeFog" in native_shader
     assert b"2047.5" in native_shader
     assert "pl/sofron/extended/ExtendedLodHandoff.class" in files
     assert "pl/sofron/extended/ExtendedLodStages.class" in files
     assert "int pass = band * 2" in pathlib.Path(
         "src/main/java/pl/sofron/extended/client/ExtendedWorldLodRenderer.java").read_text()
-    assert b"sofronFogStrength(FogEnvironmentalEnd)" in extended_shader
+    assert b"sofronVolumeFog(fogRelative, FogEnvironmentalEnd)" in extended_shader
     # Original three-layer 0.1.33 build (17a6daf), distinct from main's same-name JAR.
     import hashlib
     for ext, digest in {
@@ -137,7 +137,7 @@ with zipfile.ZipFile(jar) as z:
         "assets/minecraft/shaders/core/lightmap.fsh")
     assert b"GameTime" in z.read("assets/minecraft/shaders/core/stars.fsh")
     lod_vertex = z.read("assets/minecraft/shaders/core/sofronpack/extended_voxel.vsh")
-    assert b"horizontalChunks" in lod_vertex
+    assert b"fogRelative = relative" in lod_vertex
     assert b"cylindricalBlocks" in lod_vertex
     lod_renderer = pathlib.Path(
         "src/main/java/pl/sofron/extended/client/ExtendedWorldLodRenderer.java").read_text()
@@ -154,7 +154,7 @@ with zipfile.ZipFile(jar) as z:
     atmosphere_source = pathlib.Path(
         "src/main/java/pl/sofron/atmosphere/AtmospherePresets.java").read_text()
     assert "distantFogBlend = (float)" in atmosphere_source
-    assert "customBiomeWeight" in atmosphere_source
+    assert "Math.max(caveWeight, weather)" in atmosphere_source
     cloud_source = pathlib.Path(
         "src/main/java/pl/sofron/atmosphere/CloudBandLayout.java").read_text()
     assert "LOW = 256.0f" in cloud_source

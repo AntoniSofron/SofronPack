@@ -30,6 +30,32 @@ class ExtendedSurfaceMeshTest {
         assertTrue(dirtTop[0]);
     }
 
+    @Test void stoneCliffRemainsVisibleBehindTallerNeighboringLeaves() {
+        short[] cells = new short[4096];
+        for (int y = 0; y < 6; y++) cells[y * 256 + 17] = 1;
+        cells[18] = 1;
+        cells[8 * 256 + 18] = 2;
+        var chunks = new ExtendedVoxelStore.VoxelChunk[36];
+        chunks[7] = ExtendedVoxelStore.encode(0, 0, 0, 16, 0, 0, 0,
+                new String[]{"minecraft:air", "minecraft:stone", "minecraft:oak_leaves"}, cells);
+        var mesh = new ExtendedSurfaceMesh().build(0, chunks, (name, face) ->
+                new ExtendedVoxelMesher.MaterialUV(0, 0, 1, 1, 0xffffff, name.endsWith("leaves")));
+        var vertices = mesh.vertices();
+        boolean found = false;
+        for (int i = 0; i < vertices.limit(); i += 4 * ExtendedVoxelMesher.VERTEX_BYTES) {
+            boolean onCliff = true;
+            float bottom = 100, top = -100;
+            for (int j = 0; j < 4; j++) {
+                int at = i + j * ExtendedVoxelMesher.VERTEX_BYTES;
+                onCliff &= vertices.getFloat(at) == 2f;
+                bottom = Math.min(bottom, vertices.getFloat(at + 4));
+                top = Math.max(top, vertices.getFloat(at + 4));
+            }
+            found |= onCliff && bottom == 1f && top == 6f;
+        }
+        assertTrue(found);
+    }
+
     @Test void levelWaterMeetsAtTheNativeHeightAcrossAChunkEdge() {
         short[] cells = new short[4096];
         java.util.Arrays.fill(cells, 0, 256, (short)1);
@@ -39,22 +65,28 @@ class ExtendedSurfaceMeshTest {
                     new String[]{"minecraft:air", "minecraft:water[level=0]"}, cells);
         var uv = new ExtendedVoxelMesher.MaterialUV(0, 0, 1, 1, -1, true);
         var surface = new ExtendedSurfaceMesh().build(0, chunks, (name, face) -> uv);
-        var volume = new ExtendedVolumeMesh().build(chunks, new int[36], (name, face) -> uv);
-        for (var mesh : new ExtendedVoxelMesher.Mesh[]{surface, volume}) {
-            boolean left = false, right = false;
-            for (int i = 0; i < mesh.vertices().limit(); i += 4 * ExtendedVoxelMesher.VERTEX_BYTES) {
-                float min = Float.POSITIVE_INFINITY, max = Float.NEGATIVE_INFINITY;
-                boolean surfaceQuad = true;
-                for (int j = 0; j < 4; j++) {
-                    int at = i + j * ExtendedVoxelMesher.VERTEX_BYTES;
-                    float x = mesh.vertices().getFloat(at);
-                    min = Math.min(min, x); max = Math.max(max, x);
-                    surfaceQuad &= Math.abs(mesh.vertices().getFloat(at + 4) - (63f - 1f/9f)) < .0001f;
+        var volumes = new ExtendedVolumeMesh();
+        for (int level = 0; level < 2; level++) {
+            int[] levels = new int[36];
+            levels[7] = level;
+            levels[8] = level + 1;
+            var volume = volumes.build(chunks, levels, (name, face) -> uv);
+            for (var mesh : new ExtendedVoxelMesher.Mesh[]{surface, volume}) {
+                boolean left = false, right = false;
+                for (int i = 0; i < mesh.vertices().limit(); i += 4 * ExtendedVoxelMesher.VERTEX_BYTES) {
+                    float min = Float.POSITIVE_INFINITY, max = Float.NEGATIVE_INFINITY;
+                    boolean surfaceQuad = true;
+                    for (int j = 0; j < 4; j++) {
+                        int at = i + j * ExtendedVoxelMesher.VERTEX_BYTES;
+                        float x = mesh.vertices().getFloat(at);
+                        min = Math.min(min, x); max = Math.max(max, x);
+                        surfaceQuad &= Math.abs(mesh.vertices().getFloat(at + 4) - (63f - 1f/9f)) < .0001f;
+                    }
+                    left |= surfaceQuad && min == 0 && max == 16;
+                    right |= surfaceQuad && min == 16 && max == 32;
                 }
-                left |= surfaceQuad && min == 0 && max == 16;
-                right |= surfaceQuad && min == 16 && max == 32;
+                assertTrue(left && right);
             }
-            assertTrue(left && right);
         }
     }
 
