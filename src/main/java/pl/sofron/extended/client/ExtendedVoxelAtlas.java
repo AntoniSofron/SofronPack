@@ -8,7 +8,6 @@ import net.minecraft.client.resources.model.geometry.BakedQuad;
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
-import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.SingleThreadedRandomSource;
@@ -35,6 +34,14 @@ public final class ExtendedVoxelAtlas implements ExtendedVoxelMesher.MaterialRes
     public void clear() {
         materials.clear();
         previousModels = null;
+    }
+
+    public boolean refreshModels() {
+        Object models = Minecraft.getInstance().getModelManager().getBlockStateModelSet();
+        if (previousModels == models) return false;
+        clear();
+        previousModels = models;
+        return true;
     }
 
     @Override
