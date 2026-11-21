@@ -20,8 +20,8 @@ import java.util.zip.*;
 public final class ExtendedVoxelStore {
     public static final int CELL = 2;
     public static final int GRID = 16 / CELL;
-    private static final int MAGIC = 0x53465632; // SFV2
-    private static final int VERSION = 2;
+    private static final int MAGIC = 0x53465633; // SFV3
+    private static final int VERSION = 3;
     private static final int MAX_RECORD = 1_048_576;
     private static volatile Session current;
     private static volatile long generation;
@@ -30,6 +30,7 @@ public final class ExtendedVoxelStore {
 
     /** A compressed immutable 8 x (height/2) x 8 material-palette grid. */
     public record VoxelChunk(int chunkX, int chunkZ, int minY, int yCount,
+                             int grassTint, int foliageTint, int waterTint,
                              String[] palette, byte[] deflated) {
         public VoxelChunk {
             if (yCount < 1 || yCount > 1024 || palette.length == 0
@@ -69,7 +70,8 @@ public final class ExtendedVoxelStore {
 
         public boolean same(VoxelChunk other) {
             return other != null && minY == other.minY && yCount == other.yCount
-                    && Arrays.equals(palette, other.palette)
+                    && grassTint == other.grassTint && foliageTint == other.foliageTint
+                    && waterTint == other.waterTint && Arrays.equals(palette, other.palette)
                     && Arrays.equals(deflated, other.deflated);
         }
     }
@@ -173,7 +175,7 @@ public final class ExtendedVoxelStore {
     public static synchronized void open(Path save, String dimension) {
         String name = dimension.replaceAll("[^a-zA-Z0-9_.-]", "_");
         Path path = save.resolve("sofronpack-extended-world")
-                .resolve(name + ".voxel.v2.bin").toAbsolutePath().normalize();
+                .resolve(name + ".voxel.v3.bin").toAbsolutePath().normalize();
         Session old = current;
         if (old != null && old.file.equals(path)) return;
         close();
@@ -279,10 +281,27 @@ public final class ExtendedVoxelStore {
                 }
             }
         }
-        return encode(chunkX, chunkZ, minimum, count, palette.toArray(String[]::new), cells);
+        // The integrated server knows the real far-away biome. Keep its
+        // Minecraft foliage/grass/water tint in the persisted LOD snapshot,
+        // rather than inventing one constant color for every biome.
+        pos.set(chunkX * 16 + 8, chunk.getHeight(
+                net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, 8, 8),
+                chunkZ * 16 + 8);
+        var biome = level.getBiome(pos).value();
+        return encode(chunkX, chunkZ, minimum, count,
+                biome.getGrassColor(pos.getX(), pos.getZ()),
+                biome.getFoliageColor(), biome.getWaterColor(),
+                palette.toArray(String[]::new), cells);
     }
 
     public static VoxelChunk encode(int x, int z, int minY, int yCount,
+                                    String[] palette, short[] raw) {
+        return encode(x, z, minY, yCount, 0x7aaf57, 0x6ea951, 0x3f76e4,
+                palette, raw);
+    }
+
+    public static VoxelChunk encode(int x, int z, int minY, int yCount,
+                                    int grassTint, int foliageTint, int waterTint,
                                     String[] palette, short[] raw) {
         if (raw.length != GRID * GRID * yCount) throw new IllegalArgumentException("Voxel volume");
         byte[] bytes = new byte[raw.length * 2];
@@ -305,7 +324,7 @@ public final class ExtendedVoxelStore {
         } catch (IOException impossible) {
             throw new IllegalStateException(impossible);
         } finally { deflater.end(); }
-        return new VoxelChunk(x, z, minY, yCount, palette, compressed);
+        return new VoxelChunk(x, z, minY, yCount, grassTint, foliageTint, waterTint, palette, compressed);
     }
 
     static byte[] payload(VoxelChunk chunk) throws IOException {
@@ -315,6 +334,9 @@ public final class ExtendedVoxelStore {
             out.writeInt(chunk.chunkZ());
             out.writeInt(chunk.minY());
             out.writeShort(chunk.yCount());
+            out.writeInt(chunk.grassTint());
+            out.writeInt(chunk.foliageTint());
+            out.writeInt(chunk.waterTint());
             out.writeShort(chunk.palette().length);
             for (String identifier : chunk.palette()) out.writeUTF(identifier);
             out.writeInt(chunk.deflated().length);
@@ -328,14 +350,16 @@ public final class ExtendedVoxelStore {
     static VoxelChunk readPayload(byte[] payload) throws IOException {
         try (DataInputStream in = new DataInputStream(new ByteArrayInputStream(payload))) {
             int x = in.readInt(), z = in.readInt(), y = in.readInt();
-            int count = in.readUnsignedShort(), paletteSize = in.readUnsignedShort();
+            int count = in.readUnsignedShort();
+            int grassTint = in.readInt(), foliageTint = in.readInt(), waterTint = in.readInt();
+            int paletteSize = in.readUnsignedShort();
             if (count < 1 || count > 1024 || paletteSize < 1 || paletteSize > 32767)
                 throw new IOException("Invalid cache record");
             String[] palette = new String[paletteSize];
             for (int i = 0; i < paletteSize; i++) palette[i] = in.readUTF();
             int bytes = in.readInt();
             if (bytes < 0 || bytes > MAX_RECORD || bytes > in.available()) throw new IOException("Invalid compressed length");
-            return new VoxelChunk(x, z, y, count, palette, in.readNBytes(bytes));
+            return new VoxelChunk(x, z, y, count, grassTint, foliageTint, waterTint, palette, in.readNBytes(bytes));
         }
     }
     public static long pack(int x, int z) { return ((long)x << 32) | (z & 0xffffffffL); }
