@@ -3,7 +3,9 @@ package pl.sofron.extended;
 import net.minecraft.core.Direction;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.Iterator;
+import java.util.Map;
 
 /**
  * Chunk-voxel surface extraction: emits axis-aligned, opaque Minecraft-style
@@ -33,6 +35,40 @@ public final class ExtendedVoxelMesher {
         ExtendedVoxelStore.VoxelChunk get(int x, int z);
     }
 
+    private static final int DECODED_CACHE_LIMIT = 256;
+    // One per client render thread, not one decompressed volume per quad.
+    // 256 x 16*16*worldHeight*2bytes ~= 50 MB at Minecraft's 384-block height.
+    private static final LinkedHashMap<Long, Decoded> DECODED_CACHE =
+            new LinkedHashMap<>(256, 0.75f, true);
+
+    // Reuse the upload staging memory rather than creating ~3 MB of native
+    // allocations on every LOD rebuild. The renderer consumes each Mesh
+    // immediately before requesting another one.
+    private static final ThreadLocal<ByteBuffer> VERTEX_STAGING =
+            ThreadLocal.withInitial(() -> ByteBuffer.allocateDirect(
+                    MAX_QUADS * 4 * VERTEX_BYTES).order(ByteOrder.nativeOrder()));
+
+    public static void clearCachedChunks() {
+        DECODED_CACHE.clear();
+        VERTEX_STAGING.remove();
+    }
+
+    private static Decoded decode(int x, int z, ChunkLookup lookup) {
+        ExtendedVoxelStore.VoxelChunk source = lookup.get(x, z);
+        if (source == null) return null;
+        long key = ExtendedVoxelStore.pack(x, z);
+        Decoded cached = DECODED_CACHE.get(key);
+        if (cached != null && cached.source == source) return cached;
+        Decoded fresh = new Decoded(source);
+        DECODED_CACHE.put(key, fresh);
+        if (DECODED_CACHE.size() > DECODED_CACHE_LIMIT) {
+            Iterator<Long> eldest = DECODED_CACHE.keySet().iterator();
+            eldest.next();
+            eldest.remove();
+        }
+        return fresh;
+    }
+
     private static final class Decoded {
         final ExtendedVoxelStore.VoxelChunk source;
         final short[] cells;
@@ -60,12 +96,13 @@ public final class ExtendedVoxelMesher {
         int minY = 0, yCount = 0;
         for (int z = -1; z <= TILE_CHUNKS; z++) {
             for (int x = -1; x <= TILE_CHUNKS; x++) {
-                var chunk = lookup.get(tileX * TILE_CHUNKS + x, tileZ * TILE_CHUNKS + z);
-                if (chunk != null) {
-                    chunks[(z + 1) * stride + (x + 1)] = new Decoded(chunk);
+                Decoded decoded = decode(tileX * TILE_CHUNKS + x,
+                        tileZ * TILE_CHUNKS + z, lookup);
+                if (decoded != null) {
+                    chunks[(z + 1) * stride + (x + 1)] = decoded;
                     if (x >= 0 && x < TILE_CHUNKS && z >= 0 && z < TILE_CHUNKS) {
-                        minY = chunk.minY();
-                        yCount = chunk.yCount();
+                        minY = decoded.source.minY();
+                        yCount = decoded.source.yCount();
                     }
                 }
             }
@@ -75,8 +112,8 @@ public final class ExtendedVoxelMesher {
         }
 
         int side = TILE_CHUNKS * ExtendedVoxelStore.GRID;
-        ByteBuffer data = ByteBuffer.allocateDirect(MAX_QUADS * 4 * VERTEX_BYTES)
-                .order(ByteOrder.nativeOrder());
+        ByteBuffer data = VERTEX_STAGING.get();
+        data.clear();
         int rendered = 0;
         int voxelUnit = ExtendedVoxelStore.CELL * detail;
 
@@ -132,7 +169,7 @@ public final class ExtendedVoxelMesher {
                         }
                         if (++rendered > MAX_QUADS) {
                             data.flip();
-                            return new Mesh(data.limit(MAX_QUADS * 4 * VERTEX_BYTES), MAX_QUADS);
+                            return new Mesh(data.limit(MAX_QUADS * 4 * VERTEX_BYTES).slice().order(ByteOrder.nativeOrder()), MAX_QUADS);
                         }
                         emit(data, bx, by, bz, voxelUnit, face, material, tint);
                     }
@@ -140,7 +177,7 @@ public final class ExtendedVoxelMesher {
             }
         }
         data.flip();
-        return new Mesh(data, rendered);
+        return new Mesh(data.slice().order(ByteOrder.nativeOrder()), rendered);
     }
 
     /** Test presence of a block; water and leaves remain separate textured voxels. */
