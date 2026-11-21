@@ -17,6 +17,13 @@ public final class ChunkLightAtlas {
     private static final ByteBuffer EMPTY_BYTES = ByteBuffer.allocateDirect(4).order(ByteOrder.nativeOrder()).asReadOnlyBuffer();
     private static final int MAX_WORDS = 16 * 1024 * 1024;
     private record Column(List<LightSource> lights, int[] words) {}
+    // Placed light centers sit on half-block coordinates. For each configured radius
+    // there are only a finite number of distinct squared distances to a grid node.
+    private final Map<Float, float[]> falloffs = new java.util.LinkedHashMap<>(16, 0.75f, true) {
+        @Override protected boolean removeEldestEntry(Map.Entry<Float, float[]> eldest) {
+            return size() > 16;
+        }
+    };
     private final Map<Long,Column> cached = new HashMap<>();
     // Reuse off-heap staging memory. Repeated reallocations of multi-megabyte
     // direct buffers on every atlas revision trigger expensive native cleanup.
@@ -24,6 +31,7 @@ public final class ChunkLightAtlas {
     public record Snapshot(ByteBuffer bytes, int chunkCount, int lightReferences) {}
     public void clear() {
         cached.clear();
+        falloffs.clear();
         staging = null;
     }
 
@@ -76,7 +84,7 @@ public final class ChunkLightAtlas {
         return new Snapshot(staging.asReadOnlyBuffer().order(ByteOrder.nativeOrder()),cells,references);
     }
 
-    private static int[] encode(List<LightSource> lights, int x0, int z0) {
+    private int[] encode(List<LightSource> lights, int x0, int z0) {
         var sections = new TreeMap<Integer,List<LightSource>>();
         for (LightSource light : lights) {
             int low = (int)Math.floor((light.y()-light.radius())/16);
@@ -105,18 +113,27 @@ public final class ChunkLightAtlas {
         return out.toIntArray();
     }
 
-    private static void bake(IntArrayList out, List<LightSource> lights, int x0, int y0, int z0) {
+    private void bake(IntArrayList out, List<LightSource> lights, int x0, int y0, int z0) {
         float[] sums = new float[GRID*GRID*GRID*5];
         for (LightSource s : lights) {
             double x=s.x()-x0, y=s.y()-y0, z=s.z()-z0, radius=s.radius();
             var c = s.color();
             float peak = Math.max(c.red(),Math.max(c.green(),c.blue()));
             if (peak<=0 || s.power()<=0) continue;
+            float[] falloff = null;
+            if (radius <= 64 && x*2 == Math.rint(x*2) && y*2 == Math.rint(y*2) && z*2 == Math.rint(z*2)) {
+                falloff = falloffs.computeIfAbsent(s.radius(), r -> {
+                    double r2 = (double)r*r;
+                    float[] table = new float[(int)Math.ceil(4*r2)];
+                    for (int i=0; i<table.length; i++) table[i] = attenuation(i * 0.25, r);
+                    return table;
+                });
+            }
             int xa=first(x,radius), xb=last(x,radius), ya=first(y,radius), yb=last(y,radius);
             for (int k=first(z,radius); k<=last(z,radius); k++) for (int j=ya; j<=yb; j++) for (int i=xa; i<=xb; i++) {
                 double dx=2*i-x, dy=2*j-y, dz=2*k-z, sq=dx*dx+dy*dy+dz*dz;
                 if (sq >= radius*radius) continue;
-                float influence = s.power()*(float)Math.pow(1-Math.sqrt(sq)/radius,2.8);
+                float influence = s.power()*(falloff == null ? attenuation(sq, radius) : falloff[(int)(4*sq)]);
                 float weight = influence*influence;
                 int at=5*((k*GRID+j)*GRID+i);
                 sums[at]+=c.red()*weight; sums[at+1]+=c.green()*weight; sums[at+2]+=c.blue()*weight;
@@ -132,6 +149,10 @@ public final class ChunkLightAtlas {
             out.add(rgb);
             put(out,weight>1e-5f ? sums[i+4] : 0);
         }
+    }
+
+    private static float attenuation(double squared, double radius) {
+        return (float)Math.pow(1 - Math.sqrt(squared)/radius, 2.8);
     }
 
     private static int first(double center,double radius) { return Math.max(0,(int)Math.ceil((center-radius)/2)); }
