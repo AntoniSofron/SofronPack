@@ -116,8 +116,11 @@ public final class ExtendedVoxelMesher {
                         if (tint == -1) {
                             Decoded owner = chunks[(z / ExtendedVoxelStore.GRID) * TILE_CHUNKS
                                     + x / ExtendedVoxelStore.GRID];
-                            String name = id.toLowerCase(java.util.Locale.ROOT);
-                            tint = name.contains("water") ? owner.source.waterTint()
+                            String name = id.substring(0, id.indexOf('[') < 0
+                                    ? id.length() : id.indexOf('['))
+                                    .toLowerCase(java.util.Locale.ROOT);
+                            tint = name.equals("minecraft:water") || name.endsWith("_water")
+                                    ? owner.source.waterTint()
                                     : name.contains("leaves") || name.contains("vine")
                                     ? owner.source.foliageTint() : owner.source.grassTint();
                         }
@@ -138,9 +141,13 @@ public final class ExtendedVoxelMesher {
     private static boolean solid(Decoded[] chunks, int x, int y, int z, int height,
                                  int side, String ownMaterial) {
         String id = block(chunks, x, y, z, height, side);
-        return id != null && !id.equals("minecraft:air")
-                && !id.contains("water") && !id.contains("lava")
-                && !(ownMaterial.contains("leaves") && !id.contains("leaves"));
+        if (id == null || id.equals("minecraft:air")) return false;
+        String neighbor = id.substring(0, id.indexOf('[') < 0 ? id.length() : id.indexOf('['));
+        String own = ownMaterial.substring(0, ownMaterial.indexOf('[') < 0
+                ? ownMaterial.length() : ownMaterial.indexOf('['));
+        boolean fluid = neighbor.equals("minecraft:water") || neighbor.equals("minecraft:lava");
+        if (fluid) return neighbor.equals(own); // Never draw buried water-water faces.
+        return !(own.contains("leaves") && !neighbor.contains("leaves"));
     }
 
     private static String block(Decoded[] chunks, int x, int y, int z, int height, int side) {
