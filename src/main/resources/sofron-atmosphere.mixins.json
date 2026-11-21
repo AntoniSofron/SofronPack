@@ -5,7 +5,9 @@
   "compatibilityLevel": "JAVA_25",
   "client": [
     "AtmosphereBuilderMixin",
-    "AtmosphericFogMixin"
+    "AtmosphericFogMixin",
+    "CloudLayersMixin",
+    "CloudPipelineMixin"
   ],
   "injectors": {
     "defaultRequire": 1
