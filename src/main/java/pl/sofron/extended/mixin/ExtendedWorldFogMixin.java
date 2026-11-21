@@ -41,7 +41,7 @@ public abstract class ExtendedWorldFogMixin {
         // Keep normal chunk loading/simulation untouched while shifting only
         // this artificial distance fade to the *same* distant-world range.
         // Real environmental fog end/start still wins in severe conditions.
-        float start = 16f * 16f;
+        float start = pl.sofron.extended.ExtendedLodHandoff.nearStartChunks(renderDistanceInChunks) * 16f;
         float end = ExtendedWorldConfig.DISTANT_RADIUS_CHUNKS * 16f;
         fog.renderDistanceStart = start;
         fog.renderDistanceEnd = end;
