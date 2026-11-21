@@ -140,7 +140,7 @@ public final class ExtendedWorldLodRenderer {
                         (float)((long)tz * TILE * 16 - camera.z));
                 var transform = RenderSystem.getDynamicUniforms().writeTransform(
                         relative, new Vector4f(1f, 1f, 1f, 1f),
-                        new Vector3f(), new Matrix4f(), 1f);
+                        new Vector3f(), new Matrix4f());
                 pass.setUniform("DynamicTransforms", transform);
                 pass.setVertexBuffer(0, tile.buffer.slice());
                 pass.drawIndexed(tile.quads * 6, 1, 0, 0, 0);
