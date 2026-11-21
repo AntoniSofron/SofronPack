@@ -102,3 +102,10 @@ envelope. Clear-weather LODs keep their extended visibility instead of
 inheriting the ordinary render-distance fade. Cloud undersides inherit the
 biome's blended sky color at a stronger intensity, while their tops stay
 bright and the three layers remain at 256/384/512.
+
+The vanilla normal-chunk render-distance fade is extended to the same
+256-2048 block horizon when Extended World is enabled, while world chunk
+loading and simulation remain unchanged. Custom environmental fog still
+shortens visibility equally on both renderers. The environmental fog
+selection acts as a toggle, not a second opacity multiplier: smoothly
+blended biome fog distances are already taken into account on the CPU.

@@ -8,6 +8,7 @@ import net.minecraft.client.renderer.fog.FogRenderer;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.material.FogType;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
@@ -21,6 +22,8 @@ import pl.sofron.extended.ExtendedWorldConfig;
  */
 @Mixin(FogRenderer.class)
 public abstract class ExtendedWorldFogMixin {
+    @Unique private static boolean sofron$logged;
+
     @Inject(method = "setupFog", at = @At("RETURN"))
     private void sofron$extendTerrainFog(Camera camera, int renderDistanceInChunks,
             DeltaTracker deltaTracker, float darkenWorldAmount, ClientLevel level,
@@ -39,5 +42,9 @@ public abstract class ExtendedWorldFogMixin {
         // Real environmental fog end/start still wins in severe conditions.
         fog.renderDistanceStart = 16f * 16f;
         fog.renderDistanceEnd = ExtendedWorldConfig.DISTANT_RADIUS_CHUNKS * 16f;
+        if (!sofron$logged) {
+            sofron$logged = true;
+            System.out.println("[SofronPack] Unified Extended World fog active: normal + LOD terrain, 128 chunks");
+        }
     }
 }

@@ -110,6 +110,7 @@ with zipfile.ZipFile(jar) as z:
     assert b"sphericalBlocks" in extended_shader
     assert b"environmentFog" in extended_shader
     assert b"max(baseFog, unifiedEnvironment)" in extended_shader
+    assert b"step(0.001, atmosphereBlend)" in extended_shader
     cloud_vertex = z.read("assets/minecraft/shaders/core/sofronpack/clouds.vsh")
     assert b"0.96 * underside" in cloud_vertex
     assert b"ColorModulator.rgb" in cloud_vertex
@@ -124,6 +125,7 @@ with zipfile.ZipFile(jar) as z:
     fog_mixin_source = pathlib.Path(
         "src/main/java/pl/sofron/extended/mixin/ExtendedWorldFogMixin.java").read_text()
     assert "fog.renderDistanceStart = 16f * 16f" in fog_mixin_source
+    assert "Unified Extended World fog active" in fog_mixin_source
     assert "fog.renderDistanceEnd = ExtendedWorldConfig.DISTANT_RADIUS_CHUNKS * 16f" in fog_mixin_source
     assert b"sphericalBlocks = length(relative)" in lod_vertex
     atmosphere_source = pathlib.Path(

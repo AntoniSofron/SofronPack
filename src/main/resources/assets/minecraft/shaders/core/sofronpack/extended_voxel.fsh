@@ -50,7 +50,10 @@ void main() {
             / max(FogEnvironmentalEnd - FogEnvironmentalStart, 0.001),
         0.0, 1.0
     );
-    float unifiedEnvironment = environmentFog * clamp(atmosphereBlend, 0.0, 1.0);
+    // Camera biome weights were ALREADY blended into FogEnvironmentalEnd.
+    // Multiplying that fog by the biome weight a second time would make the
+    // LOD half-transparent when the normal chunk is completely fogged.
+    float unifiedEnvironment = environmentFog * step(0.001, atmosphereBlend);
     float fog = max(baseFog, unifiedEnvironment);
     // FogColor comes from the live blended biome/environment, not a fixed hue.
     sampled.rgb = mix(sampled.rgb, FogColor.rgb, fog);
