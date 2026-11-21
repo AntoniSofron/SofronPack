@@ -119,7 +119,10 @@ with zipfile.ZipFile(jar) as z:
     assert b"sofronExtendedFog" in native_shader
     assert b"2047.5" in native_shader
     assert "pl/sofron/extended/ExtendedLodHandoff.class" in files
-    assert b"max(baseFog, nativeFog)" in extended_shader
+    assert "pl/sofron/extended/ExtendedLodStages.class" in files
+    assert "int pass = band * 2" in pathlib.Path(
+        "src/main/java/pl/sofron/extended/client/ExtendedWorldLodRenderer.java").read_text()
+    assert b"sofronFogStrength(FogEnvironmentalEnd)" in extended_shader
     cloud_vertex = z.read("assets/minecraft/shaders/core/sofronpack/clouds.vsh")
     assert b"0.60 * underside" in cloud_vertex
     assert b"ColorModulator.rgb" in cloud_vertex

@@ -152,3 +152,32 @@ blended biome fog distances are already taken into account on the CPU.
 
 The old distance and caching rules documented above describe historical
 implementations; v0.1.37 takes precedence where they differ.
+
+## v0.1.38 — shared four-stage fog and seven-stage terrain preparation
+
+The same `sofronpack:extended_fog.glsl` function is used in Sodium's
+ordinary-chunk fragment pass and in SofronPack's textured LOD pass. Clear
+weather: 0% at 16 chunks, 13% at 32, 55% at 64, 85% at 96 and
+100% at 128 chunks. The four ranges are smoothstep interpolated.
+In the extended-world mode, the native renderer uses the custom
+four-stage distance curve instead of the much shorter linear fade.
+The global blended environmental fog end distance, which incorporates
+weather, cave and biome rules, shifts all the stages closer together
+without applying a second unrelated fog overlay. Non-extended worlds
+continue to use normal Minecraft/Sodium fog.
+
+The LOD geometry is hidden at distances strictly less than
+`renderDistance * 7 / 8`, including old GPU tiles from before the camera
+moved. The source-mesh culling and shader-pixel clipping enforce the
+same dynamic threshold. Vanilla client chunks retain priority in the
+overlap between the 7/8 threshold and full view radius.
+
+Full worldgen/caching prioritizes **square rings** in this exact order:
+8, 16, 32, 48, 64, 96 and 128 chunks. The scheduler waits for the
+current ring to finish being captured and persisted before requesting
+new chunks in the next ring. Already-loaded chunks are captured without
+another generation request; in-flight requests are deduplicated.
+The first two stages have a larger dispatch budget when the server is
+healthy, but still respect a strict maximum of 12 outstanding jobs
+and back off if the server is overloaded. This describes task priority;
+it is not a measured 10x worldgen speedup.

@@ -106,8 +106,9 @@ public final class ExtendedWorldPrefetch {
         // before the preceding band has finished persisting its snapshots.
         while (submitted < submitBudget && pending < MAX_PENDING && inspected < 4096) {
             if (stageIndex >= ExtendedLodStages.count()) {
-                // Fully generated horizon: periodically revisit the nearest
-                // region to fill new gaps from ordinary player movement.
+                // All seven bands have been processed. Do not spin through
+                // the 128-chunk world every tick once the cache is complete.
+                if (ticks % 20 != 0) break;
                 stageIndex = cursor = 0;
             }
 
