@@ -111,11 +111,22 @@ public final class ExtendedVoxelMesher {
                         };
                         MaterialUV material = materials.face(id, dir);
                         if (material == null) continue;
+                        // Apply the source chunk's *real* biome tint to tinted
+                        // block-atlas sprites, not an arbitrary palette colour.
+                        int tint = material.tint();
+                        if (tint == -1) {
+                            Decoded owner = chunks[(z / ExtendedVoxelStore.GRID) * TILE_CHUNKS
+                                    + x / ExtendedVoxelStore.GRID];
+                            String name = id.toLowerCase(java.util.Locale.ROOT);
+                            tint = name.contains("water") ? owner.source.waterTint()
+                                    : name.contains("leaves") || name.contains("vine")
+                                    ? owner.source.foliageTint() : owner.source.grassTint();
+                        }
                         if (++rendered > MAX_QUADS) {
                             data.flip();
                             return new Mesh(data.limit(MAX_QUADS * 4 * VERTEX_BYTES), MAX_QUADS);
                         }
-                        emit(data, bx, by, bz, voxelUnit, face, material);
+                        emit(data, bx, by, bz, voxelUnit, face, material, tint);
                     }
                 }
             }
@@ -148,7 +159,7 @@ public final class ExtendedVoxelMesher {
     }
 
     private static void emit(ByteBuffer out, float x, float y, float z, float n,
-                             int face, MaterialUV uv) {
+                             int face, MaterialUV uv, int tint) {
         float[][] p = switch (face) {
             case 0 -> new float[][] {{x,y+n,z},{x,y+n,z+n},{x+n,y+n,z+n},{x+n,y+n,z}};
             case 1 -> new float[][] {{x,y,z+n},{x,y,z},{x+n,y,z},{x+n,y,z+n}};
@@ -163,7 +174,6 @@ public final class ExtendedVoxelMesher {
             case 2, 3 -> 0.82f;
             default -> 0.7f;
         };
-        int tint = uv.tint();
         int r = Math.clamp(Math.round((tint >> 16 & 255) * shade), 0, 255);
         int g = Math.clamp(Math.round((tint >> 8 & 255) * shade), 0, 255);
         int b = Math.clamp(Math.round((tint & 255) * shade), 0, 255);
