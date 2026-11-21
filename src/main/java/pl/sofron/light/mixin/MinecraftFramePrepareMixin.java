@@ -9,6 +9,13 @@ import pl.sofron.light.render.gpu.SodiumRenderPassCoordinator;
 
 @Mixin(net.minecraft.client.renderer.GameRenderer.class)
 public abstract class MinecraftFramePrepareMixin {
+    @org.spongepowered.asm.mixin.injection.ModifyArg(method = "renderLevel",
+            at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/ProjectionMatrixBuffer;getBuffer(Lorg/joml/Matrix4f;)Lcom/mojang/renderpearl/api/buffers/GpuBufferSlice;"), index = 0, require = 1)
+    private org.joml.Matrix4f sofron$captureTerrainProjection(org.joml.Matrix4f matrix) {
+        pl.sofron.extended.client.ExtendedWorldLodRenderer.updateProjection(matrix);
+        return matrix;
+    }
+
     @Inject(method = "renderLevel", at = @At("HEAD"))
     private void sofron$prepareLightsBeforeFrame(CallbackInfo ci) {
         Minecraft mc = Minecraft.getInstance();

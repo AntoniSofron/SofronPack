@@ -30,6 +30,34 @@ class ExtendedSurfaceMeshTest {
         assertTrue(dirtTop[0]);
     }
 
+    @Test void levelWaterMeetsAtTheNativeHeightAcrossAChunkEdge() {
+        short[] cells = new short[4096];
+        java.util.Arrays.fill(cells, 0, 256, (short)1);
+        var chunks = new ExtendedVoxelStore.VoxelChunk[36];
+        for (int x = 0; x < 2; x++)
+            chunks[7 + x] = ExtendedVoxelStore.encode(x, 0, 62, 16, 0, 0, 0,
+                    new String[]{"minecraft:air", "minecraft:water[level=0]"}, cells);
+        var uv = new ExtendedVoxelMesher.MaterialUV(0, 0, 1, 1, -1, true);
+        var surface = new ExtendedSurfaceMesh().build(0, chunks, (name, face) -> uv);
+        var volume = new ExtendedVolumeMesh().build(chunks, new int[36], (name, face) -> uv);
+        for (var mesh : new ExtendedVoxelMesher.Mesh[]{surface, volume}) {
+            boolean left = false, right = false;
+            for (int i = 0; i < mesh.vertices().limit(); i += 4 * ExtendedVoxelMesher.VERTEX_BYTES) {
+                float min = Float.POSITIVE_INFINITY, max = Float.NEGATIVE_INFINITY;
+                boolean surfaceQuad = true;
+                for (int j = 0; j < 4; j++) {
+                    int at = i + j * ExtendedVoxelMesher.VERTEX_BYTES;
+                    float x = mesh.vertices().getFloat(at);
+                    min = Math.min(min, x); max = Math.max(max, x);
+                    surfaceQuad &= Math.abs(mesh.vertices().getFloat(at + 4) - (63f - 1f/9f)) < .0001f;
+                }
+                left |= surfaceQuad && min == 0 && max == 16;
+                right |= surfaceQuad && min == 16 && max == 32;
+            }
+            assertTrue(left && right);
+        }
+    }
+
     @Test void topOffSamplingGridSurvivesAtEveryResolution() {
         short[] cells = new short[16 * 16 * 16];
         cells[15 * 256 + 7 * 16 + 11] = 1;

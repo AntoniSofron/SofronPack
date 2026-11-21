@@ -110,17 +110,18 @@ public final class ExtendedVoxelAtlas implements ExtendedVoxelMesher.MaterialRes
                 var free = part.getQuads(null);
                 if (!free.isEmpty()) { quad = free.getFirst(); break; }
             }
-            if (quad == null) {
+            boolean water = baseName.equals("minecraft:water") || baseName.equals("minecraft:bubble_column");
+            if (water || baseName.equals("minecraft:lava") || quad == null) {
                 // Fluid blocks have no baked block-state model, so load the
                 // genuine vanilla fluid sprite from the active texture pack.
-                String spriteName = baseName.equals("minecraft:water") ? "minecraft:block/water_still" :
+                String spriteName = water ? "minecraft:block/water_still" :
                         baseName.equals("minecraft:lava") ? "minecraft:block/lava_still" : null;
                 if (spriteName != null) {
                     var texture = (TextureAtlas)Minecraft.getInstance().getTextureManager()
                             .getTexture(Identifier.parse("minecraft:textures/atlas/blocks.png"));
                     TextureAtlasSprite sprite = texture.getSprite(Identifier.parse(spriteName));
                     if (sprite != null) {
-                        int tint = baseName.equals("minecraft:water") ? -1 : 0xffffff;
+                        int tint = water ? -1 : 0xffffff;
                         result[i] = new ExtendedVoxelMesher.MaterialUV(
                                 sprite.getU0(), sprite.getV0(), sprite.getU1(), sprite.getV1(),
                                 tint, true, state.getLightEmission());

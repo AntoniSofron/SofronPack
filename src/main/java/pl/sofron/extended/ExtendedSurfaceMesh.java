@@ -146,7 +146,7 @@ public final class ExtendedSurfaceMesh {
                     int z0 = oz + (z + 1 - width) * detail, z1 = oz + (z + 1) * detail;
                     float u = packUv(uv.u0(), uv.u1()), v = packUv(uv.v0(), uv.v1());
                     for (int corner = 0; corner < 4; corner++) {
-                        staging.putFloat(corner < 2 ? x0 : x1).putFloat(own.height[column])
+                        staging.putFloat(corner < 2 ? x0 : x1).putFloat(own.height[column] - surfaceInset(name))
                                 .putFloat(corner == 0 || corner == 3 ? z0 : z1)
                                 .putFloat(u).putFloat(v).put((byte)(tint >> 16))
                                 .put((byte)(tint >> 8)).put((byte)tint).put((byte)(254 - 3 * uv.emission()));
@@ -166,7 +166,11 @@ public final class ExtendedSurfaceMesh {
                         int xx = x + (f == 4 ? -detail : f == 5 ? detail : 0);
                         int zz = z + (f == 2 ? -detail : f == 3 ? detail : 0);
                         Columns next = owner(data, xx, zz);
-                        if (next == null) continue;
+                        if (next == null) {
+                            if (water(own.palette[own.top[column]]))
+                                face(own, own.top[column], x, h - 1, z, detail, 1, f, materials);
+                            continue;
+                        }
                         int bottom = next.height[next.column(xx, zz, detail)];
                         // At a mixed-resolution boundary the neighbouring tile may use a
                         // lower column. Close the edge against its minimum covered height.
@@ -202,9 +206,14 @@ public final class ExtendedSurfaceMesh {
         var uv = materials.face(name, DIRECTIONS[face]);
         if (uv == null) return;
         int tint = color(own.grass, own.foliage, own.water, name, uv.tint());
-        ExtendedVoxelMesher.emit(staging, x, y, z, width, height, face, uv, tint);
+        float inset = surfaceInset(name);
+        ExtendedVoxelMesher.emit(staging, x, y, z, width, height - inset, face, uv, tint);
     }
-    private static boolean water(String state) {
+    static float surfaceInset(String name) {
+        return water(name) ? 1f / 9f : 0f;
+    }
+
+    static boolean water(String state) {
         return state.equals("minecraft:water") || state.startsWith("minecraft:water[")
                 || state.equals("minecraft:bubble_column") || state.startsWith("minecraft:bubble_column[");
     }

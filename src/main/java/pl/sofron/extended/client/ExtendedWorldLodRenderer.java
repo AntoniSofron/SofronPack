@@ -185,7 +185,6 @@ public final class ExtendedWorldLodRenderer {
         try {
             finishMeshes(minTX, maxTX, minTZ, maxTZ, cx, cz);
             ensureIndices();
-            uploadFarProjection(mc);
             // Pick the nearest visible dirty tile. Random HashSet iteration
             // caused important close LOD chunks to appear after far-off ones.
             var view = mc.gameRenderer.mainCamera().forwardVector();
@@ -288,9 +287,9 @@ public final class ExtendedWorldLodRenderer {
      * 128-chunk LOD projection extends that far plane without altering near
      * terrain, camera FOV, chunk simulation or game options.
      */
-    private static void uploadFarProjection(Minecraft mc) {
-        Matrix4f projection = new Matrix4f(mc.gameRenderer.gameRenderState()
-                .levelRenderState.cameraRenderState.projectionMatrix);
+    public static void updateProjection(Matrix4f terrainProjection) {
+        if (device == null || MESHES.isEmpty() || failed || !ExtendedWorldConfig.get().enabled) return;
+        Matrix4f projection = new Matrix4f(terrainProjection);
         // Leave the overlapping native geometry in front in the shared depth buffer.
         float near = 0.025f, far = FAR * 16f + 512f;
         boolean reversed = DepthStencilState.DEFAULT.depthTest()
@@ -299,8 +298,12 @@ public final class ExtendedWorldLodRenderer {
             float tmp = near; near = far; far = tmp;
         }
         boolean zeroToOne = device.getDeviceInfo().isZZeroToOne();
-        projection.m22((zeroToOne ? far : far + near) / (near - far));
-        projection.m32((zeroToOne ? far : far + far) * near / (near - far));
+        // Keep the X, Y and W clip coordinates from the actual terrain pass, including
+        // view bobbing, camera tilt and portal effects. Only replace the depth row.
+        float scale = (zeroToOne ? far : far + near) / (far - near);
+        float offset = (zeroToOne ? far : far + far) * near / (near - far);
+        projection.m02(scale * projection.m03()).m12(scale * projection.m13())
+                .m22(scale * projection.m23()).m32(scale * projection.m33() + offset);
         if (longProjection != null && projection.equals(farProjection)) return;
         farProjection.set(projection);
         PROJECTION_STAGING.clear();
@@ -337,7 +340,9 @@ public final class ExtendedWorldLodRenderer {
                 var chunk = mc.level.getChunkSource().getChunk(chunkX, chunkZ, ChunkStatus.FULL, false);
                 if (chunk == null || sodium == null) continue;
                 int surface = chunk.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, 8, 8);
-                if (sodium.isSectionReady(chunkX, surface >> 4, chunkZ)) mask |= 1 << (z * TILE + x);
+                if (sodium.isSectionReady(chunkX, surface >> 4, chunkZ)
+                        && sodium.isBoxVisible(chunkX * 16, surface, chunkZ * 16,
+                                chunkX * 16 + 16, surface + 1, chunkZ * 16 + 16)) mask |= 1 << (z * TILE + x);
             }
             long key = ExtendedVoxelStore.pack(tx, tz);
             Integer old = readyColumns.put(key, mask);

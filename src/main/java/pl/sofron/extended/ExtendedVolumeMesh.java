@@ -119,7 +119,7 @@ public final class ExtendedVolumeMesh {
                             }
                             int neighbor = owner + (nx >> 4) + (nz >> 4) * (TILE + 2);
                             Volume other = data[neighbor];
-                            boolean visible = false;
+                            boolean visible = other == null && ExtendedSurfaceMesh.water(v.source.palette()[id]);
                             if (other != null) {
                                 int adjacent = levels[neighbor];
                                 if (face >= 2 && adjacent < level) {
@@ -178,7 +178,7 @@ public final class ExtendedVolumeMesh {
                 int a = (col + 1 - (corner < 2 ? width : 0)) * step;
                 int b = (row + 1 - (corner == 0 || corner == 3 ? height : 0)) * step;
                 staging.putFloat(ox + (face < 4 ? a : plane))
-                        .putFloat(v.source.minY() + (face < 2 ? plane : b))
+                        .putFloat(v.source.minY() + (face < 2 ? plane : b) - (face == 0 ? ExtendedSurfaceMesh.surfaceInset(name) : 0f))
                         .putFloat(oz + (face < 2 ? b : face < 4 ? plane : a))
                         .putFloat(u).putFloat(t)
                         .put((byte)((tint >> 16 & 255) * shade / 255))
