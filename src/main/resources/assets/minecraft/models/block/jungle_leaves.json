@@ -1,0 +1,8 @@
+{
+  "parent": "sofronpack:block/near_leaves_template",
+  "textures": {
+    "all": "minecraft:block/jungle_leaves",
+    "top": "sofronpack:block/jungle_leaves_top",
+    "bottom": "sofronpack:block/jungle_leaves_bottom"
+  }
+}

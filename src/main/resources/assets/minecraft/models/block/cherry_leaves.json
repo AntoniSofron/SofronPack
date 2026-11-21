@@ -1,0 +1,8 @@
+{
+  "parent": "sofronpack:block/near_leaves_template",
+  "textures": {
+    "all": "minecraft:block/cherry_leaves",
+    "top": "sofronpack:block/cherry_leaves_top",
+    "bottom": "sofronpack:block/cherry_leaves_bottom"
+  }
+}
