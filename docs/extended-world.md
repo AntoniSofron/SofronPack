@@ -84,3 +84,21 @@ The Overworld renders three independent textured cloud decks at Y=256, 384 and
 512. The cloud shader keeps them visibly pale/white, with a light pastel
 biome-sky influence only on the underside. The earlier 50% fog-colour wash was
 removed because it made clouds look like tinted sky.
+
+
+## Shared biome/weather/cave fog (v0.1.36)
+
+The LOD fragment shader uses exactly the same **environmental fog start and
+end distances** (and live fog color) as Minecraft's normal chunks. A single
+CPU-side signal, sourced from AtmospherePresets' blended surface-biome fog
+rules, live rain/thunder, and enclosed-cave factor, enables the environmental
+fog on the LOD pipeline. The signal is transmitted via the LOD-only dynamic
+transform color alpha; the source material's texture transparency is preserved.
+In heavy fog, the radial camera-to-voxel distance is compared with the same
+FogEnvironmentalStart and FogEnvironmentalEnd uniforms as the normal renderer.
+The full environment fog is combined with the always-on 16/32/64/96/128 distant
+fog using `max`, never delayed with an extra weather-specific 128-chunk
+envelope. Clear-weather LODs keep their extended visibility instead of
+inheriting the ordinary render-distance fade. Cloud undersides inherit the
+biome's blended sky color at a stronger intensity, while their tops stay
+bright and the three layers remain at 256/384/512.

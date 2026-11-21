@@ -102,7 +102,7 @@ with zipfile.ZipFile(jar) as z:
     assert b"FogColor.rgb" in extended_shader
     assert b"FogEnvironmentalStart" in extended_shader
     assert b"FogEnvironmentalEnd" in extended_shader
-    assert b"FogRenderDistanceEnd" in extended_shader
+    assert b"FogRenderDistanceEnd" not in extended_shader
     assert b"atmosphereBlend" in extended_shader
     assert b"sphericalBlocks" in extended_shader
     assert b"environmentFog" in extended_shader
@@ -115,8 +115,14 @@ with zipfile.ZipFile(jar) as z:
     assert b"sofronPackDarkLight" in z.read(
         "assets/minecraft/shaders/core/lightmap.fsh")
     assert b"GameTime" in z.read("assets/minecraft/shaders/core/stars.fsh")
-    assert b"horizontalChunks" in z.read(
-        "assets/minecraft/shaders/core/sofronpack/extended_voxel.vsh")
+    lod_vertex = z.read("assets/minecraft/shaders/core/sofronpack/extended_voxel.vsh")
+    assert b"horizontalChunks" in lod_vertex
+    assert b"atmosphereBlend = ColorModulator.a" in lod_vertex
+    assert b"sphericalBlocks = length(relative)" in lod_vertex
+    atmosphere_source = pathlib.Path(
+        "src/main/java/pl/sofron/atmosphere/AtmospherePresets.java").read_text()
+    assert "distantFogBlend = (float)" in atmosphere_source
+    assert "customBiomeWeight" in atmosphere_source
     cloud_source = pathlib.Path(
         "src/main/java/pl/sofron/atmosphere/CloudBandLayout.java").read_text()
     assert "LOW = 256.0f" in cloud_source
