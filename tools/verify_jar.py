@@ -103,9 +103,12 @@ with zipfile.ZipFile(jar) as z:
     assert b"FogEnvironmentalStart" in extended_shader
     assert b"FogEnvironmentalEnd" in extended_shader
     assert b"FogRenderDistanceEnd" in extended_shader
-    assert b"weatherStrength" in extended_shader
+    assert b"atmosphereBlend" in extended_shader
+    assert b"sphericalBlocks" in extended_shader
+    assert b"environmentFog" in extended_shader
+    assert b"max(baseFog, unifiedEnvironment)" in extended_shader
     cloud_vertex = z.read("assets/minecraft/shaders/core/sofronpack/clouds.vsh")
-    assert b"0.82 * underside" in cloud_vertex
+    assert b"0.96 * underside" in cloud_vertex
     assert b"ColorModulator.rgb" in cloud_vertex
     assert b"sofronPackDarkLight" in z.read(
         "assets/sofronpack/shaders/include/darker_light.glsl")
