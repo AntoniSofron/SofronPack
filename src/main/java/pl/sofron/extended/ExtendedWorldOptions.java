@@ -1,6 +1,6 @@
 package pl.sofron.extended;
 
-import net.caffeinemc.mods.sodium.api.config.option.BooleanOptionBuilder;
+import net.caffeinemc.mods.sodium.api.config.structure.BooleanOptionBuilder;
 import net.caffeinemc.mods.sodium.api.config.structure.ConfigBuilder;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
