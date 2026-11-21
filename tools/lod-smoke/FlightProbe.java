@@ -18,7 +18,12 @@ public final class FlightProbe implements ClientModInitializer {
         ClientTickEvents.END_CLIENT_TICK.register(mc -> {
             if (mc.player == null || mc.getConnection() == null || stage >= x.length) return;
             if (!moved) {
-                if (stage == 0) mc.getConnection().sendCommand("gamemode spectator");
+                if (stage == 0) {
+                    mc.getConnection().sendCommand("gamemode spectator");
+                    mc.getConnection().sendCommand("setblock 43 187 44 minecraft:birch_log[axis=x]");
+                    mc.getConnection().sendCommand("setblock 43 189 44 minecraft:oak_leaves[persistent=true]");
+                    mc.getConnection().sendCommand("setblock 43 188 44 minecraft:air");
+                }
                 mc.getConnection().sendCommand(stage == 1 ? "time set midnight" : "time set noon");
                 mc.getConnection().sendCommand(stage == 2 ? "weather thunder" : "weather clear");
                 mc.getConnection().sendCommand("tp @s " + x[stage] + " 180 42 150 16");
@@ -36,6 +41,15 @@ public final class FlightProbe implements ClientModInitializer {
             if (stage == 5 && (42 - mc.player.getZ() < 3 || !mc.player.onGround())) return;
             if (Math.abs(mc.player.getX() - x[stage]) > 1 || Math.abs(mc.player.getY() - 180) > 1
                     || System.nanoTime() - since < (stage == 5 ? 0L : 22_000_000_000L)) return;
+            if (stage == 4) {
+                var snapshot = ExtendedVoxelStore.get(43 >> 4, 44 >> 4);
+                if (snapshot == null) return;
+                short[] cells = snapshot.unpack();
+                int idx = (187 - snapshot.minY()) * 256 + (44 & 15) * 16 + (43 & 15);
+                if (!snapshot.palette()[cells[idx]].contains("birch_log[axis=x]")
+                        || cells[idx+256] != 0 || !snapshot.palette()[cells[idx+512]].contains("oak_leaves")) return;
+                System.out.println("LOD verified horizontal birch log, air gap and oak leaves after return");
+            }
             String name = "lod-" + labels[stage];
             int preview = 0;
             for (int r = 0; r <= 128; r += 4)

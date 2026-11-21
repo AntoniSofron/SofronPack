@@ -17,6 +17,11 @@ public final class ExtendedVolumeMesh {
             Direction.SOUTH, Direction.WEST, Direction.EAST};
     private static final int[] SHADE = {255, 140, 209, 209, 179, 179};
     private final LinkedHashMap<Long, Volume> cache = new LinkedHashMap<>(128, .75f, true);
+    private record ChunkMesh(VoxelChunk own, VoxelChunk west, VoxelChunk east, VoxelChunk north, VoxelChunk south,
+                             int cx, int cz, byte[] bytes) {}
+    private final LinkedHashMap<Long, ChunkMesh> recent = new LinkedHashMap<>(128, .75f, true);
+    private int recentBytes;
+    private static final int CACHE_BYTES = 12 * 1024 * 1024;
     private ByteBuffer staging = ByteBuffer.allocate(ExtendedVoxelMesher.MAX_QUADS
             * 4 * ExtendedVoxelMesher.VERTEX_BYTES).order(ByteOrder.nativeOrder());
 
@@ -75,8 +80,12 @@ public final class ExtendedVolumeMesh {
     }
 
     private void reserveQuad() {
-        if (staging.remaining() >= 4 * ExtendedVoxelMesher.VERTEX_BYTES) return;
-        var larger = ByteBuffer.allocate(Math.multiplyExact(staging.capacity(), 2)).order(ByteOrder.nativeOrder());
+        reserve(4 * ExtendedVoxelMesher.VERTEX_BYTES);
+    }
+
+    private void reserve(int count) {
+        if (staging.remaining() >= count) return;
+        var larger = ByteBuffer.allocate(Math.max(staging.position() + count, Math.multiplyExact(staging.capacity(), 2))).order(ByteOrder.nativeOrder());
         larger.put(staging.flip());
         staging = larger;
     }
@@ -102,6 +111,19 @@ public final class ExtendedVolumeMesh {
             Volume v = data[owner];
             if (v == null) continue;
             int level = levels[owner], step = 1 << level, width = 16 / step;
+            int stride = TILE + 2;
+            boolean exact = level == 0 && levels[owner-1] == 0 && levels[owner+1] == 0
+                    && levels[owner-stride] == 0 && levels[owner+stride] == 0;
+            long key = ExtendedVoxelStore.pack(v.source.chunkX(), v.source.chunkZ());
+            ChunkMesh old = exact ? recent.get(key) : null;
+            if (old != null && old.own == v.source && old.cx == cx && old.cz == cz
+                    && old.west == chunks[owner-1] && old.east == chunks[owner+1]
+                    && old.north == chunks[owner-stride] && old.south == chunks[owner+stride]) {
+                reserve(old.bytes.length);
+                staging.put(old.bytes);
+                continue;
+            }
+            int start = staging.position();
             int height = v.top;
             for (int face = 0; face < 6; face++) {
                 int planes = face < 2 ? height : width;
@@ -150,6 +172,17 @@ public final class ExtendedVolumeMesh {
                     }
                     scan.finish();
                 }
+            }
+            int size = staging.position() - start;
+            if (exact && size <= CACHE_BYTES / 4) {
+                if (old != null) { recent.remove(key); recentBytes -= old.bytes.length; }
+                while (!recent.isEmpty() && (recentBytes + size > CACHE_BYTES || recent.size() >= 128))
+                    recentBytes -= recent.pollFirstEntry().getValue().bytes.length;
+                byte[] copy = new byte[size];
+                staging.get(start, copy);
+                recent.put(key, new ChunkMesh(v.source, chunks[owner-1], chunks[owner+1],
+                        chunks[owner-stride], chunks[owner+stride], cx, cz, copy));
+                recentBytes += size;
             }
         }
         staging.flip();
