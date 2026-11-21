@@ -26,6 +26,8 @@ with zipfile.ZipFile(jar) as z:
     assert len(mod["mixins"]) == 5
     assert "sofron-extended.mixins.json" in mod["mixins"]
     assert "sofron-extended-client.mixins.json" in mod["mixins"]
+    far_mixins = json.loads(z.read("sofron-extended-client.mixins.json"))
+    assert "ExtendedWorldFogMixin" in far_mixins["client"]
     assert "pl/sofron/extended/ExtendedWorldVoxyBridge.class" not in files
     assert "pl/sofron/extended/ExtendedWorldMeshBuilder.class" not in files
     assert "pl/sofron/extended/ExtendedWorldStorage.class" not in files
@@ -40,6 +42,7 @@ with zipfile.ZipFile(jar) as z:
         "pl/sofron/extended/client/ExtendedWorldLodRenderer.class",
         "pl/sofron/extended/mixin/ExtendedWorldSodiumRenderMixin.class",
         "pl/sofron/extended/mixin/ExtendedWorldSodiumOptionsMixin.class",
+        "pl/sofron/extended/mixin/ExtendedWorldFogMixin.class",
     ):
         assert class_name in files, class_name
     for required in (
@@ -98,10 +101,37 @@ with zipfile.ZipFile(jar) as z:
     for extension in ("vsh", "fsh"):
         path = f"assets/minecraft/shaders/core/sofronpack/extended_voxel.{extension}"
         assert path in files, path
-    assert b"FogColor.rgb" in z.read(
-        "assets/minecraft/shaders/core/sofronpack/extended_voxel.fsh")
-    assert b"horizontalChunks" in z.read(
-        "assets/minecraft/shaders/core/sofronpack/extended_voxel.vsh")
+    extended_shader = z.read("assets/minecraft/shaders/core/sofronpack/extended_voxel.fsh")
+    assert b"FogColor.rgb" in extended_shader
+    assert b"FogEnvironmentalStart" in extended_shader
+    assert b"FogEnvironmentalEnd" in extended_shader
+    assert b"FogRenderDistanceEnd" not in extended_shader
+    assert b"atmosphereBlend" in extended_shader
+    assert b"sphericalBlocks" in extended_shader
+    assert b"environmentFog" in extended_shader
+    assert b"max(baseFog, unifiedEnvironment)" in extended_shader
+    assert b"step(0.001, atmosphereBlend)" in extended_shader
+    cloud_vertex = z.read("assets/minecraft/shaders/core/sofronpack/clouds.vsh")
+    assert b"0.96 * underside" in cloud_vertex
+    assert b"ColorModulator.rgb" in cloud_vertex
+    assert b"sofronPackDarkLight" in z.read(
+        "assets/sofronpack/shaders/include/darker_light.glsl")
+    assert b"sofronPackDarkLight" in z.read(
+        "assets/minecraft/shaders/core/lightmap.fsh")
+    assert b"GameTime" in z.read("assets/minecraft/shaders/core/stars.fsh")
+    lod_vertex = z.read("assets/minecraft/shaders/core/sofronpack/extended_voxel.vsh")
+    assert b"horizontalChunks" in lod_vertex
+    assert b"atmosphereBlend = ColorModulator.a" in lod_vertex
+    fog_mixin_source = pathlib.Path(
+        "src/main/java/pl/sofron/extended/mixin/ExtendedWorldFogMixin.java").read_text()
+    assert "fog.renderDistanceStart = 16f * 16f" in fog_mixin_source
+    assert "Unified Extended World fog active" in fog_mixin_source
+    assert "fog.renderDistanceEnd = ExtendedWorldConfig.DISTANT_RADIUS_CHUNKS * 16f" in fog_mixin_source
+    assert b"sphericalBlocks = length(relative)" in lod_vertex
+    atmosphere_source = pathlib.Path(
+        "src/main/java/pl/sofron/atmosphere/AtmospherePresets.java").read_text()
+    assert "distantFogBlend = (float)" in atmosphere_source
+    assert "customBiomeWeight" in atmosphere_source
     cloud_source = pathlib.Path(
         "src/main/java/pl/sofron/atmosphere/CloudBandLayout.java").read_text()
     assert "LOW = 256.0f" in cloud_source

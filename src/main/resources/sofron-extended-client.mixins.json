@@ -6,7 +6,8 @@
   "client": [
     "ExtendedWorldSodiumOptionsMixin",
     "ExtendedWorldSodiumRenderMixin",
-    "ExtendedVoxelPipelineMixin"
+    "ExtendedVoxelPipelineMixin",
+    "ExtendedWorldFogMixin"
   ],
   "injectors": {
     "defaultRequire": 0

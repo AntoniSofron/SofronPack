@@ -18,7 +18,7 @@ import pl.sofron.extended.mixin.ExtendedChunkFutureAccess;
 public final class ExtendedWorldPrefetch {
     private static final int RADIUS = ExtendedWorldConfig.DISTANT_RADIUS_CHUNKS;
     private static final long[] OFFSETS = spiralOffsets(RADIUS);
-    private static final int MAX_PENDING = 6;
+    private static final int MAX_PENDING = 12;
     private static int ticks, cursor, nearbyCursor;
     private static int pending;
     private static int centerX = Integer.MIN_VALUE, centerZ = Integer.MIN_VALUE;
@@ -69,15 +69,16 @@ public final class ExtendedWorldPrefetch {
         // Nearby live data can change through normal gameplay. Refresh only
         // loaded chunks at a bounded rate; frozen far LOD is not resampled.
         int normal = Math.max(2, server.getPlayerList().getViewDistance());
-        if (ticks % 10 == 0) refreshNearby(level, cx, cz, normal);
+        if (ticks % 5 == 0) refreshNearby(level, cx, cz, normal);
 
         if ((++ticks % 40) == 0) ExtendedVoxelStore.flush();
-        // Balanced async pipeline: up to six FULL chunk requests in flight.
-        // The budget dynamically reduces itself when the integrated server's
-        // average tick exceeds 35 ms, preserving game responsiveness.
+        // Prioritize response time rather than saturating the integrated server:
+        // keeping too many FULL futures inflight can starve nearby rendering.
+        // This is a bounded throughput improvement, not a 100x worldgen claim.
+        // Throttle hard as soon as server tick duration becomes critical.
         boolean busyServer = server.getAverageTickTimeNanos() > 35_000_000L;
         if (busyServer && ticks % 4 != 0) return;
-        int submitBudget = busyServer ? 1 : 2;
+        int submitBudget = busyServer ? 1 : 4;
         for (int submitted = 0; submitted < submitBudget && pending < MAX_PENDING; ) {
             int inspected = 0;
             boolean launched = false;

@@ -38,6 +38,14 @@ public final class AtmospherePresets {
     private static volatile Map<String, Palette> resourcePackColors = Map.of();
     private static volatile Map<String, FogRule> resourcePackFog = Map.of();
 
+    // The same atmosphere decision controls native terrain and far LODs.
+    // Render pass can read this without reparsing the biome data per tile.
+    private static volatile float distantFogBlend;
+
+    public static float distantFogBlend() {
+        return distantFogBlend;
+    }
+
     private record Palette(Vector3fc fog, Vector3fc sky) {}
     private record FogRule(String start, String end) {}
 
@@ -188,6 +196,7 @@ public final class AtmospherePresets {
 
     public static void applyFog(FogData fog, Camera camera, ClientLevel level,
                                 float renderDistance, DeltaTracker deltaTracker) {
+        distantFogBlend = 0f;
         if (!ENABLED || !level.dimension().equals(net.minecraft.world.level.Level.OVERWORLD)) return;
         var blend = blendedBiomes(level, camera.position());
         BlockPos pos = camera.blockPosition();
@@ -199,6 +208,7 @@ public final class AtmospherePresets {
                 level.getRainLevel(partialTick), level.getThunderLevel(partialTick));
         long time = level.getOverworldClockTime();
         double start = 0, end = 0;
+        double customBiomeWeight = 0.0;
         double baseStart = fog.environmentalStart;
         double baseEnd = fog.environmentalEnd;
 
@@ -208,6 +218,7 @@ public final class AtmospherePresets {
             double sampledStart = baseStart;
             double sampledEnd = baseEnd;
             if (rule != null) {
+                customBiomeWeight += entry.getValue();
                 try {
                     sampledStart = Math.max(0, AtmosphereMath.evaluate(rule.start(), time, weather, skyLight));
                     sampledEnd = Math.max(sampledStart + 2,
@@ -259,6 +270,13 @@ public final class AtmospherePresets {
             start = AtmosphereFogMath.interpolate(start, caveStart, caveWeight);
             end = AtmosphereFogMath.interpolate(end, caveEnd, caveWeight);
         }
+
+        // The blend approaches one in the middle of an affected biome, in
+        // heavy weather, or underground. The environment's actual distances
+        // still decide where the fog becomes opaque. No separate LOD curve.
+        double weatherWeight = AtmosphereFogMath.smoothstep(0.03, 0.18, weather);
+        distantFogBlend = (float) AtmosphereFogMath.clamp01(
+                Math.max(Math.max(customBiomeWeight, caveWeight), weatherWeight));
 
         fog.environmentalStart = (float) Math.max(0, start);
         fog.environmentalEnd = (float) Math.max(start + 2, end);

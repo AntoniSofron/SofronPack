@@ -44,7 +44,7 @@ import com.mojang.renderpearl.api.textures.FilterMode;
 public final class ExtendedWorldLodRenderer {
     private static final int TILE = ExtendedVoxelMesher.TILE_CHUNKS;
     private static final int FAR = ExtendedWorldConfig.DISTANT_RADIUS_CHUNKS;
-    private static final int UPLOADS_PER_FRAME = 8;
+    private static final int UPLOADS_PER_FRAME = 24;
     private static final long FRAME_MESH_BUDGET_NS = 5_000_000L;
     // A 128-chunk radius can require many more visible tiles than 64.
     // Evicting after only 384 tiles caused distant regions to vanish.
@@ -65,7 +65,7 @@ public final class ExtendedWorldLodRenderer {
     private static boolean loggedFirstUpload;
     private static boolean loggedFirstDraw;
 
-    private record GpuTile(GpuBuffer buffer, int quads) implements AutoCloseable {
+    private record GpuTile(GpuBuffer buffer, int quads, int detail) implements AutoCloseable {
         @Override public void close() { buffer.close(); }
     }
 
@@ -108,7 +108,14 @@ public final class ExtendedWorldLodRenderer {
             centerX = cx; centerZ = cz; lastRenderDistance = distance;
             for (int tx = minTX; tx <= maxTX; tx++) for (int tz = minTZ; tz <= maxTZ; tz++) {
                 long key = ExtendedVoxelStore.pack(tx, tz);
-                if ((!MESHES.containsKey(key) || first ||
+                GpuTile current = MESHES.get(key);
+                int dx = Math.abs(tx * TILE + TILE / 2 - cx);
+                int dz = Math.abs(tz * TILE + TILE / 2 - cz);
+                int wantedDetail = ExtendedLodLevels.voxelSize(Math.max(dx, dz));
+                // A tile changes resolution in real time as the camera
+                // crosses any of the 32/48/64/96-chunk detail boundaries.
+                boolean detailChanged = current != null && current.detail() != wantedDetail;
+                if ((current == null || first || detailChanged ||
                         intersectsMovingRings(tx, tz, cx, cz, distance)) && hasChunkData(tx, tz)) {
                     DIRTY.add(key);
                 }
@@ -218,7 +225,8 @@ public final class ExtendedWorldLodRenderer {
                         (float)-camera.y,
                         (float)((long)tz * TILE * 16 - camera.z));
                 var transform = RenderSystem.getDynamicUniforms().writeTransform(
-                        relative, new Vector4f(1f, 1f, 1f, 1f),
+                        relative, new Vector4f(1f, 1f, 1f,
+                                pl.sofron.atmosphere.AtmospherePresets.distantFogBlend()),
                         new Vector3f(
                                 (float)((long)tx * TILE * 16 - camera.x),
                                 (float)-camera.y,
@@ -294,12 +302,14 @@ public final class ExtendedWorldLodRenderer {
                 ExtendedVoxelStore::get, ATLAS,
                 (chunkX, chunkZ) -> client != null &&
                         client.getChunkSource().getChunk(chunkX, chunkZ, ChunkStatus.FULL, false) != null);
-        GpuTile previous = MESHES.remove(ExtendedVoxelStore.pack(tx, tz));
-        if (previous != null) previous.close();
+        // Never retire the visible mesh before the replacement is ready.
+        // If source data is temporarily missing, preserve the prior buffer.
         if (mesh.quads() == 0) return;
         GpuBuffer buffer = device.createBuffer(() -> "SofronPack Extended World tile",
                 GpuBuffer.USAGE_VERTEX | GpuBuffer.USAGE_COPY_DST, mesh.vertices());
-        MESHES.put(ExtendedVoxelStore.pack(tx, tz), new GpuTile(buffer, mesh.quads()));
+        GpuTile previous = MESHES.put(ExtendedVoxelStore.pack(tx, tz),
+                new GpuTile(buffer, mesh.quads(), detail));
+        if (previous != null) previous.close();
         if (!loggedFirstUpload) {
             loggedFirstUpload = true;
             System.out.println("[SofronPack] Textured Extended World LOD GPU tile uploaded: "
