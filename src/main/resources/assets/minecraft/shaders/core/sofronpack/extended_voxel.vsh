@@ -10,7 +10,7 @@ layout(location = 2) in vec4 Color;
 
 layout(location = 0) out vec2 texCoord0;
 layout(location = 1) out vec4 vertexColor;
-layout(location = 2) out float horizontalChunks;
+layout(location = 2) out vec3 fogRelative;
 layout(location = 3) out float sphericalBlocks;
 layout(location = 4) out float cylindricalBlocks;
 
@@ -46,7 +46,7 @@ void main() {
     // It is independent of pitch, so fog bands remain at the requested
     // horizontal distances even during high-altitude flight.
     vec3 relative = Position + ModelOffset;
-    horizontalChunks = length(relative.xz) * (1.0 / 16.0);
+    fogRelative = relative;
     sphericalBlocks = length(relative);
     cylindricalBlocks = max(length(relative.xz), abs(relative.y));
 }

@@ -8,7 +8,7 @@ uniform sampler2D Sampler0;
 
 layout(location = 0) in vec2 texCoord0;
 layout(location = 1) in vec4 vertexColor;
-layout(location = 2) in float horizontalChunks;
+layout(location = 2) in vec3 fogRelative;
 layout(location = 3) in float sphericalBlocks;
 layout(location = 4) in float cylindricalBlocks;
 
@@ -27,6 +27,7 @@ void main() {
 
     // Dynamic per-pixel handoff: an old cached buffer must stop drawing the
     // instant the camera moves inside 7/8 of the normal render distance.
+    float horizontalChunks = length(fogRelative.xz) / 16.0;
     ivec2 cell = clamp(ivec2(floor(tileXZ / 16.0)), ivec2(0), ivec2(3));
     bool normalReady = (readyMask & (1 << (cell.y * 4 + cell.x))) != 0;
     if (normalReady && FogRenderDistanceEnd >= 2047.5 &&
@@ -37,11 +38,11 @@ void main() {
 
     // Same four-zone function as the native Sodium terrain shader.
     float fog = FogRenderDistanceEnd >= 2047.5
-            ? sofronExtendedFog(horizontalChunks, sofronFogStrength(FogEnvironmentalEnd))
+            ? sofronVolumeFog(fogRelative, FogEnvironmentalEnd)
             : max(linear_fog_value(sphericalBlocks, FogEnvironmentalStart, FogEnvironmentalEnd),
                   linear_fog_value(cylindricalBlocks, FogRenderDistanceStart, FogRenderDistanceEnd));
     // FogColor comes from the live blended biome/environment, not a fixed hue.
-    sampled.rgb = mix(sampled.rgb, FogColor.rgb, fog * FogColor.a);
+    sampled.rgb = mix(sampled.rgb, FogColor.rgb, FogRenderDistanceEnd >= 2047.5 ? fog : fog * FogColor.a);
     // At 128 chunks even semi-transparent water must disappear completely
     // into the surrounding fog, rather than retaining a distant silhouette.
     sampled.a = 1.0;

@@ -39,22 +39,28 @@ class ExtendedSurfaceMeshTest {
                     new String[]{"minecraft:air", "minecraft:water[level=0]"}, cells);
         var uv = new ExtendedVoxelMesher.MaterialUV(0, 0, 1, 1, -1, true);
         var surface = new ExtendedSurfaceMesh().build(0, chunks, (name, face) -> uv);
-        var volume = new ExtendedVolumeMesh().build(chunks, new int[36], (name, face) -> uv);
-        for (var mesh : new ExtendedVoxelMesher.Mesh[]{surface, volume}) {
-            boolean left = false, right = false;
-            for (int i = 0; i < mesh.vertices().limit(); i += 4 * ExtendedVoxelMesher.VERTEX_BYTES) {
-                float min = Float.POSITIVE_INFINITY, max = Float.NEGATIVE_INFINITY;
-                boolean surfaceQuad = true;
-                for (int j = 0; j < 4; j++) {
-                    int at = i + j * ExtendedVoxelMesher.VERTEX_BYTES;
-                    float x = mesh.vertices().getFloat(at);
-                    min = Math.min(min, x); max = Math.max(max, x);
-                    surfaceQuad &= Math.abs(mesh.vertices().getFloat(at + 4) - (63f - 1f/9f)) < .0001f;
+        var volumes = new ExtendedVolumeMesh();
+        for (int level = 0; level < 2; level++) {
+            int[] levels = new int[36];
+            levels[7] = level;
+            levels[8] = level + 1;
+            var volume = volumes.build(chunks, levels, (name, face) -> uv);
+            for (var mesh : new ExtendedVoxelMesher.Mesh[]{surface, volume}) {
+                boolean left = false, right = false;
+                for (int i = 0; i < mesh.vertices().limit(); i += 4 * ExtendedVoxelMesher.VERTEX_BYTES) {
+                    float min = Float.POSITIVE_INFINITY, max = Float.NEGATIVE_INFINITY;
+                    boolean surfaceQuad = true;
+                    for (int j = 0; j < 4; j++) {
+                        int at = i + j * ExtendedVoxelMesher.VERTEX_BYTES;
+                        float x = mesh.vertices().getFloat(at);
+                        min = Math.min(min, x); max = Math.max(max, x);
+                        surfaceQuad &= Math.abs(mesh.vertices().getFloat(at + 4) - (63f - 1f/9f)) < .0001f;
+                    }
+                    left |= surfaceQuad && min == 0 && max == 16;
+                    right |= surfaceQuad && min == 16 && max == 32;
                 }
-                left |= surfaceQuad && min == 0 && max == 16;
-                right |= surfaceQuad && min == 16 && max == 32;
+                assertTrue(left && right);
             }
-            assertTrue(left && right);
         }
     }
 

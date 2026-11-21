@@ -208,7 +208,6 @@ public final class AtmospherePresets {
                 level.getRainLevel(partialTick), level.getThunderLevel(partialTick));
         long time = level.getOverworldClockTime();
         double start = 0, end = 0;
-        double customBiomeWeight = 0.0;
         double baseStart = fog.environmentalStart;
         double baseEnd = fog.environmentalEnd;
 
@@ -218,7 +217,6 @@ public final class AtmospherePresets {
             double sampledStart = baseStart;
             double sampledEnd = baseEnd;
             if (rule != null) {
-                customBiomeWeight += entry.getValue();
                 try {
                     sampledStart = Math.max(0, AtmosphereMath.evaluate(rule.start(), time, weather, skyLight));
                     sampledEnd = Math.max(sampledStart + 2,
@@ -271,12 +269,9 @@ public final class AtmospherePresets {
             end = AtmosphereFogMath.interpolate(end, caveEnd, caveWeight);
         }
 
-        // The blend approaches one in the middle of an affected biome, in
-        // heavy weather, or underground. The environment's actual distances
-        // still decide where the fog becomes opaque. No separate LOD curve.
-        double weatherWeight = AtmosphereFogMath.smoothstep(0.03, 0.18, weather);
-        distantFogBlend = (float) AtmosphereFogMath.clamp01(
-                Math.max(Math.max(customBiomeWeight, caveWeight), weatherWeight));
+        // Preserve the clear horizon in every surface biome. The same weather
+        // progression drives both terrain passes, including dry-biome storms.
+        distantFogBlend = (float)Math.max(caveWeight, weather);
 
         fog.environmentalStart = (float) Math.max(0, start);
         fog.environmentalEnd = (float) Math.max(start + 2, end);

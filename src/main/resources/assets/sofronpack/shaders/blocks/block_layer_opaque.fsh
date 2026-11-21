@@ -113,10 +113,9 @@ vec4 calculateFinalColor(vec4 color) {
     // normal terrain when Extended World is enabled. LODs call this exact
     // same function, so both renderers use the same 16/32/64/96/128 stages.
     if (u_RenderFog.y >= 2047.5) {
-        float horizontalChunks = length(spl_SurfaceCameraPos.xz) / 16.0;
-        float strength = sofronFogStrength(u_EnvironmentFog.y);
-        float fog = max(1.0 - factor, sofronExtendedFog(horizontalChunks, strength));
-        return vec4(mix(color.rgb, fogColor.rgb, fog * fogColor.a), color.a);
+
+        float fog = max(1.0 - factor, sofronVolumeFog(spl_SurfaceCameraPos, u_EnvironmentFog.y));
+        return vec4(mix(color.rgb, fogColor.rgb, fog), color.a);
     }
     return _linearFog(color, v_FragDistance, fogColor, u_EnvironmentFog, u_RenderFog, factor);
 }

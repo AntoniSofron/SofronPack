@@ -17,7 +17,7 @@ public final class ExtendedSurfaceMesh {
             Direction.UP, Direction.DOWN, Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST
     };
     private final LinkedHashMap<Long, Columns> cache = new LinkedHashMap<>(512, .75f, true);
-    private final ByteBuffer staging = ByteBuffer.allocate(SIDE * SIDE * 6 * 4 * ExtendedVoxelMesher.VERTEX_BYTES)
+    private final ByteBuffer staging = ByteBuffer.allocate(SIDE * SIDE * 10 * 4 * ExtendedVoxelMesher.VERTEX_BYTES)
             .order(ByteOrder.nativeOrder());
 
     private static final class Columns {
@@ -81,6 +81,10 @@ public final class ExtendedSurfaceMesh {
                 side[i] = top[i] = (short)tile.material(x, z, ground);
             }
             reduce();
+        }
+
+        int ground(int column) {
+            return backing[column] == 0 ? height[column] : backingHeight[column];
         }
 
         private void reduce() {
@@ -171,17 +175,24 @@ public final class ExtendedSurfaceMesh {
                                 face(own, own.top[column], x, h - 1, z, detail, 1, f, materials);
                             continue;
                         }
-                        int bottom = next.height[next.column(xx, zz, detail)];
+                        int bottom = next.ground(next.column(xx, zz, detail));
                         // At a mixed-resolution boundary the neighbouring tile may use a
                         // lower column. Close the edge against its minimum covered height.
                         if ((xx >> 4) != cx || (zz >> 4) != cz) {
                             for (int j = 0; j < detail; j++) {
                                 int ex = f < 4 ? x + j : f == 4 ? x - 1 : x + detail;
                                 int ez = f >= 4 ? z + j : f == 2 ? z - 1 : z + detail;
-                                bottom = Math.min(bottom, next.height[next.column(ex, ez, 1)]);
+                                bottom = Math.min(bottom, next.ground(next.column(ex, ez, 1)));
                             }
                         }
                         bottom = Math.max(own.minimum, bottom);
+                        if (own.backing[column] != 0) {
+                            int ground = own.backingHeight[column];
+                            if (bottom < ground) face(own, own.backing[column], x, bottom, z,
+                                    detail, ground - bottom, f, materials);
+                            // Keep the canopy separate from the supporting hillside.
+                            bottom = Math.max(ground, Math.max(bottom, h - detail));
+                        }
                         if (bottom < h) face(own, h - bottom > 1 ? own.side[column] : own.top[column],
                                 x, bottom, z, detail, h - bottom, f, materials);
                     }
@@ -207,7 +218,14 @@ public final class ExtendedSurfaceMesh {
         if (uv == null) return;
         int tint = color(own.grass, own.foliage, own.water, name, uv.tint());
         float inset = surfaceInset(name);
+        int start = staging.position();
         ExtendedVoxelMesher.emit(staging, x, y, z, width, height - inset, face, uv, tint);
+        float u = packUv(uv.u0(), uv.u1()), v = packUv(uv.v0(), uv.v1());
+        for (int vertex = 0; vertex < 4; vertex++) {
+            int at = start + vertex * ExtendedVoxelMesher.VERTEX_BYTES;
+            staging.putFloat(at + 12, u).putFloat(at + 16, v);
+            staging.put(at + 23, (byte)(254 - face / 2 - 3 * uv.emission()));
+        }
     }
     static float surfaceInset(String name) {
         return water(name) ? 1f / 9f : 0f;

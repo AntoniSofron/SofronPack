@@ -110,13 +110,13 @@ with zipfile.ZipFile(jar) as z:
     assert b"cylindricalBlocks" in extended_shader
     assert b"FogRenderDistanceStart" in extended_shader
     assert b"linear_fog_value" in extended_shader
-    assert b"sofronExtendedFog" in extended_shader
+    assert b"sofronVolumeFog" in extended_shader
     assert b"horizontalChunks < FogRenderDistanceStart / 16.0" in extended_shader
     shared_shader = z.read("assets/sofronpack/shaders/include/extended_fog.glsl")
     assert b"sofronExtendedFog" in shared_shader
-    assert b"16.0,  8.0" in shared_shader
+    assert b"float a = 16.0" in shared_shader
     native_shader = z.read("assets/sofronpack/shaders/blocks/block_layer_opaque.fsh")
-    assert b"sofronExtendedFog" in native_shader
+    assert b"sofronVolumeFog" in native_shader
     assert b"2047.5" in native_shader
     assert "pl/sofron/extended/ExtendedLodHandoff.class" in files
     assert "pl/sofron/extended/ExtendedLodStages.class" in files
