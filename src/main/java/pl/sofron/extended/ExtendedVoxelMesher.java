@@ -7,13 +7,12 @@ import java.util.Arrays;
 
 /**
  * Chunk-voxel surface extraction: emits axis-aligned, opaque Minecraft-style
- * block faces, not sloping terrain triangles. A 2-block voxel is used near the
- * normal view radius, 4 and 8 blocks farther away.
+ * block faces, not sloping terrain triangles. One-block cubes are preserved near the normal view radius;\n * 2- and 4-block cubes are used farther away.
  */
 public final class ExtendedVoxelMesher {
     public static final int TILE_CHUNKS = 4;
     public static final int VERTEX_BYTES = 24; // xyz float, uv float, rgba bytes
-    public static final int MAX_QUADS = 16_384;
+    public static final int MAX_QUADS = 32_768;
 
     public record MaterialUV(float u0, float v0, float u1, float v1,
                              int tint, boolean translucent) {}
@@ -46,7 +45,7 @@ public final class ExtendedVoxelMesher {
     private ExtendedVoxelMesher() {}
 
     /**
-     * @param detail 1 for 2-block cubes, 2 for 4-block cubes, 4 for 8-block cubes
+     * @param detail 1 for exact 1-block voxels, 2 and 4 for distant simplified cubes
      */
     public static Mesh build(int tileX, int tileZ, int cx, int cz, int near, int far,
                              int detail, ChunkLookup lookup, MaterialResolver materials) {
