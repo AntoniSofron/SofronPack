@@ -17,7 +17,7 @@ public final class ExtendedLodFog {
     public static float opacity(double chunks) {
         if (!Double.isFinite(chunks)) return chunks > 0 ? 1f : 0f;
         if (chunks < START) return 0f;
-        if (chunks < STAGE_TWO) return segment(chunks, START, STAGE_TWO, 0.02f, 0.13f);
+        if (chunks < STAGE_TWO) return segment(chunks, START, STAGE_TWO, 0f, 0.13f);
         if (chunks < STAGE_THREE) return segment(chunks, STAGE_TWO, STAGE_THREE, 0.13f, 0.55f);
         if (chunks < STAGE_FOUR) return segment(chunks, STAGE_THREE, STAGE_FOUR, 0.55f, 0.85f);
         if (chunks < END) return segment(chunks, STAGE_FOUR, END, 0.85f, 1f);
