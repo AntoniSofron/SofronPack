@@ -15,6 +15,7 @@ import net.minecraft.core.SectionPos;
  * This CPU pre-culling uses a one-chunk safety margin for section rebuilds.
  */
 public final class LeafDetailRange {
+    public static final int DISTANCE_BLOCKS = 128;
     private static ClientLevel level;
     private static int playerX, playerZ;
     private static final LongOpenHashSet omitted = new LongOpenHashSet();

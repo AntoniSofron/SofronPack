@@ -287,7 +287,7 @@ with zipfile.ZipFile(jar) as z:
         for suffix in ("top", "bottom"):
             texture = f"assets/sofronpack/textures/block/{foliage_type}_leaves_{suffix}.png"
             png = z.read(texture)
-            assert png[:8] == b"\\x89PNG\\r\\n\\x1a\\n"  # 32x32 RGBA
+            assert png[:8] == bytes((137, 80, 78, 71, 13, 10, 26, 10))  # 32x32 RGBA
             assert png[12:16] == b"IHDR"
             assert (int.from_bytes(png[16:20], "big"), int.from_bytes(png[20:24], "big")) == (32, 32)
             assert png[24:26] == bytes((8, 6))

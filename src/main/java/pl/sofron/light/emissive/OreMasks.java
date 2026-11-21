@@ -53,6 +53,9 @@ public record OreMasks(Map<TextureAtlasSprite, TextureAtlasSprite> pairs, Set<Te
             if (base != null) pairs.put(base, mask);
         });
         current = new OreMasks(Map.copyOf(pairs), Set.copyOf(leaves), tileIndex(atlas, pairs));
+        // Source-pack details and bundled near-only leaf textures use the
+        // same sprite identification. The original cube remains rendered.
+        System.out.println("[SofronPack] Near-leaf top/bottom sprites: " + leaves.size());
     }
 
     private static ByteBuffer tileIndex(SpriteLoader.Preparations atlas, Map<TextureAtlasSprite, TextureAtlasSprite> pairs) {
