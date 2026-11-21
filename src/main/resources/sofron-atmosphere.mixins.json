@@ -6,7 +6,8 @@
   "client": [
     "AtmosphereBuilderMixin",
     "AtmosphericFogMixin",
-    "CloudLayersMixin"
+    "CloudLayersMixin",
+    "CloudPipelineMixin"
   ],
   "injectors": {
     "defaultRequire": 1

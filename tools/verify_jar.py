@@ -61,7 +61,10 @@ with zipfile.ZipFile(jar) as z:
     assert "sofron-atmosphere.mixins.json" in mod["mixins"]
     atmosphere_mixins = json.loads(z.read("sofron-atmosphere.mixins.json"))
     assert atmosphere_mixins["package"] == "pl.sofron.atmosphere.mixin"
-    assert atmosphere_mixins["client"] == ["AtmosphereBuilderMixin", "AtmosphericFogMixin", "CloudLayersMixin"]
+    assert atmosphere_mixins["client"] == ["AtmosphereBuilderMixin", "AtmosphericFogMixin", "CloudLayersMixin", "CloudPipelineMixin"]
+    for extension in ("vsh", "fsh"):
+        shader = f"assets/minecraft/shaders/core/sofronpack/clouds.{extension}"
+        assert shader in files and b"undersideTint" in z.read(shader)
     for mixin in atmosphere_mixins["client"]:
         path = "pl/sofron/atmosphere/mixin/" + mixin + ".class"
         assert path in files, path
