@@ -108,6 +108,7 @@ public final class ExtendedWorldLodRenderer {
             centerX = cx; centerZ = cz; lastRenderDistance = distance;
             for (int tx = minTX; tx <= maxTX; tx++) for (int tz = minTZ; tz <= maxTZ; tz++) {
                 long key = ExtendedVoxelStore.pack(tx, tz);
+                if (tileEntirelyInsideHandoff(tx, tz, cx, cz, distance)) continue;
                 GpuTile current = MESHES.get(key);
                 int dx = Math.abs(tx * TILE + TILE / 2 - cx);
                 int dz = Math.abs(tz * TILE + TILE / 2 - cz);
@@ -147,6 +148,11 @@ public final class ExtendedWorldLodRenderer {
             if (tx >= minTX && tx <= maxTX && tz >= minTZ && tz <= maxTZ)
                 DIRTY.add(ExtendedVoxelStore.pack(tx, tz));
         }
+        // Do not spend scarce meshing time building invisible tiles entirely
+        // inside the normal renderer's inner 7/8 distance. As soon as the
+        // camera moves, prepareFrame re-discovers these from cached snapshots.
+        DIRTY.removeIf(key -> tileEntirelyInsideHandoff(
+                (int)(key >> 32), (int)(long)key, cx, cz, distance));
         // Invalidate LOD around normal client chunks that have just arrived
         // or been unloaded. Otherwise cached meshes can remain blank while the
         // camera stands still waiting for the network's chunk stream.
@@ -160,6 +166,8 @@ public final class ExtendedWorldLodRenderer {
             DIRTY.add(ExtendedVoxelStore.pack(Math.floorDiv(x, TILE), Math.floorDiv(z, TILE)));
         }
 
+        DIRTY.removeIf(key -> tileEntirelyInsideHandoff(
+                (int)(key >> 32), (int)(long)key, cx, cz, distance));
         try {
             ensureIndices();
             uploadFarProjection(mc);
@@ -234,6 +242,11 @@ public final class ExtendedWorldLodRenderer {
                 long key = entry.getKey();
                 int tx = (int)(key >> 32), tz = (int)(long)key;
                 if (!isInView(tx, tz, camera.x, camera.z, forward.x(), forward.z())) continue;
+                int cameraCX = ((int)Math.floor(camera.x)) >> 4;
+                int cameraCZ = ((int)Math.floor(camera.z)) >> 4;
+                if (tileEntirelyInsideHandoff(tx, tz, cameraCX, cameraCZ,
+                        Math.max(2, Minecraft.getInstance().options.getEffectiveRenderDistance())))
+                    continue;
                 GpuTile tile = entry.getValue();
                 if (tile.quads == 0) continue;
                 Matrix4f relative = new Matrix4f(matrices.modelView()).translate(
@@ -294,6 +307,16 @@ public final class ExtendedWorldLodRenderer {
         var encoder = device.createCommandEncoder();
         encoder.writeToBuffer(longProjection.slice(), PROJECTION_STAGING);
         encoder.submit();
+    }
+
+    private static boolean tileEntirelyInsideHandoff(int tx, int tz,
+                                                       int cx, int cz, int renderDistance) {
+        int left = tx * TILE - cx, right = (tx + 1) * TILE - cx;
+        int top = tz * TILE - cz, bottom = (tz + 1) * TILE - cz;
+        double maxX = Math.max(Math.abs(left), Math.abs(right));
+        double maxZ = Math.max(Math.abs(top), Math.abs(bottom));
+        return Math.hypot(maxX, maxZ)
+                < pl.sofron.extended.ExtendedLodHandoff.nearStartChunks(renderDistance);
     }
 
     private static boolean intersectsMovingRings(int tx, int tz, int cx, int cz, int near) {
