@@ -11,8 +11,8 @@ public final class ExtendedWorldOptions {
 
     public static BooleanOptionBuilder build(ConfigBuilder builder) {
         var option = builder.createBooleanOption(Identifier.parse("sofronpack:extended_world"));
-        option.setName(Component.literal("Większy świat (LOD 64 chunki)"));
-        option.setTooltip(Component.literal("SofronPack samodzielnie wyświetla i zapisuje uproszczony " +
+        option.setName(Component.literal("Większy świat (tekstury bloków, 64 chunki)"));
+        option.setTooltip(Component.literal("SofronPack samodzielnie wyświetla i zapisuje wokselowy " +
                 "teren do 64 chunków. Zwykły zasięg renderowania i symulacji " +
                 "pozostaje bez zmian. Generowanie nowego terenu działa stopniowo " +
                 "w trybie jednoosobowym. Nie potrzebujesz dodatkowego moda."));

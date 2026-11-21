@@ -1,0 +1,71 @@
+name: Native textured LOD — in-world smoke
+on:
+  push:
+    branches: ['feature/voxel-texture-lod']
+    paths:
+      - '.github/workflows/native-lod-e2e.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  textured-world:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.5.0'
+      - name: Prepare software graphics device
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq xvfb mesa-utils libgl1-mesa-dri libglx-mesa0 mesa-vulkan-drivers libvulkan1
+          mkdir -p run/mods
+          cp libs/sodium-fabric-0.9.2+mc26.3.jar run/mods/
+      - name: Build a real Minecraft single-player save
+        run: |
+          python3 scripts/wild_rice_smoke.py
+          mkdir -p run/saves run/config
+          cp -a run/sofronpack-wild-rice-smoke run/saves/SofronLodE2E
+          printf '{"enabled":true}\n' > run/config/sofronpack-extended-world.json
+          printf 'renderDistance:6\nsimulationDistance:4\n' >> run/options.txt
+          test -f run/saves/SofronLodE2E/level.dat
+      - name: Boot directly into the world with textured LOD enabled
+        run: |
+          set +e
+          timeout -s TERM 180s xvfb-run -a -s "-screen 0 1280x960x24 +extension GLX" \
+            env LIBGL_ALWAYS_SOFTWARE=1 MESA_GL_VERSION_OVERRIDE=4.6 \
+            gradle --no-daemon --console=plain runClient \
+            --args='--quickPlaySingleplayer SofronLodE2E' > native-lod-client.log 2>&1
+          code=$?
+          set -e
+          echo "Exit code: $code"
+          grep -E 'SofronPack|Voxel LOD|Extended World|Joining|Loading|graphics backend|Exception|ERROR' native-lod-client.log | tail -n 95 || true
+          if grep -E 'Mixin apply failed|InvalidMixinException|Native Extended World renderer disabled|Extended World GPU preparation failed|Extended World draw disabled|Crash Report' native-lod-client.log; then
+            echo 'LOADING OR GPU RENDER FAILURE'
+            exit 1
+          fi
+          if ! grep -q '\[SofronPack\] Voxel LOD: restored' native-lod-client.log; then
+            echo 'Integrated single-player world was not loaded, or voxel cache failed to initialize'
+            exit 1
+          fi
+          if ! grep -q 'Textured Extended World GPU draw issued' native-lod-client.log; then
+            echo 'The actual textured GPU render hook was not reached while in the world'
+            exit 1
+          fi
+          echo 'PASS: generated real Minecraft chunks and issued textured LOD GPU draws'
+      - name: Keep the actual in-world startup log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-lod-in-world-log
+          path: |
+            native-lod-client.log
+            wild-rice-smoke.log
+          if-no-files-found: ignore

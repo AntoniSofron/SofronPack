@@ -24,8 +24,10 @@ import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
 import pl.sofron.extended.ExtendedWorldConfig;
-import pl.sofron.extended.ExtendedWorldMeshBuilder;
-import pl.sofron.extended.ExtendedWorldStorage;
+import pl.sofron.extended.ExtendedVoxelMesher;
+import pl.sofron.extended.ExtendedVoxelStore;
+import net.minecraft.resources.Identifier;
+import com.mojang.renderpearl.api.textures.FilterMode;
 
 /**
  * Native RenderPearl (OpenGL + Vulkan) renderer of compact distant surface
@@ -37,10 +39,12 @@ import pl.sofron.extended.ExtendedWorldStorage;
  * control; all meshing/uploads have a hard per-frame budget.
  */
 public final class ExtendedWorldLodRenderer {
-    private static final int TILE = ExtendedWorldMeshBuilder.TILE_CHUNKS;
+    private static final int TILE = ExtendedVoxelMesher.TILE_CHUNKS;
     private static final int FAR = ExtendedWorldConfig.DISTANT_RADIUS_CHUNKS;
-    private static final int UPLOADS_PER_FRAME = 3;
-    private static final int MAX_QUADS = ExtendedWorldMeshBuilder.MAX_QUADS;
+    private static final int UPLOADS_PER_FRAME = 1;
+    private static final int MAX_GPU_TILES = 384;
+    private static final ExtendedVoxelAtlas ATLAS = new ExtendedVoxelAtlas();
+    private static final int MAX_QUADS = ExtendedVoxelMesher.MAX_QUADS;
     private static final Map<Long, GpuTile> MESHES = new HashMap<>();
     private static final Set<Long> DIRTY = new HashSet<>();
 
@@ -52,6 +56,8 @@ public final class ExtendedWorldLodRenderer {
     private static int centerX = Integer.MIN_VALUE, centerZ = Integer.MIN_VALUE;
     private static int lastRenderDistance;
     private static boolean failed;
+    private static boolean loggedFirstUpload;
+    private static boolean loggedFirstDraw;
 
     private record GpuTile(GpuBuffer buffer, int quads) implements AutoCloseable {
         @Override public void close() { buffer.close(); }
@@ -75,12 +81,16 @@ public final class ExtendedWorldLodRenderer {
             return;
         }
         GpuDevice now = RenderSystem.getDevice();
-        if (device != now || worldGeneration != ExtendedWorldStorage.generation()) {
+        if (device != now || worldGeneration != ExtendedVoxelStore.generation()) {
             close();
             device = now;
-            worldGeneration = ExtendedWorldStorage.generation();
+            worldGeneration = ExtendedVoxelStore.generation();
         }
-        if (ExtendedWorldStorage.count() == 0) return;
+        if (ExtendedVoxelStore.count() == 0) return;
+        if (ATLAS.refreshModels()) {
+            clearMeshes();
+            centerX = centerZ = Integer.MIN_VALUE;
+        }
 
         int cx = ((int)Math.floor(cameraX)) >> 4;
         int cz = ((int)Math.floor(cameraZ)) >> 4;
@@ -91,9 +101,9 @@ public final class ExtendedWorldLodRenderer {
             boolean first = centerX == Integer.MIN_VALUE || lastRenderDistance != distance;
             centerX = cx; centerZ = cz; lastRenderDistance = distance;
             for (int tx = minTX; tx <= maxTX; tx++) for (int tz = minTZ; tz <= maxTZ; tz++) {
-                long key = ExtendedWorldStorage.pack(tx, tz);
-                if (!MESHES.containsKey(key) || first ||
-                        intersectsMovingRings(tx, tz, cx, cz, distance)) {
+                long key = ExtendedVoxelStore.pack(tx, tz);
+                if ((!MESHES.containsKey(key) || first ||
+                        intersectsMovingRings(tx, tz, cx, cz, distance)) && hasChunkData(tx, tz)) {
                     DIRTY.add(key);
                 }
             }
@@ -111,25 +121,36 @@ public final class ExtendedWorldLodRenderer {
         // Publish surface changes to the GPU gradually; do not iterate every
         // saved chunk or upload the whole LOD mesh when one surface changes.
         for (int i = 0; i < 2048; i++) {
-            Long changed = ExtendedWorldStorage.pollChanged();
+            Long changed = ExtendedVoxelStore.pollChanged();
             if (changed == null) break;
             int x = (int)(changed >> 32), z = (int)(long)changed;
             int tx = Math.floorDiv(x, TILE), tz = Math.floorDiv(z, TILE);
             if (tx >= minTX && tx <= maxTX && tz >= minTZ && tz <= maxTZ)
-                DIRTY.add(ExtendedWorldStorage.pack(tx, tz));
+                DIRTY.add(ExtendedVoxelStore.pack(tx, tz));
         }
         try {
             ensureIndices();
             uploadFarProjection(mc);
-            int rebuilt = 0;
-            Iterator<Long> pending = DIRTY.iterator();
-            while (pending.hasNext() && rebuilt < UPLOADS_PER_FRAME) {
-                long key = pending.next();
-                pending.remove();
-                int tx = (int)(key >> 32), tz = (int)key;
-                if (tx < minTX || tx > maxTX || tz < minTZ || tz > maxTZ) continue;
-                rebuildTile(tx, tz, cx, cz, distance);
-                rebuilt++;
+            // Pick the nearest visible dirty tile. Random HashSet iteration
+            // caused important close LOD chunks to appear after far-off ones.
+            var view = mc.gameRenderer.mainCamera().forwardVector();
+            double px = cameraX, pz = cameraZ;
+            for (int rebuilt = 0; rebuilt < UPLOADS_PER_FRAME; rebuilt++) {
+                Long best = null;
+                double nearest = Double.POSITIVE_INFINITY;
+                for (long key : DIRTY) {
+                    int tx = (int)(key >> 32), tz = (int)key;
+                    if (tx < minTX || tx > maxTX || tz < minTZ || tz > maxTZ) continue;
+                    if (!isInView(tx, tz, px, pz, view.x(), view.z())) continue;
+                    double dx = (long)tx * TILE * 16 + TILE * 8 - px;
+                    double dz = (long)tz * TILE * 16 + TILE * 8 - pz;
+                    double distanceSq = dx * dx + dz * dz;
+                    if (distanceSq < nearest) { nearest = distanceSq; best = key; }
+                }
+                if (best == null) break;
+                DIRTY.remove(best);
+                rebuildTile((int)(best >> 32), (int)(long)best, cx, cz, distance);
+                trimGpuCache(cx, cz);
             }
         } catch (RuntimeException | LinkageError problem) {
             System.err.println("[SofronPack] Extended World GPU preparation failed: "
@@ -148,13 +169,19 @@ public final class ExtendedWorldLodRenderer {
         if (terrainPass != DefaultTerrainRenderPasses.CUTOUT || pass == null
                 || failed || MESHES.isEmpty() || quadIndices == null || longProjection == null) return;
         try {
-            pass.setPipeline(RenderSystem.getCompiledPipeline(RenderPipelines.DEBUG_QUADS));
+            pass.setPipeline(RenderSystem.getCompiledPipeline(ExtendedVoxelPipeline.TERRAIN));
             RenderSystem.bindDefaultUniforms(pass);
             pass.setUniform("Projection", longProjection.slice());
+            var blockAtlas = Minecraft.getInstance().getTextureManager().getTexture(
+                    Identifier.parse("minecraft:textures/atlas/blocks.png")).getTextureView();
+            pass.setUniform("Sampler0", blockAtlas,
+                    RenderSystem.getSamplerCache().getClampToEdge(FilterMode.LINEAR));
             pass.setIndexBuffer(quadIndices, IndexType.INT);
+            var forward = Minecraft.getInstance().gameRenderer.mainCamera().forwardVector();
             for (Map.Entry<Long, GpuTile> entry : MESHES.entrySet()) {
                 long key = entry.getKey();
                 int tx = (int)(key >> 32), tz = (int)(long)key;
+                if (!isInView(tx, tz, camera.x, camera.z, forward.x(), forward.z())) continue;
                 GpuTile tile = entry.getValue();
                 if (tile.quads == 0) continue;
                 Matrix4f relative = new Matrix4f(matrices.modelView()).translate(
@@ -167,6 +194,11 @@ public final class ExtendedWorldLodRenderer {
                 pass.setUniform("DynamicTransforms", transform);
                 pass.setVertexBuffer(0, tile.buffer.slice());
                 pass.drawIndexed(tile.quads * 6, 1, 0, 0, 0);
+                if (!loggedFirstDraw) {
+                    loggedFirstDraw = true;
+                    System.out.println("[SofronPack] Textured Extended World GPU draw issued: "
+                            + tile.quads + " square block faces");
+                }
             }
         } catch (RuntimeException | LinkageError problem) {
             // Defer freeing GPU buffers until the beginning of the next frame.
@@ -220,13 +252,23 @@ public final class ExtendedWorldLodRenderer {
     }
 
     private static void rebuildTile(int tx, int tz, int cx, int cz, int near) {
-        var mesh = ExtendedWorldMeshBuilder.build(tx, tz, cx, cz, near, FAR, ExtendedWorldStorage::get);
-        GpuTile previous = MESHES.remove(ExtendedWorldStorage.pack(tx, tz));
+        int dx = Math.abs(tx * TILE + TILE / 2 - cx);
+        int dz = Math.abs(tz * TILE + TILE / 2 - cz);
+        int range = Math.max(dx, dz);
+        int detail = range <= 28 ? 1 : range <= 48 ? 2 : 4;
+        var mesh = ExtendedVoxelMesher.build(tx, tz, cx, cz, near, FAR, detail,
+                ExtendedVoxelStore::get, ATLAS);
+        GpuTile previous = MESHES.remove(ExtendedVoxelStore.pack(tx, tz));
         if (previous != null) previous.close();
-        if (mesh.quadCount() == 0) return;
+        if (mesh.quads() == 0) return;
         GpuBuffer buffer = device.createBuffer(() -> "SofronPack Extended World tile",
                 GpuBuffer.USAGE_VERTEX | GpuBuffer.USAGE_COPY_DST, mesh.vertices());
-        MESHES.put(ExtendedWorldStorage.pack(tx, tz), new GpuTile(buffer, mesh.quadCount()));
+        MESHES.put(ExtendedVoxelStore.pack(tx, tz), new GpuTile(buffer, mesh.quads()));
+        if (!loggedFirstUpload) {
+            loggedFirstUpload = true;
+            System.out.println("[SofronPack] Textured Extended World LOD GPU tile uploaded: "
+                    + mesh.quads() + " square block faces");
+        }
     }
 
     private static void ensureIndices() {
@@ -243,11 +285,53 @@ public final class ExtendedWorldLodRenderer {
                 GpuBuffer.USAGE_INDEX | GpuBuffer.USAGE_COPY_DST, buffer);
     }
 
-    /** Release all device resources from the render thread. */
-    public static void close() {
+    private static boolean hasChunkData(int tx, int tz) {
+        for (int dz = 0; dz < TILE; dz++) {
+            for (int dx = 0; dx < TILE; dx++) {
+                if (ExtendedVoxelStore.has(tx * TILE + dx, tz * TILE + dz)) return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean isInView(int tx, int tz, double px, double pz,
+                                    float lookX, float lookZ) {
+        double dx = (long) tx * TILE * 16 + TILE * 8 - px;
+        double dz = (long) tz * TILE * 16 + TILE * 8 - pz;
+        double length = Math.sqrt(dx * dx + dz * dz);
+        // Keep tiles behind the player at very close range and a generous
+        // horizontal field of view to avoid corner pop-in on ultrawide screens.
+        return length < 128 || (dx * lookX + dz * lookZ) >= -length * .2;
+    }
+
+    private static void trimGpuCache(int cx, int cz) {
+        if (MESHES.size() <= MAX_GPU_TILES) return;
+        Long worst = null;
+        long worstDistance = -1;
+        for (long key : MESHES.keySet()) {
+            long tx = (int)(key >> 32), tz = (int)(long)key;
+            long dx = tx * TILE + TILE / 2 - cx;
+            long dz = tz * TILE + TILE / 2 - cz;
+            long distance = dx * dx + dz * dz;
+            if (distance > worstDistance) { worstDistance = distance; worst = key; }
+        }
+        if (worst != null) {
+            GpuTile evicted = MESHES.remove(worst);
+            if (evicted != null) evicted.close();
+        }
+    }
+
+    private static void clearMeshes() {
         for (GpuTile tile : MESHES.values()) tile.close();
         MESHES.clear();
         DIRTY.clear();
+    }
+
+    /** Release all device resources from the render thread. */
+    public static void close() {
+        clearMeshes();
+        ATLAS.clear();
+        ExtendedVoxelMesher.clearCachedChunks();
         if (quadIndices != null) quadIndices.close();
         if (longProjection != null) longProjection.close();
         quadIndices = null;
@@ -256,5 +340,6 @@ public final class ExtendedWorldLodRenderer {
         worldGeneration = Long.MIN_VALUE;
         centerX = centerZ = Integer.MIN_VALUE;
         lastRenderDistance = 0;
+        loggedFirstUpload = loggedFirstDraw = false;
     }
 }
