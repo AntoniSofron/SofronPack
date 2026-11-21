@@ -81,11 +81,11 @@ public final class ExtendedVoxelMesher {
     private ExtendedVoxelMesher() {}
 
     /**
-     * @param detail 1 for exact 1-block voxels, 2 and 4 for distant simplified cubes
+     * @param detail 1 / 2 / 4 / 8 / 16 block voxels by distance
      */
     public static Mesh build(int tileX, int tileZ, int cx, int cz, int near, int far,
                              int detail, ChunkLookup lookup, MaterialResolver materials) {
-        if (detail != 1 && detail != 2 && detail != 4)
+        if (detail != 1 && detail != 2 && detail != 4 && detail != 8 && detail != 16)
             throw new IllegalArgumentException("LOD resolution");
         if (far < 1 || far > 256) throw new IllegalArgumentException("radius");
         // Include one full neighbour-chunk halo to cull hidden faces at
