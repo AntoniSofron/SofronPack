@@ -49,7 +49,7 @@ public final class ExtendedWorldPrefetch {
     private static void tick(MinecraftServer server) {
         // Do not schedule unauthorized generation on external multiplayer servers.
         if (!server.isSingleplayer() || !ExtendedWorldConfig.get().enabled ||
-                !ExtendedWorldVoxyBridge.available() || pending ||
+                !ExtendedWorldVoxyBridge.ready() || pending ||
                 (++tick % 4) != 0) return;
         if (server.getPlayerList().getPlayers().isEmpty()) return;
         ServerPlayer player = server.getPlayerList().getPlayers().getFirst();
