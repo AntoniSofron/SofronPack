@@ -121,8 +121,14 @@ void main() {
 
     // Use the same camera sky sample as the sky disc, including biome transitions.
     float underside = (useTopColor && CloudOffset.y < 0.0) ? 0.0 : 1.0 - faceVertex.y;
+    // The biomes influence only a *soft, pale shade* beneath the bank.
+    // Previous 55% multiplication by the raw sky colour could make the entire
+    // cloud look like an extension of the sky instead of a white cloud.
+    vec3 sky = clamp(ColorModulator.rgb, 0.0, 1.0);
+    float luma = dot(sky, vec3(0.2126, 0.7152, 0.0722));
+    vec3 pastelSky = mix(vec3(luma), sky, 0.40);
     undersideTint = ColorModulator.a < 0.0
-        ? mix(vec3(1.0), clamp(ColorModulator.rgb, 0.0, 1.0), 0.55 * underside)
+        ? mix(vec3(1.0), pastelSky, 0.16 * underside)
         : vec3(1.0);
     PlayerPos = pos;
 
