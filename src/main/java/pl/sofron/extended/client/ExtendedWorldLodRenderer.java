@@ -319,6 +319,7 @@ public final class ExtendedWorldLodRenderer {
     public static void close() {
         clearMeshes();
         ATLAS.clear();
+        ExtendedVoxelMesher.clearCachedChunks();
         if (quadIndices != null) quadIndices.close();
         if (longProjection != null) longProjection.close();
         quadIndices = null;
