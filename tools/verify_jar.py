@@ -26,6 +26,8 @@ with zipfile.ZipFile(jar) as z:
     assert len(mod["mixins"]) == 5
     assert "sofron-extended.mixins.json" in mod["mixins"]
     assert "sofron-extended-client.mixins.json" in mod["mixins"]
+    far_mixins = json.loads(z.read("sofron-extended-client.mixins.json"))
+    assert "ExtendedWorldFogMixin" in far_mixins["client"]
     assert "pl/sofron/extended/ExtendedWorldVoxyBridge.class" not in files
     assert "pl/sofron/extended/ExtendedWorldMeshBuilder.class" not in files
     assert "pl/sofron/extended/ExtendedWorldStorage.class" not in files
@@ -40,6 +42,7 @@ with zipfile.ZipFile(jar) as z:
         "pl/sofron/extended/client/ExtendedWorldLodRenderer.class",
         "pl/sofron/extended/mixin/ExtendedWorldSodiumRenderMixin.class",
         "pl/sofron/extended/mixin/ExtendedWorldSodiumOptionsMixin.class",
+        "pl/sofron/extended/mixin/ExtendedWorldFogMixin.class",
     ):
         assert class_name in files, class_name
     for required in (
@@ -118,6 +121,10 @@ with zipfile.ZipFile(jar) as z:
     lod_vertex = z.read("assets/minecraft/shaders/core/sofronpack/extended_voxel.vsh")
     assert b"horizontalChunks" in lod_vertex
     assert b"atmosphereBlend = ColorModulator.a" in lod_vertex
+    fog_mixin_source = pathlib.Path(
+        "src/main/java/pl/sofron/extended/mixin/ExtendedWorldFogMixin.java").read_text()
+    assert "fog.renderDistanceStart = 16f * 16f" in fog_mixin_source
+    assert "fog.renderDistanceEnd = ExtendedWorldConfig.DISTANT_RADIUS_CHUNKS * 16f" in fog_mixin_source
     assert b"sphericalBlocks = length(relative)" in lod_vertex
     atmosphere_source = pathlib.Path(
         "src/main/java/pl/sofron/atmosphere/AtmospherePresets.java").read_text()

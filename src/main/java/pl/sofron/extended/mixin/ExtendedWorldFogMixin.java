@@ -1,0 +1,43 @@
+package pl.sofron.extended.mixin;
+
+import net.minecraft.client.Camera;
+import net.minecraft.client.DeltaTracker;
+import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.client.renderer.fog.FogData;
+import net.minecraft.client.renderer.fog.FogRenderer;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.material.FogType;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+import pl.sofron.extended.ExtendedWorldConfig;
+
+/**
+ * Normal chunks and far LODs share one atmospheric depth range. Only the
+ * automatic vanilla render-distance fade is extended; environmental fog
+ * remains untouched, so biome, weather, blindness and cave density continue
+ * to affect *both* renderers through the same uniforms.
+ */
+@Mixin(FogRenderer.class)
+public abstract class ExtendedWorldFogMixin {
+    @Inject(method = "setupFog", at = @At("RETURN"))
+    private void sofron$extendTerrainFog(Camera camera, int renderDistanceInChunks,
+            DeltaTracker deltaTracker, float darkenWorldAmount, ClientLevel level,
+            CallbackInfoReturnable<FogData> cir) {
+        if (!ExtendedWorldConfig.get().enabled || level == null
+                || !level.dimension().equals(Level.OVERWORLD)
+                || camera.getFluidInCamera() != FogType.NONE) return;
+
+        FogData fog = cir.getReturnValue();
+        if (fog == null) return;
+
+        // Minecraft's normal terrain disappears completely at the selected
+        // render distance, leaving an unnatural fog wall in front of LODs.
+        // Keep normal chunk loading/simulation untouched while shifting only
+        // this artificial distance fade to the *same* distant-world range.
+        // Real environmental fog end/start still wins in severe conditions.
+        fog.renderDistanceStart = 16f * 16f;
+        fog.renderDistanceEnd = ExtendedWorldConfig.DISTANT_RADIUS_CHUNKS * 16f;
+    }
+}
