@@ -20,12 +20,19 @@ import pl.sofron.extended.client.ExtendedWorldLodRenderer;
 /** Draw our self-contained LOD tiles inside Minecraft's existing terrain pass. */
 @Mixin(value = DefaultChunkRenderer.class, remap = false)
 public abstract class ExtendedWorldSodiumRenderMixin {
+    @org.spongepowered.asm.mixin.Unique private boolean sofron$loggedSodiumFog;
+
     @Inject(method = "render", at = @At("HEAD"), remap = false, require = 0)
     private void sofron$nativeLod(ChunkRenderMatrices matrices,
             ChunkRenderListIterable lists, TerrainRenderPass terrainPass,
             CameraTransform camera, FogParameters fog, boolean sort,
             RenderPass renderPass, GpuSampler sampler, GpuBufferSlice transforms,
             GpuBuffer uniform, OitStage stage, CallbackInfo ci) {
+        if (!sofron$loggedSodiumFog && fog.renderEnd() == 2048f &&
+                pl.sofron.extended.ExtendedWorldConfig.get().enabled) {
+            sofron$loggedSodiumFog = true;
+            System.out.println("[SofronPack] Sodium terrain fog range confirmed at 2048 blocks");
+        }
         ExtendedWorldLodRenderer.render(renderPass, matrices, terrainPass, camera);
     }
 }

@@ -60,7 +60,7 @@ public final class ExtendedWorldPrefetch {
     private ExtendedWorldPrefetch() {}
 
     public static void register() {
-        ServerChunkEvents.CHUNK_LOAD.register((level, chunk) -> {
+        ServerChunkEvents.CHUNK_LOAD.register((level, chunk, generated) -> {
             if (level == lastLevel && ExtendedWorldConfig.get().enabled) {
                 if (recentlyLoaded.size() >= 2048) recentlyLoaded.removeFirst();
                 recentlyLoaded.add(pack(chunk.getPos().x(), chunk.getPos().z()));

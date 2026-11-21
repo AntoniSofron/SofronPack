@@ -60,6 +60,7 @@ jobs:
             echo 'The 128-chunk, fogged GPU render hook was not reached while in the world'
             exit 1
           fi
+          grep -Fq 'Sodium terrain fog range confirmed at 2048 blocks' triple-clouds-128-fog.log
           if ! grep -q 'Unified Extended World fog active' triple-clouds-128-fog.log; then
             echo 'The shared normal-chunk + LOD fog mixin was not activated'
             exit 1
