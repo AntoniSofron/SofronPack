@@ -14,6 +14,9 @@
     "client": [
       "pl.sofron.terralab.BirchColors",
       "pl.sofron.light.SofronPackLightClient"
+    ],
+    "sodium:config_api_user": [
+      "pl.sofron.extended.ExtendedWorldOptions"
     ]
   },
   "depends": {
@@ -28,7 +31,8 @@
   "mixins": [
     "sofron-soil.mixins.json",
     "sofron.mixins.json",
-    "sofron-atmosphere.mixins.json"
+    "sofron-atmosphere.mixins.json",
+    "sofron-extended.mixins.json"
   ],
   "icon": "assets/sofronpack/icon.png"
 }
