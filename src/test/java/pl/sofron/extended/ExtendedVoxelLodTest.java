@@ -67,6 +67,24 @@ class ExtendedVoxelLodTest {
         assertEquals(10, mesh.quads());
     }
 
+    @Test void sharedVoxelFaceBetweenNeighbouringTilesIsNotRendered() {
+        int grid = ExtendedVoxelStore.GRID;
+        short[] left = new short[grid * grid];
+        short[] right = new short[grid * grid];
+        left[grid - 1] = 1; // easternmost block in chunk (3,0)
+        right[0] = 1; // matching westernmost block of chunk (4,0)
+        var west = ExtendedVoxelStore.encode(3, 0, 0, 1,
+                new String[] {"minecraft:air", "minecraft:stone"}, left);
+        var east = ExtendedVoxelStore.encode(4, 0, 0, 1,
+                new String[] {"minecraft:air", "minecraft:stone"}, right);
+        var texture = new ExtendedVoxelMesher.MaterialUV(0, 0, 1, 1, 0xffffff, false);
+        var mesh = ExtendedVoxelMesher.build(0, 0, 20, 20, 12, 64, 1,
+                (cx, cz) -> cx == 3 && cz == 0 ? west
+                        : cx == 4 && cz == 0 ? east : null,
+                (block, face) -> texture);
+        assertEquals(5, mesh.quads(), "Face shared with a neighbouring LOD tile must be culled");
+    }
+
     @Test void normalRenderRangeKeepsPriority() {
         short[] cells = new short[ExtendedVoxelStore.GRID * ExtendedVoxelStore.GRID];
         Arrays.fill(cells, (short)1);
