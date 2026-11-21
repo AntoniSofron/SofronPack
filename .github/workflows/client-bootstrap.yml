@@ -1,7 +1,7 @@
 name: Client bootstrap
 on:
   push:
-    branches: [main, 'optimization/**']
+    branches: [main, 'optimization/**', 'feature/**']
     paths:
       - 'src/**'
       - 'build.gradle'
