@@ -1,5 +1,6 @@
 package pl.sofron.light.runtime;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -9,14 +10,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import net.minecraft.client.Minecraft;
-import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
 import pl.sofron.light.config.LightConfig;
-import pl.sofron.light.engine.LightPalette;
 import pl.sofron.light.engine.BlockLightRules;
 import pl.sofron.light.engine.LightSource;
-import pl.sofron.light.engine.RgbLight;
+
 
 public final class ChunkLightIndex {
     private record ChunkKey(int x, int z) {}
@@ -27,64 +26,96 @@ public final class ChunkLightIndex {
     private long ticks;
     private int previousX, previousZ, previousRadius;
     private long nextDiscovery;
+    private final ArrayDeque<ChunkKey> pending = new ArrayDeque<>();
     private long revision;
+    private record Emission(float radius, BlockLightRules.Rule rule) {}
+    private static final Emission UNLIT = new Emission(0, null);
+    private final Map<BlockState, Emission> emissions = new IdentityHashMap<>();
+    private float configuredRadius;
+    private boolean configuredColor;
     private long lastRuleRevision = Long.MIN_VALUE;
     public long revision() { return revision; }
     private static final int SCANS_PER_TICK = 3;
     private static final int REFRESH_TICKS = 600;
     private final Set<ChunkKey> dirty = new HashSet<>();
-    public void invalidate(int cx, int cz) { dirty.add(new ChunkKey(cx,cz)); }
+    public void invalidate(int cx, int cz) {
+        ChunkKey key = new ChunkKey(cx, cz);
+        // Unscanned columns are already handled by distance-ordered discovery.
+        if (indexed.containsKey(key)) dirty.add(key);
+    }
     public void clear() {
         if (lastLevel != null || !indexed.isEmpty()) revision++;
-        indexed.clear(); buckets.clear(); dirty.clear(); lastLevel = null; ticks = 0;
+        emissions.clear(); pending.clear(); indexed.clear(); buckets.clear(); dirty.clear(); lastLevel = null; ticks = 0;
     }
     public int indexedChunks() { return indexed.size(); }
-    public int indexedLights() { return indexed.values().stream().mapToInt(e -> e.lights().size()).sum(); }
+    public int indexedLights() { return buckets.sourceCount(); }
 
     public void tick(Minecraft client, LightConfig cfg) {
         if (client.level == null || client.player == null) { clear(); return; }
-        if (lastLevel != client.level) { indexed.clear(); buckets.clear(); lastLevel = client.level; ticks = 0; revision++; }
+        if (lastLevel != client.level) { clear(); lastLevel = client.level; revision++; }
         ticks++;
         long currentRuleRevision = BlockLightRules.revision();
-        boolean rulesChanged = lastRuleRevision != currentRuleRevision;
+        boolean rulesChanged = lastRuleRevision != currentRuleRevision
+                || configuredRadius != (float)cfg.dynamicLightRadius || configuredColor != cfg.coloredLighting;
         if (rulesChanged) {
             indexed.clear(); buckets.clear(); revision++;
+            emissions.clear();
+            configuredRadius = (float)cfg.dynamicLightRadius;
+            configuredColor = cfg.coloredLighting;
             lastRuleRevision = currentRuleRevision;
         }
         int cx = client.player.blockPosition().getX() >> 4;
         int cz = client.player.blockPosition().getZ() >> 4;
         int radius = Math.max(1, client.options.renderDistance().get());
-        if (ticks > 1 && ticks < nextDiscovery && dirty.isEmpty() && cx == previousX
-                && cz == previousZ && radius == previousRadius && !rulesChanged) return;
-        previousX=cx; previousZ=cz; previousRadius=radius;
-        indexed.keySet().removeIf(k -> {
-            boolean stale = Math.abs(k.x - cx) > radius + 1 || Math.abs(k.z - cz) > radius + 1
-                || !client.level.hasChunk(k.x, k.z);
-            if (stale) { buckets.remove(k.x, k.z); revision++; }
-            return stale;
-        });
-        dirty.retainAll(indexed.keySet());
-        List<ChunkKey> candidates = new ArrayList<>();
-        for (int dz = -radius; dz <= radius; dz++) {
-            for (int dx = -radius; dx <= radius; dx++) {
-                int x = cx + dx, z = cz + dz;
-                if (!client.level.hasChunk(x,z)) continue;
-                ChunkKey key = new ChunkKey(x,z);
-                Entry old = indexed.get(key);
-                if (old == null || dirty.contains(key) || ticks - old.scannedTick >= REFRESH_TICKS) candidates.add(key);
+        boolean moved = cx != previousX || cz != previousZ || radius != previousRadius;
+        if (ticks == 1 || rulesChanged || moved || ticks >= nextDiscovery) {
+            previousX = cx;
+            previousZ = cz;
+            previousRadius = radius;
+            nextDiscovery = ticks + 20;
+            indexed.keySet().removeIf(key -> {
+                if (Math.abs(key.x - cx) <= radius + 1 && Math.abs(key.z - cz) <= radius + 1
+                        && client.level.hasChunk(key.x, key.z)) return false;
+                Entry entry = indexed.get(key);
+                if (!entry.lights.isEmpty()) {
+                    buckets.remove(key.x, key.z);
+                    revision++;
+                }
+                return true;
+            });
+            List<ChunkKey> candidates = new ArrayList<>();
+            for (int z = cz - radius; z <= cz + radius; z++) {
+                for (int x = cx - radius; x <= cx + radius; x++) {
+                    if (!client.level.hasChunk(x,z)) continue;
+                    ChunkKey key = new ChunkKey(x,z);
+                    Entry old = indexed.get(key);
+                    if (old == null || ticks - old.scannedTick >= REFRESH_TICKS) candidates.add(key);
+                }
             }
+            candidates.sort(Comparator
+                .comparingLong((ChunkKey k) -> indexed.containsKey(k) ? indexed.get(k).scannedTick : -1L)
+                .thenComparingInt(k -> Math.max(Math.abs(k.x-cx), Math.abs(k.z-cz))));
+            pending.clear();
+            pending.addAll(candidates);
         }
-        if (candidates.size() > SCANS_PER_TICK) candidates.sort(Comparator
-            .comparingInt((ChunkKey k) -> dirty.contains(k) ? -1 : indexed.containsKey(k) ? 1 : 0)
-            .thenComparingLong(k -> indexed.containsKey(k) ? indexed.get(k).scannedTick : -1L)
-            .thenComparingInt(k -> Math.max(Math.abs(k.x-cx), Math.abs(k.z-cz))));
-        nextDiscovery = ticks + (candidates.size() > SCANS_PER_TICK ? 1 : 20);
-        int scans = Math.min(SCANS_PER_TICK, candidates.size());
-        for (int i = 0; i < scans; i++) {
-            ChunkKey key = candidates.get(i);
+        if (dirty.isEmpty() && pending.isEmpty()) return;
+        var changes = dirty.iterator();
+        int scans = 0;
+        while (scans < SCANS_PER_TICK && (changes.hasNext() || !pending.isEmpty())) {
+            ChunkKey key;
+            if (changes.hasNext()) {
+                key = changes.next();
+                changes.remove();
+                if (Math.abs(key.x - cx) > radius || Math.abs(key.z - cz) > radius) continue;
+            } else {
+                key = pending.removeFirst();
+                Entry old = indexed.get(key);
+                if (old != null && ticks - old.scannedTick < REFRESH_TICKS) continue;
+            }
+            if (!client.level.hasChunk(key.x, key.z)) continue;
+            scans++;
             List<LightSource> lights = scanChunk(client, cfg, key.x, key.z);
             Entry old = indexed.put(key, new Entry(lights, ticks));
-            dirty.remove(key);
             if (old == null ? !lights.isEmpty() : !old.lights().equals(lights)) {
                 buckets.replace(key.x, key.z, lights);
                 revision++;
@@ -98,37 +129,38 @@ public final class ChunkLightIndex {
         return buckets.affecting(chunkX, chunkZ);
     }
 
-    private static List<LightSource> scanChunk(Minecraft client, LightConfig cfg, int cx, int cz) {
-        List<LightSource> found = new ArrayList<>();
+    private Emission emission(BlockState state) {
+        Emission cached = emissions.get(state);
+        if (cached != null) return cached;
+        int vanilla = state.getLightEmission();
+        Emission result = UNLIT;
+        if (vanilla > 0) {
+            var rule = BlockLightRules.rule(BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString());
+            if (rule != null && rule.intensity() > 0) {
+                int level = rule.emission() == null ? vanilla : rule.emission();
+                float radius = BlockLightRules.tintRadius(rule, configuredRadius, level);
+                if (level > 0 && radius > 0) result = new Emission(radius, rule);
+            }
+        }
+        emissions.put(state, result);
+        return result;
+    }
+
+    private List<LightSource> scanChunk(Minecraft client, LightConfig cfg, int cx, int cz) {
         var chunk = client.level.getChunkSource().getChunkNow(cx, cz);
         if (chunk == null || !cfg.coloredLighting) return List.of();
-        // Most sections contain many instances of the same block type. Cache the
-        // resolved RGB rule per block identity for this scan (including misses).
-        Map<Block, BlockLightRules.Rule> localRules = new IdentityHashMap<>();
+        List<LightSource> found = new ArrayList<>();
         for (int sectionIndex = 0; sectionIndex < chunk.getSections().length; sectionIndex++) {
             var section = chunk.getSection(sectionIndex);
-            if (section.hasOnlyAir() || !section.maybeHas(state -> state.getLightEmission() > 0)) continue;
+            if (section.hasOnlyAir() || !section.maybeHas(state -> emission(state) != UNLIT)) continue;
             int baseY = chunk.getSectionYFromSectionIndex(sectionIndex) << 4;
             for (int dy=0; dy<16; dy++) for (int dx=0; dx<16; dx++) for (int dz=0; dz<16; dz++) {
                 var state = section.getBlockState(dx, dy, dz);
                 if (state.getLightEmission() == 0) continue;
-                int x = (cx << 4) + dx, y = baseY + dy, z = (cz << 4) + dz;
-                Block block = state.getBlock();
-                BlockLightRules.Rule rule;
-                if (localRules.containsKey(block)) {
-                    rule = localRules.get(block);
-                } else {
-                    rule = BlockLightRules.rule(BuiltInRegistries.BLOCK.getKey(block).toString());
-                    localRules.put(block, rule);
-                }
-                if (rule == null || !cfg.coloredLighting) continue;
-                int vanilla = state.getLightEmission(); // actual override now supplied by BlockStateEmissionMixin
-                int visual = rule.emission() == null ? vanilla : rule.emission();
-                if (visual <= 0 || rule.intensity() <= 0) continue;
-                float radius = BlockLightRules.tintRadius(rule, (float)cfg.dynamicLightRadius, visual);
-                if (radius <= 0) continue;
-                found.add(new LightSource(x+.5, y+.5, z+.5,
-                    radius, rule.intensity(), rule.color()));
+                Emission value = emission(state);
+                if (value == UNLIT) continue;
+                found.add(new LightSource((cx << 4) + dx + .5, baseY + dy + .5, (cz << 4) + dz + .5,
+                        value.radius, value.rule.intensity(), value.rule.color()));
             }
         }
         return List.copyOf(found);
