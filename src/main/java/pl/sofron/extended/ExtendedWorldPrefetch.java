@@ -18,9 +18,10 @@ import pl.sofron.extended.mixin.ExtendedChunkFutureAccess;
 public final class ExtendedWorldPrefetch {
     private static final int RADIUS = ExtendedWorldConfig.DISTANT_RADIUS_CHUNKS;
     private static final long[] OFFSETS = spiralOffsets(RADIUS);
+    private static final int MAX_PENDING = 6;
     private static int ticks, cursor, nearbyCursor;
+    private static int pending;
     private static int centerX = Integer.MIN_VALUE, centerZ = Integer.MIN_VALUE;
-    private static boolean pending;
     private static ServerLevel lastLevel;
 
     private ExtendedWorldPrefetch() {}
@@ -29,7 +30,7 @@ public final class ExtendedWorldPrefetch {
         ServerTickEvents.END_SERVER_TICK.register(ExtendedWorldPrefetch::tick);
         ServerLifecycleEvents.SERVER_STOPPING.register(server -> {
             ExtendedVoxelStore.close();
-            pending = false;
+            pending = 0;
             lastLevel = null;
             cursor = nearbyCursor = ticks = 0;
             centerX = centerZ = Integer.MIN_VALUE;
@@ -48,13 +49,21 @@ public final class ExtendedWorldPrefetch {
             lastLevel = level;
             centerX = centerZ = Integer.MIN_VALUE;
             cursor = nearbyCursor = 0;
-            pending = false;
+            pending = 0;
         }
         ExtendedVoxelStore.open(server.getWorldPath(LevelResource.ROOT),
                 level.dimension().identifier().toString());
         int cx = player.chunkPosition().x(), cz = player.chunkPosition().z();
         if (cx != centerX || cz != centerZ) {
-            centerX = cx; centerZ = cz; cursor = 0;
+            // Do not restart the expensive 128-chunk scan every time the
+            // player crosses a chunk boundary. Continuous flight otherwise
+            // prevents the cursor from ever reaching the distant rings.
+            if (centerX != Integer.MIN_VALUE &&
+                    Math.max(Math.abs(cx - centerX), Math.abs(cz - centerZ)) > 24) {
+                cursor = 0; // Actual teleport / dimension repositioning.
+            }
+            centerX = cx;
+            centerZ = cz;
         }
 
         // Nearby live data can change through normal gameplay. Refresh only
@@ -63,37 +72,49 @@ public final class ExtendedWorldPrefetch {
         if (ticks % 10 == 0) refreshNearby(level, cx, cz, normal);
 
         if ((++ticks % 40) == 0) ExtendedVoxelStore.flush();
-        if (pending || ticks % 4 != 0) return;
-        int inspected = 0;
-        while (inspected++ < 1024) {
-            if (cursor == OFFSETS.length) cursor = 0;
-            long offset = OFFSETS[cursor++];
-            int dx = (int)(offset >> 32), dz = (int)offset;
-            if (Math.max(Math.abs(dx), Math.abs(dz)) <= normal) continue;
-            int x = cx + dx, z = cz + dz;
-            if (ExtendedVoxelStore.has(x, z)) continue;
-            pending = true;
-            final ServerLevel expectedLevel = level;
-            try {
-                var future = ((ExtendedChunkFutureAccess) level.getChunkSource())
-                        .sofron$getChunkFuture(x, z, ChunkStatus.FULL, true);
-                future.whenComplete((result, error) -> server.execute(() -> {
-                    try {
-                        if (expectedLevel != lastLevel || error != null || result == null) return;
-                        result.ifSuccess(chunk -> {
-                            if (chunk instanceof LevelChunk full) {
-                                ExtendedVoxelStore.put(ExtendedVoxelStore.sample(expectedLevel, full));
-                            }
-                        });
-                    } finally {
-                        pending = false;
-                    }
-                }));
-            } catch (RuntimeException failure) {
-                pending = false;
-                System.err.println("[SofronPack] Distant chunk generation: " + failure.getMessage());
+        // Balanced async pipeline: up to six FULL chunk requests in flight.
+        // The budget dynamically reduces itself when the integrated server's
+        // average tick exceeds 35 ms, preserving game responsiveness.
+        boolean busyServer = server.getAverageTickTimeNanos() > 35_000_000L;
+        if (busyServer && ticks % 4 != 0) return;
+        int submitBudget = busyServer ? 1 : 2;
+        for (int submitted = 0; submitted < submitBudget && pending < MAX_PENDING; ) {
+            int inspected = 0;
+            boolean launched = false;
+            while (inspected++ < 2048) {
+                if (cursor == OFFSETS.length) cursor = 0;
+                long offset = OFFSETS[cursor++];
+                int dx = (int)(offset >> 32), dz = (int)offset;
+                if (Math.max(Math.abs(dx), Math.abs(dz)) <= normal) continue;
+                int x = cx + dx, z = cz + dz;
+                if (ExtendedVoxelStore.has(x, z)) continue;
+
+                final ServerLevel expectedLevel = level;
+                pending++;
+                submitted++;
+                launched = true;
+                try {
+                    var future = ((ExtendedChunkFutureAccess)level.getChunkSource())
+                            .sofron$getChunkFuture(x, z, ChunkStatus.FULL, true);
+                    future.whenComplete((result, error) -> server.execute(() -> {
+                        try {
+                            if (expectedLevel != lastLevel || error != null || result == null) return;
+                            result.ifSuccess(chunk -> {
+                                if (chunk instanceof LevelChunk full) {
+                                    ExtendedVoxelStore.put(ExtendedVoxelStore.sample(expectedLevel, full));
+                                }
+                            });
+                        } finally {
+                            if (expectedLevel == lastLevel) pending = Math.max(0, pending - 1);
+                        }
+                    }));
+                } catch (RuntimeException failure) {
+                    pending = Math.max(0, pending - 1);
+                    System.err.println("[SofronPack] Distant chunk generation: " + failure.getMessage());
+                }
+                break;
             }
-            return;
+            if (!launched) break;
         }
     }
 
