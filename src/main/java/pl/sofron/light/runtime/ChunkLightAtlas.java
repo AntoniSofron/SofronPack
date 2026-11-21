@@ -14,6 +14,7 @@ import pl.sofron.light.engine.LightSource;
  * store the accumulated RGB field on a two-block lattice (nine nodes per axis). */
 public final class ChunkLightAtlas {
     private static final int GRID = 9;
+    private static final ByteBuffer EMPTY_BYTES = ByteBuffer.allocateDirect(4).order(ByteOrder.nativeOrder()).asReadOnlyBuffer();
     private static final int MAX_WORDS = 16 * 1024 * 1024;
     private record Column(List<LightSource> lights, int[] words) {}
     private final Map<Long,Column> cached = new HashMap<>();
@@ -137,6 +138,6 @@ public final class ChunkLightAtlas {
     private static int last(double center,double radius) { return Math.min(GRID-1,(int)Math.floor((center+radius)/2)); }
     private static void put(IntArrayList out,double value) { out.add(Float.floatToRawIntBits((float)value)); }
     public static Snapshot empty() {
-        return new Snapshot(ByteBuffer.allocateDirect(4).order(ByteOrder.nativeOrder()),0,0);
+        return new Snapshot(EMPTY_BYTES.asReadOnlyBuffer().order(ByteOrder.nativeOrder()),0,0);
     }
 }
