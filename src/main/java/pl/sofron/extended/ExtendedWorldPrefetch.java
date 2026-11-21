@@ -31,7 +31,7 @@ public final class ExtendedWorldPrefetch {
         return thread;
     });
     private static int ticks, cursor, nearbyCursor;
-    private static int pending;
+    private static int pending, nearbyPending;
     private static int centerX = Integer.MIN_VALUE, centerZ = Integer.MIN_VALUE;
     private static ServerLevel lastLevel;
 
@@ -41,7 +41,7 @@ public final class ExtendedWorldPrefetch {
         ServerTickEvents.END_SERVER_TICK.register(ExtendedWorldPrefetch::tick);
         ServerLifecycleEvents.SERVER_STOPPING.register(server -> {
             ExtendedVoxelStore.close();
-            pending = 0;
+            pending = nearbyPending = 0;
             lastLevel = null;
             cursor = nearbyCursor = ticks = 0;
             centerX = centerZ = Integer.MIN_VALUE;
@@ -60,7 +60,7 @@ public final class ExtendedWorldPrefetch {
             lastLevel = level;
             centerX = centerZ = Integer.MIN_VALUE;
             cursor = nearbyCursor = 0;
-            pending = 0;
+            pending = nearbyPending = 0;
         }
         ExtendedVoxelStore.open(server.getWorldPath(LevelResource.ROOT),
                 level.dimension().identifier().toString());
@@ -77,17 +77,21 @@ public final class ExtendedWorldPrefetch {
             centerZ = cz;
         }
 
-        // Nearby live data can change through normal gameplay. Refresh only
-        // loaded chunks at a bounded rate; frozen far LOD is not resampled.
+        // Fast-fill real, ALREADY-LOADED near chunks. Before this change one
+        // chunk every five ticks meant at most 4 snapshots/second. On an idle
+        // server we now take two captures per tick (up to 40/second); actual
+        // zlib encoding happens on bounded daemon workers.
         int normal = Math.max(2, server.getPlayerList().getViewDistance());
-        if (ticks % 5 == 0) refreshNearby(level, cx, cz, normal);
+        boolean busyServer = server.getAverageTickTimeNanos() > 35_000_000L;
+        if (!busyServer || ticks % 5 == 0) {
+            refreshNearby(server, level, cx, cz, normal, busyServer ? 1 : 2);
+        }
 
         if ((++ticks % 40) == 0) ExtendedVoxelStore.flush();
         // Prioritize response time rather than saturating the integrated server:
         // keeping too many FULL futures inflight can starve nearby rendering.
         // This is a bounded throughput improvement, not a 100x worldgen claim.
         // Throttle hard as soon as server tick duration becomes critical.
-        boolean busyServer = server.getAverageTickTimeNanos() > 35_000_000L;
         if (busyServer && ticks % 4 != 0) return;
         int submitBudget = busyServer ? 1 : 4;
         for (int submitted = 0; submitted < submitBudget && pending < MAX_PENDING; ) {
@@ -151,15 +155,41 @@ public final class ExtendedWorldPrefetch {
         }
     }
 
-    private static void refreshNearby(ServerLevel level, int cx, int cz, int normal) {
+    private static void refreshNearby(MinecraftServer server, ServerLevel level,
+                                      int cx, int cz, int normal, int budget) {
         int size = normal * 2 + 1;
         int total = size * size;
-        for (int i = 0; i < 1; i++) {
+        for (int i = 0; i < budget && nearbyPending < 4; i++) {
             int slot = nearbyCursor++ % total;
             int dx = slot % size - normal, dz = slot / size - normal;
-            LevelChunk chunk = level.getChunkSource().getChunkNow(cx + dx, cz + dz);
-            if (chunk != null) {
-                ExtendedVoxelStore.put(ExtendedVoxelStore.sample(level, chunk));
+            int x = cx + dx, z = cz + dz;
+            // Prioritise holes in the persistent cache; periodically refresh
+            // known chunks to capture player edits without resampling the same
+            // unchanged 3D volume on every pass of the nearby scanner.
+            if (ExtendedVoxelStore.has(x, z) && (nearbyCursor & 15) != 0) continue;
+            LevelChunk chunk = level.getChunkSource().getChunkNow(x, z);
+            if (chunk == null) continue;
+            var captured = ExtendedVoxelStore.capture(level, chunk);
+            nearbyPending++;
+            try {
+                CompletableFuture.supplyAsync(captured::encode, ENCODERS)
+                        .whenComplete((encoded, failure) -> server.execute(() -> {
+                            try {
+                                if (level != lastLevel) return;
+                                if (failure != null) {
+                                    System.err.println("[SofronPack] Nearby voxel encode: "
+                                            + failure.getMessage());
+                                } else if (encoded != null) {
+                                    ExtendedVoxelStore.put(encoded);
+                                }
+                            } finally {
+                                if (level == lastLevel)
+                                    nearbyPending = Math.max(0, nearbyPending - 1);
+                            }
+                        }));
+            } catch (RuntimeException rejected) {
+                nearbyPending = Math.max(0, nearbyPending - 1);
+                System.err.println("[SofronPack] Nearby voxel queue: " + rejected.getMessage());
             }
         }
     }
