@@ -13,6 +13,7 @@ import java.io.DataOutputStream;
 import java.io.EOFException;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.channels.FileChannel;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
@@ -28,6 +29,8 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 public final class ExtendedWorldStorage {
     private static final int MAGIC = 0x53465731; // SFW1
     private static final int VERSION = 1;
+    private static final int HEADER_BYTES = 8;
+    private static final int RECORD_BYTES = 42;
     private static volatile Session session;
     private static volatile long generation;
 
@@ -59,6 +62,20 @@ public final class ExtendedWorldStorage {
         void open() throws IOException {
             Files.createDirectories(file.getParent());
             if (Files.isRegularFile(file)) {
+                // A sudden power loss can truncate the final append. Never
+                // append behind a torn record or future reloads will be
+                // misaligned. Preserve every previously completed record.
+                long size = Files.size(file);
+                if (size < HEADER_BYTES) {
+                    throw new IOException("Distant-world cache header is incomplete: " + file);
+                }
+                long complete = HEADER_BYTES
+                        + ((size - HEADER_BYTES) / RECORD_BYTES) * RECORD_BYTES;
+                if (complete != size) {
+                    try (FileChannel channel = FileChannel.open(file, StandardOpenOption.WRITE)) {
+                        channel.truncate(complete);
+                    }
+                }
                 try (DataInputStream in = new DataInputStream(
                         new BufferedInputStream(Files.newInputStream(file)))) {
                     if (in.readInt() != MAGIC || in.readInt() != VERSION) {
