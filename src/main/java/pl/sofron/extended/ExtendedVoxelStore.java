@@ -6,6 +6,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.block.RenderShape;
+import net.minecraft.world.level.block.state.properties.Property;
 import java.io.*;
 import java.nio.file.*;
 import java.util.*;
@@ -245,6 +246,7 @@ public final class ExtendedVoxelStore {
         int count = chunk.getSections().length * 16 / CELL;
         short[] cells = new short[GRID * GRID * count];
         Map<String, Integer> mapping = new HashMap<>();
+        IdentityHashMap<BlockState, String> stateNames = new IdentityHashMap<>();
         List<String> palette = new ArrayList<>();
         palette.add("minecraft:air");
         mapping.put("minecraft:air", 0);
@@ -267,7 +269,7 @@ public final class ExtendedVoxelStore {
                     BlockState state = chunk.getBlockState(pos);
                     int material = 0;
                     if (!state.isAir() && (state.getRenderShape() != RenderShape.INVISIBLE || !state.getFluidState().isEmpty())) {
-                        String id = BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString();
+                        String id = stateNames.computeIfAbsent(state, ExtendedVoxelStore::serializeState);
                         Integer mapped = mapping.get(id);
                         if (mapped == null) {
                             mapped = palette.size();
@@ -291,6 +293,32 @@ public final class ExtendedVoxelStore {
                 biome.getGrassColor(pos.getX(), pos.getZ()),
                 biome.getFoliageColor(), biome.getWaterColor(),
                 palette.toArray(String[]::new), cells);
+    }
+
+    /**
+     * The block registry name alone loses log axis, slabs, snow, foliage
+     * persistence and all other block-state variants. Preserve serialized
+     * properties so the distant texture lookup selects the correct baked
+     * model instead of rendering every block with its default texture.
+     */
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    static String serializeState(BlockState state) {
+        StringBuilder key = new StringBuilder(
+                BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString());
+        boolean first = true;
+        for (var entry : state.getValues().entrySet()) {
+            if (first) {
+                key.append('[');
+                first = false;
+            } else {
+                key.append(',');
+            }
+            Property property = entry.getKey();
+            key.append(property.getName()).append('=')
+                    .append(property.getName((Comparable) entry.getValue()));
+        }
+        if (!first) key.append(']');
+        return key.toString();
     }
 
     public static VoxelChunk encode(int x, int z, int minY, int yCount,
