@@ -3,6 +3,7 @@ package pl.sofron.light.runtime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -10,6 +11,7 @@ import java.util.Set;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.world.level.block.Block;
 import pl.sofron.light.config.LightConfig;
 import pl.sofron.light.engine.LightPalette;
 import pl.sofron.light.engine.BlockLightRules;
@@ -72,7 +74,7 @@ public final class ChunkLightIndex {
                 if (old == null || dirty.contains(key) || ticks - old.scannedTick >= REFRESH_TICKS) candidates.add(key);
             }
         }
-        candidates.sort(Comparator
+        if (candidates.size() > SCANS_PER_TICK) candidates.sort(Comparator
             .comparingInt((ChunkKey k) -> dirty.contains(k) ? -1 : indexed.containsKey(k) ? 1 : 0)
             .thenComparingLong(k -> indexed.containsKey(k) ? indexed.get(k).scannedTick : -1L)
             .thenComparingInt(k -> Math.max(Math.abs(k.x-cx), Math.abs(k.z-cz))));
@@ -100,6 +102,9 @@ public final class ChunkLightIndex {
         List<LightSource> found = new ArrayList<>();
         var chunk = client.level.getChunkSource().getChunkNow(cx, cz);
         if (chunk == null || !cfg.coloredLighting) return List.of();
+        // Most sections contain many instances of the same block type. Cache the
+        // resolved RGB rule per block identity for this scan (including misses).
+        Map<Block, BlockLightRules.Rule> localRules = new IdentityHashMap<>();
         for (int sectionIndex = 0; sectionIndex < chunk.getSections().length; sectionIndex++) {
             var section = chunk.getSection(sectionIndex);
             if (section.hasOnlyAir() || !section.maybeHas(state -> state.getLightEmission() > 0)) continue;
@@ -108,8 +113,14 @@ public final class ChunkLightIndex {
                 var state = section.getBlockState(dx, dy, dz);
                 if (state.getLightEmission() == 0) continue;
                 int x = (cx << 4) + dx, y = baseY + dy, z = (cz << 4) + dz;
-                String id = BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString();
-                var rule = BlockLightRules.rule(id);
+                Block block = state.getBlock();
+                BlockLightRules.Rule rule;
+                if (localRules.containsKey(block)) {
+                    rule = localRules.get(block);
+                } else {
+                    rule = BlockLightRules.rule(BuiltInRegistries.BLOCK.getKey(block).toString());
+                    localRules.put(block, rule);
+                }
                 if (rule == null || !cfg.coloredLighting) continue;
                 int vanilla = state.getLightEmission(); // actual override now supplied by BlockStateEmissionMixin
                 int visual = rule.emission() == null ? vanilla : rule.emission();
