@@ -252,20 +252,20 @@ public final class ExtendedVoxelStore {
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
         int index = 0;
         for (int yi = 0; yi < count; yi++) {
-            // Most upper-world sections are pure air: skip all 64 samples in
-            // those sections without calling getBlockState.
-            if (chunk.getSections()[(yi * CELL) / 16].hasOnlyAir()) {
+            // Read directly from the chunk's 16x16x16 palette instead of
+            // repeating BlockPos -> world chunk/section lookups 100k times.
+            var section = chunk.getSections()[(yi * CELL) / 16];
+            if (section.hasOnlyAir()) {
                 index += GRID * GRID;
                 continue;
             }
-            int y = minimum + yi * CELL;
+            int localY = (yi * CELL) & 15;
             for (int z = 0; z < GRID; z++) {
                 for (int x = 0; x < GRID; x++) {
                     // Store the actual Minecraft block at exact integer
                     // coordinates: no 2-block averaging, synthetic colours
                     // or diagonally interpolated heightfield.
-                    pos.set(chunkX * 16 + x, y, chunkZ * 16 + z);
-                    BlockState state = chunk.getBlockState(pos);
+                    BlockState state = section.getBlockState(x, localY, z);
                     int material = 0;
                     if (!state.isAir() && (state.getRenderShape() != RenderShape.INVISIBLE || !state.getFluidState().isEmpty())) {
                         String id = stateNames.computeIfAbsent(state, ExtendedVoxelStore::serializeState);
