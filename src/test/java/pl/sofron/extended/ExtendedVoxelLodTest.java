@@ -28,7 +28,7 @@ class ExtendedVoxelLodTest {
 
     @Test void independentStoneVoxelHasSixSquareTexturedFaces() {
         short[] cells = new short[ExtendedVoxelStore.GRID * ExtendedVoxelStore.GRID * 4];
-        cells[(2 * 8 + 3) * 8 + 4] = 1;
+        cells[(2 * ExtendedVoxelStore.GRID + 3) * ExtendedVoxelStore.GRID + 4] = 1;
         var chunk = ExtendedVoxelStore.encode(0, 0, 0, 4,
                 new String[] {"minecraft:air", "minecraft:stone"}, cells);
         var material = new ExtendedVoxelMesher.MaterialUV(
