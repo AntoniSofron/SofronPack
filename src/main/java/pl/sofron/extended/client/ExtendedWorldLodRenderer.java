@@ -189,9 +189,10 @@ public final class ExtendedWorldLodRenderer {
                     int radiusChunks = Math.max(
                             Math.abs(tx * TILE + TILE / 2 - cx),
                             Math.abs(tz * TILE + TILE / 2 - cz));
-                    int pass = MESHES.containsKey(key)
-                            ? (radiusChunks <= 64 ? 1 : 3)
-                            : (radiusChunks <= 64 ? 0 : 2);
+                    // 8,16,32,48,64,96,128 bands, each with preview first
+                    // and refinement second; preserves near-first appearance.
+                    int band = pl.sofron.extended.ExtendedLodStages.indexForRadius(radiusChunks);
+                    int pass = band * 2 + (MESHES.containsKey(key) ? 1 : 0);
                     if (pass < bestPass || (pass == bestPass && distanceSq < nearest)) {
                         bestPass = pass;
                         nearest = distanceSq;
@@ -304,7 +305,9 @@ public final class ExtendedWorldLodRenderer {
         int maximum = Math.max(
                 Math.max(Math.abs(x0 - cx), Math.abs(x1 - cx)),
                 Math.max(Math.abs(z0 - cz), Math.abs(z1 - cz)));
-        return (minimum <= near + 2 && maximum >= near - 2)
+        float boundary = pl.sofron.extended.ExtendedLodHandoff.nearStartChunks(near);
+        return (minimum <= boundary + 2 && maximum >= boundary - 2)
+                || (minimum <= near + 2 && maximum >= near - 2)
                 || (minimum <= FAR + 1 && maximum >= FAR - 1);
     }
 

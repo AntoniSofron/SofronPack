@@ -22,6 +22,26 @@ class ExtendedWorldPrefetchTest {
         assertTrue(unique.contains(ExtendedWorldPrefetch.pack(128, -128)));
     }
 
+    @Test void sevenStrictStagesCoverEntireSquareWithoutOverlap() {
+        int[] expected = {8, 16, 32, 48, 64, 96, 128};
+        long[] offsets = ExtendedWorldPrefetch.spiralOffsets(128);
+        int lastEnd = 0;
+        for (int i = 0; i < expected.length; i++) {
+            assertEquals(expected[i], ExtendedLodStages.radius(i));
+            assertEquals(lastEnd, ExtendedLodStages.startInclusive(i));
+            int end = ExtendedLodStages.endExclusive(i);
+            for (int j = lastEnd; j < end; j++) {
+                long pos = offsets[j];
+                int radius = Math.max(Math.abs((int)(pos >> 32)), Math.abs((int)pos));
+                assertTrue(radius <= expected[i], "Out-of-stage chunk " + radius);
+                if (i > 0) assertTrue(radius > expected[i - 1], "Previous stage leaked");
+                assertEquals(i, ExtendedLodStages.indexForRadius(radius));
+            }
+            lastEnd = end;
+        }
+        assertEquals(offsets.length, lastEnd);
+    }
+
     @Test void sixtyFourChunkSquareIsCompleteAndUnique() {
         long[] offsets = ExtendedWorldPrefetch.spiralOffsets(64);
         assertEquals(129 * 129, offsets.length);

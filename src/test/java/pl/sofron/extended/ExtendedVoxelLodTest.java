@@ -122,6 +122,25 @@ class ExtendedVoxelLodTest {
         assertEquals(0, eastFaces[0], "Unloaded east neighbour must not become a vertical wall");
     }
 
+    @Test void sevenEighthsBoundaryIsAbsoluteButRetainsNormalChunkOverlap() {
+        short[] cells = new short[ExtendedVoxelStore.GRID * ExtendedVoxelStore.GRID];
+        cells[0] = 1;
+        var chunk = ExtendedVoxelStore.encode(13, 0, 0, 1,
+                new String[]{"minecraft:air", "minecraft:stone"}, cells);
+        var material = new ExtendedVoxelMesher.MaterialUV(0, 0, 1, 1, 0xffffff, false);
+        // Camera at (0,0); radius 13 is strictly closer than 16*7/8.
+        var hidden = ExtendedVoxelMesher.build(3, 0, 0, 0, 16, 64, 1,
+                (x,z) -> x==13 && z==0 ? chunk : null, (id,dir)->material,
+                (x,z) -> false);
+        assertEquals(0, hidden.quads());
+        var boundary = ExtendedVoxelStore.encode(14, 0, 0, 1,
+                new String[]{"minecraft:air", "minecraft:stone"}, cells);
+        var visible = ExtendedVoxelMesher.build(3, 0, 0, 0, 16, 64, 1,
+                (x,z) -> x==14 && z==0 ? boundary : null, (id,dir)->material,
+                (x,z) -> false);
+        assertTrue(visible.quads() > 0);
+    }
+
     @Test void normalRenderRangeKeepsPriority() {
         short[] cells = new short[ExtendedVoxelStore.GRID * ExtendedVoxelStore.GRID];
         Arrays.fill(cells, (short)1);

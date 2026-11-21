@@ -135,8 +135,12 @@ public final class ExtendedVoxelMesher {
                 int chunkX = tileX * TILE_CHUNKS + x;
                 int chunkZ = tileZ * TILE_CHUNKS + z;
                 int radius = Math.max(Math.abs(chunkX - cx), Math.abs(chunkZ - cz));
-                skip[z * TILE_CHUNKS + x] =
-                        radius > far || (radius <= near && normalChunkReady.test(chunkX, chunkZ));
+                // Absolute 7/8 handoff: near LOD vanishes even if its old
+                // normal chunk isn't ready. The shader performs the same
+                // clipping every frame for previously uploaded GPU buffers.
+                skip[z * TILE_CHUNKS + x] = radius > far
+                        || radius < ExtendedLodHandoff.nearStartChunks(near)
+                        || (radius <= near && normalChunkReady.test(chunkX, chunkZ));
             }
         }
         ByteBuffer data = VERTEX_STAGING.get();
