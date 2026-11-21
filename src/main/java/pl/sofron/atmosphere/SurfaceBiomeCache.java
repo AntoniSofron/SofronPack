@@ -26,12 +26,14 @@ final class SurfaceBiomeCache {
         };
     }
 
-    void prepare(Object currentWorld, long time) {
+    boolean prepare(Object currentWorld, long time) {
         if (world != currentWorld || time < refreshed || time - refreshed >= refreshTicks) {
             columns.clear();
             world = currentWorld;
             refreshed = time;
+            return true;
         }
+        return false;
     }
 
     String get(int quartX, int quartZ, Resolver source) {

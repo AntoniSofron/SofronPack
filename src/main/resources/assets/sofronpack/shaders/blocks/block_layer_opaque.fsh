@@ -45,7 +45,7 @@ vec4 spl_voxelFetch(int offset, int side, ivec3 q) {
 // not fragment derivatives. This avoids triangle-dependent face orientation.
 // The voxel field is a *dynamic* light-level supplement; Minecraft's
 // original lightmap and vertex shading remain the base rendering.
-vec4 spl_evalDynamicSurface(vec3 cameraRelativePos) {
+vec4 spl_evalDynamicSurface(vec3 cameraRelativePos, vec3 dx, vec3 dy) {
     int offset = 0;
     const int side = 33;
     vec3 world = cameraRelativePos + splVoxelCamera.xyz;
@@ -55,13 +55,12 @@ vec4 spl_evalDynamicSurface(vec3 cameraRelativePos) {
     // across face planes during vertical movement and produces dark bands.
     // Screen-space derivatives are evaluated for the current draw; normalize
     // and orient the normal towards the live camera-relative fragment vector.
-    vec3 dx = dFdx(cameraRelativePos);
-    vec3 dy = dFdy(cameraRelativePos);
+
     if (any(lessThan(world, vec3(-2))) || any(greaterThan(world, vec3(side+2)))) return vec4(0.0);
     vec3 geometric = cross(dx, dy);
     float normalSq = dot(geometric, geometric);
     if (normalSq < 1e-16) return vec4(0.0);
-    geometric *= inversesqrt(normalSq);
+    // Only component ordering and orientation are used below.
     if (dot(geometric, -cameraRelativePos) < 0.0) geometric = -geometric;
     vec3 absNormal = abs(geometric);
     int axis = absNormal.x >= absNormal.y && absNormal.x >= absNormal.z ? 0 :
@@ -178,6 +177,10 @@ vec4 sampleRGSS(sampler2D source, vec2 uv, vec2 pixelSize) {
 }
 
 void main() {
+#if !defined(OIT_ALPHA_ONLY) && !defined(SOFRON_STATIONARY_ONLY)
+    vec3 surfaceDx = dFdx(spl_SurfaceCameraPos);
+    vec3 surfaceDy = dFdy(spl_SurfaceCameraPos);
+#endif
     vec4 color = u_UseRGSS ? sampleRGSS(u_BlockTex, v_TexCoord, u_TexelSize) : sampleNearest(u_BlockTex, v_TexCoord, u_TexelSize);
     vec3 surfaceAlbedo = color.rgb * spl_UnlitVertexColor;
     color *= v_Color; // Apply per-vertex color modulator
@@ -233,11 +236,11 @@ void main() {
     // is already lit. Moving emitters supplement only missing light.
     // Crucially we DO NOT discard baked vertex tint/AO or construct a second
     // independently shaded surface: doing so exposed triangle seams.
-    if (splAtlasCamera.w > 0.0) {
-        vec4 vox = spl_evalDynamicSurface(spl_SurfaceCameraPos);
-        float movingMask=(1.0-smoothstep(0.22,0.70,spl_Sunlit))*(1.0-splFullbrightPreserve);
+    float movingMask=(1.0-smoothstep(0.22,0.70,spl_Sunlit))*(1.0-splFullbrightPreserve);
+    if (splAtlasCamera.w > 0.0 && movingMask > 0.0) {
+        vec4 vox = spl_evalDynamicSurface(spl_SurfaceCameraPos, surfaceDx, surfaceDy);
         float targetCoord = max(spl_LightCoord.x, (vox.a * 15.0 + 0.5) / 16.0);
-        if (targetCoord > spl_LightCoord.x && movingMask > 0.0) {
+        if (targetCoord > spl_LightCoord.x) {
             vec3 oldLight = textureLod(u_LightTex, spl_LightCoord, 0.0).rgb;
             vec3 newLight = textureLod(u_LightTex, vec2(targetCoord, spl_LightCoord.y), 0.0).rgb;
             float chroma = max(max(vox.r, vox.g), vox.b);

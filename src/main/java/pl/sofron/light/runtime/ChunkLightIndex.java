@@ -1,5 +1,6 @@
 package pl.sofron.light.runtime;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -27,6 +28,7 @@ public final class ChunkLightIndex {
     private long ticks;
     private int previousX, previousZ, previousRadius;
     private long nextDiscovery;
+    private final ArrayDeque<ChunkKey> pending = new ArrayDeque<>();
     private long revision;
     private long lastRuleRevision = Long.MIN_VALUE;
     public long revision() { return revision; }
@@ -36,14 +38,14 @@ public final class ChunkLightIndex {
     public void invalidate(int cx, int cz) { dirty.add(new ChunkKey(cx,cz)); }
     public void clear() {
         if (lastLevel != null || !indexed.isEmpty()) revision++;
-        indexed.clear(); buckets.clear(); dirty.clear(); lastLevel = null; ticks = 0;
+        pending.clear(); indexed.clear(); buckets.clear(); dirty.clear(); lastLevel = null; ticks = 0;
     }
     public int indexedChunks() { return indexed.size(); }
-    public int indexedLights() { return indexed.values().stream().mapToInt(e -> e.lights().size()).sum(); }
+    public int indexedLights() { return buckets.sourceCount(); }
 
     public void tick(Minecraft client, LightConfig cfg) {
         if (client.level == null || client.player == null) { clear(); return; }
-        if (lastLevel != client.level) { indexed.clear(); buckets.clear(); lastLevel = client.level; ticks = 0; revision++; }
+        if (lastLevel != client.level) { clear(); lastLevel = client.level; revision++; }
         ticks++;
         long currentRuleRevision = BlockLightRules.revision();
         boolean rulesChanged = lastRuleRevision != currentRuleRevision;
@@ -54,37 +56,54 @@ public final class ChunkLightIndex {
         int cx = client.player.blockPosition().getX() >> 4;
         int cz = client.player.blockPosition().getZ() >> 4;
         int radius = Math.max(1, client.options.renderDistance().get());
-        if (ticks > 1 && ticks < nextDiscovery && dirty.isEmpty() && cx == previousX
-                && cz == previousZ && radius == previousRadius && !rulesChanged) return;
-        previousX=cx; previousZ=cz; previousRadius=radius;
-        indexed.keySet().removeIf(k -> {
-            boolean stale = Math.abs(k.x - cx) > radius + 1 || Math.abs(k.z - cz) > radius + 1
-                || !client.level.hasChunk(k.x, k.z);
-            if (stale) { buckets.remove(k.x, k.z); revision++; }
-            return stale;
-        });
-        dirty.retainAll(indexed.keySet());
-        List<ChunkKey> candidates = new ArrayList<>();
-        for (int dz = -radius; dz <= radius; dz++) {
-            for (int dx = -radius; dx <= radius; dx++) {
-                int x = cx + dx, z = cz + dz;
-                if (!client.level.hasChunk(x,z)) continue;
-                ChunkKey key = new ChunkKey(x,z);
-                Entry old = indexed.get(key);
-                if (old == null || dirty.contains(key) || ticks - old.scannedTick >= REFRESH_TICKS) candidates.add(key);
+        boolean moved = cx != previousX || cz != previousZ || radius != previousRadius;
+        if (ticks == 1 || rulesChanged || moved || ticks >= nextDiscovery) {
+            previousX = cx;
+            previousZ = cz;
+            previousRadius = radius;
+            nextDiscovery = ticks + 20;
+            indexed.keySet().removeIf(key -> {
+                if (Math.abs(key.x - cx) <= radius + 1 && Math.abs(key.z - cz) <= radius + 1
+                        && client.level.hasChunk(key.x, key.z)) return false;
+                Entry entry = indexed.get(key);
+                if (!entry.lights.isEmpty()) {
+                    buckets.remove(key.x, key.z);
+                    revision++;
+                }
+                return true;
+            });
+            List<ChunkKey> candidates = new ArrayList<>();
+            for (int z = cz - radius; z <= cz + radius; z++) {
+                for (int x = cx - radius; x <= cx + radius; x++) {
+                    if (!client.level.hasChunk(x,z)) continue;
+                    ChunkKey key = new ChunkKey(x,z);
+                    Entry old = indexed.get(key);
+                    if (old == null || ticks - old.scannedTick >= REFRESH_TICKS) candidates.add(key);
+                }
             }
+            candidates.sort(Comparator
+                .comparingLong((ChunkKey k) -> indexed.containsKey(k) ? indexed.get(k).scannedTick : -1L)
+                .thenComparingInt(k -> Math.max(Math.abs(k.x-cx), Math.abs(k.z-cz))));
+            pending.clear();
+            pending.addAll(candidates);
         }
-        if (candidates.size() > SCANS_PER_TICK) candidates.sort(Comparator
-            .comparingInt((ChunkKey k) -> dirty.contains(k) ? -1 : indexed.containsKey(k) ? 1 : 0)
-            .thenComparingLong(k -> indexed.containsKey(k) ? indexed.get(k).scannedTick : -1L)
-            .thenComparingInt(k -> Math.max(Math.abs(k.x-cx), Math.abs(k.z-cz))));
-        nextDiscovery = ticks + (candidates.size() > SCANS_PER_TICK ? 1 : 20);
-        int scans = Math.min(SCANS_PER_TICK, candidates.size());
-        for (int i = 0; i < scans; i++) {
-            ChunkKey key = candidates.get(i);
+        var changes = dirty.iterator();
+        int scans = 0;
+        while (scans < SCANS_PER_TICK && (changes.hasNext() || !pending.isEmpty())) {
+            ChunkKey key;
+            if (changes.hasNext()) {
+                key = changes.next();
+                changes.remove();
+                if (Math.abs(key.x - cx) > radius || Math.abs(key.z - cz) > radius) continue;
+            } else {
+                key = pending.removeFirst();
+                Entry old = indexed.get(key);
+                if (old != null && ticks - old.scannedTick < REFRESH_TICKS) continue;
+            }
+            if (!client.level.hasChunk(key.x, key.z)) continue;
+            scans++;
             List<LightSource> lights = scanChunk(client, cfg, key.x, key.z);
             Entry old = indexed.put(key, new Entry(lights, ticks));
-            dirty.remove(key);
             if (old == null ? !lights.isEmpty() : !old.lights().equals(lights)) {
                 buckets.replace(key.x, key.z, lights);
                 revision++;

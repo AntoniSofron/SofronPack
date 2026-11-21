@@ -196,12 +196,6 @@ void main() {
         spl_OreLight = 2; // Ordinary leaf detail: skip the emissive sentinel.
     }
     spl_SurfaceCameraPos = position;
-#ifndef OIT_ALPHA_ONLY
-    splStationaryVertex = splVoxelCamera.w > 0.0 ? spl_evalChunkLights(position) : vec4(0.0);
-#else
-    splStationaryVertex = vec4(0);
-#endif
-
 #ifdef USE_FOG
     v_FragDistance = getFragDistance(position);
 
@@ -222,6 +216,9 @@ void main() {
     v_Color = _vert_color * texture(u_LightTex, _vert_tex_light_coord);
     spl_Sunlit = texture(u_LightTex, vec2(0.03125, _vert_tex_light_coord.y)).r;
     spl_LightCoord = _vert_tex_light_coord;
+    // Fully sunlit vertices have zero stationary tint. Diagnostics still sample them.
+    splStationaryVertex = splVoxelCamera.w > 0.0 && (spl_Sunlit < 0.85 || splLightHeader.z != 0)
+        ? spl_evalChunkLights(position) : vec4(0.0);
     // Bake the stationary tint into the existing vertex color before rasterization.
     if (splStationaryVertex.a > 0.0001 && splLightHeader.z == 0) {
         vec3 hue = clamp(splStationaryVertex.rgb, 0.0, 1.0);
@@ -233,6 +230,7 @@ void main() {
 #else
     spl_UnlitVertexColor = _vert_color.rgb;
     v_Color = _vert_color;
+    splStationaryVertex = vec4(0.0);
     spl_Sunlit = 0.0;
     spl_LightCoord = vec2(0.0);
 #endif

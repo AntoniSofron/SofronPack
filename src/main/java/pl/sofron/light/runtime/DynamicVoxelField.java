@@ -15,6 +15,14 @@ public final class DynamicVoxelField {
             return dx<0||dy<0||dz<0||dx>=SIZE||dy>=SIZE||dz>=SIZE ? 0 : voxels[index(dx,dy,dz)];
         }
     }
+    // Published snapshots own their packed arrays. Only traversal scratch is reused.
+    private static final class Scratch {
+        final byte[] obstruction = new byte[CELLS];
+        final byte[] seen = new byte[CELLS];
+        final int[] queue = new int[CELLS];
+        final int[] colors = new int[16];
+    }
+    private static final ThreadLocal<Scratch> SCRATCH = ThreadLocal.withInitial(Scratch::new);
     private DynamicVoxelField() {}
     private static int index(int x,int y,int z) {return (y*SIZE+z)*SIZE+x;}
     private static final int[] DX={1,-1,0,0,0,0};
@@ -24,9 +32,12 @@ public final class DynamicVoxelField {
                                      List<Emitter> emitters, LightOcclusion occlusion) {
         int x0=centerX-SIZE/2, y0=centerY-SIZE/2, z0=centerZ-SIZE/2;
         int[] packed = new int[CELLS];
-        byte[] obstruction = new byte[CELLS];
-        byte[] seen = new byte[CELLS];
-        int[] queue = new int[CELLS];
+        Scratch scratch = SCRATCH.get();
+        byte[] obstruction = scratch.obstruction;
+        byte[] seen = scratch.seen;
+        int[] queue = scratch.queue;
+        java.util.Arrays.fill(obstruction, (byte)0);
+        java.util.Arrays.fill(seen, (byte)0);
         for (Emitter emitter:emitters) {
             int sx=emitter.x-x0, sy=emitter.y-y0, sz=emitter.z-z0;
             if(sx<0||sy<0||sz<0||sx>=SIZE||sy>=SIZE||sz>=SIZE)continue;
@@ -34,24 +45,33 @@ public final class DynamicVoxelField {
             int head=0, tail=0;
             int sourceLevel=Math.max(0,Math.min(15,emitter.level));
             if(sourceLevel==0)continue;
+            for (int level = 1; level <= sourceLevel; level++) {
+                int distance = sourceLevel - level;
+                int color = 0;
+                if (distance <= Math.max(0, emitter.tintRange)) {
+                    float weight = 1f - (float)distance / (Math.max(1, emitter.tintRange) + 1f);
+                    color = Math.round(Math.clamp(emitter.red, 0, 255) * weight) << 16
+                          | Math.round(Math.clamp(emitter.green, 0, 255) * weight) << 8
+                          | Math.round(Math.clamp(emitter.blue, 0, 255) * weight);
+                }
+                scratch.colors[level] = color;
+            }
             seen[origin]=(byte)sourceLevel;
             queue[tail++]=origin;
             while(head < tail) {
                 int at=queue[head++];
                 int level=Byte.toUnsignedInt(seen[at]);
                 int old=packed[at];
-                int rgb=old & 0xffffff;
-                int vx=at%SIZE, vy=at/(SIZE*SIZE), vz=(at/SIZE)%SIZE;
-                int dist=sourceLevel - level;
-                if(dist<=Math.max(0,emitter.tintRange)) {
-                    float tintWeight=1f-(float)dist/(Math.max(1,emitter.tintRange)+1f);
-                    int vr=Math.round(Math.max(0,Math.min(255,emitter.red))*tintWeight);
-                    int vg=Math.round(Math.max(0,Math.min(255,emitter.green))*tintWeight);
-                    int vb=Math.round(Math.max(0,Math.min(255,emitter.blue))*tintWeight);
-                    rgb = (Math.max(vr,(old>>>16)&255)<<16) | (Math.max(vg,(old>>>8)&255)<<8)
-                        | Math.max(vb,old&255);
+                int tint = scratch.colors[level];
+                if (old == 0) {
+                    packed[at] = (level << 24) | tint;
+                } else {
+                    packed[at] = (Math.max(level, old >>> 24) << 24)
+                            | Math.max(old & 0xff0000, tint & 0xff0000)
+                            | Math.max(old & 0xff00, tint & 0xff00)
+                            | Math.max(old & 0xff, tint & 0xff);
                 }
-                packed[at]=(Math.max(level,old>>>24)<<24) | rgb;
+                int vx=at%SIZE, vy=at/(SIZE*SIZE), vz=(at/SIZE)%SIZE;
                 if(level<=1) continue;
                 for(int face=0;face<6;face++) {
                     int nx=vx+DX[face],ny=vy+DY[face],nz=vz+DZ[face];
@@ -72,6 +92,7 @@ public final class DynamicVoxelField {
     public static void put(ByteBuffer buffer, Snapshot snapshot) {
         buffer.order(ByteOrder.nativeOrder());
         buffer.putInt(snapshot.x0).putInt(snapshot.y0).putInt(snapshot.z0).putInt(SIZE);
-        for(int voxel:snapshot.voxels)buffer.putInt(voxel);
+        buffer.asIntBuffer().put(snapshot.voxels);
+        buffer.position(buffer.position() + snapshot.voxels.length * Integer.BYTES);
     }
 }
