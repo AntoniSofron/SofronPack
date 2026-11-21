@@ -5,7 +5,8 @@
   "compatibilityLevel": "JAVA_25",
   "client": [
     "ExtendedWorldSodiumOptionsMixin",
-    "ExtendedWorldSodiumRenderMixin"
+    "ExtendedWorldSodiumRenderMixin",
+    "ExtendedVoxelPipelineMixin"
   ],
   "injectors": {
     "defaultRequire": 0
