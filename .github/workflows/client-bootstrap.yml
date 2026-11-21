@@ -1,8 +1,12 @@
 name: Client bootstrap
 on:
   push:
-    branches: [main]
-    paths: ['.github/workflows/client-bootstrap.yml']
+    branches: [main, 'optimization/**']
+    paths:
+      - 'src/**'
+      - 'build.gradle'
+      - 'gradle.properties'
+      - '.github/workflows/client-bootstrap.yml'
   workflow_dispatch:
 
 permissions:
