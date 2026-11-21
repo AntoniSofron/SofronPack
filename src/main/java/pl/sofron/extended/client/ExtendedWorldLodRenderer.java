@@ -159,7 +159,7 @@ public final class ExtendedWorldLodRenderer {
             RenderSystem.bindDefaultUniforms(pass);
             pass.setUniform("Projection", longProjection.slice());
             var blockAtlas = Minecraft.getInstance().getTextureManager().getTexture(
-                    Identifier.parse("minecraft:textures/atlas/blocks.png")).getTexture();
+                    Identifier.parse("minecraft:textures/atlas/blocks.png")).getTextureView();
             pass.setUniform("Sampler0", blockAtlas,
                     RenderSystem.getSamplerCache().getClampToEdge(FilterMode.LINEAR));
             pass.setIndexBuffer(quadIndices, IndexType.INT);
