@@ -12,6 +12,7 @@ class ExtendedVoxelLodTest {
         blocks[5] = 2;
         blocks[71] = 0;
         var original = ExtendedVoxelStore.encode(-40, 12, -64, 20,
+                0x31a444, 0x406a39, 0x256db1,
                 new String[] {"minecraft:air", "minecraft:stone", "minecraft:oak_leaves"}, blocks);
         byte[] record = ExtendedVoxelStore.payload(original);
         var restored = ExtendedVoxelStore.readPayload(record);
@@ -20,6 +21,9 @@ class ExtendedVoxelLodTest {
         assertEquals(-64, restored.minY());
         assertArrayEquals(blocks, restored.unpack());
         assertArrayEquals(original.palette(), restored.palette());
+        assertEquals(0x31a444, restored.grassTint());
+        assertEquals(0x406a39, restored.foliageTint());
+        assertEquals(0x256db1, restored.waterTint());
     }
 
     @Test void independentStoneVoxelHasSixSquareTexturedFaces() {
