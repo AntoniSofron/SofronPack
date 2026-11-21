@@ -6,7 +6,7 @@ been removed: triangles with synthetic map colours are no longer used.
 
 ## Rendering
 
-* A 3D material volume is sampled at **2 × 2 × 2 block** resolution, with
+* A 3D material volume is sampled at **1 × 1 × 1 block** resolution, with
   actual block registry names and a compact per-chunk palette. Unlike the old
   heightfield it contains cliffs, trees and overhang silhouettes. Blocks are
   drawn as square, axis-aligned faces.
@@ -14,7 +14,7 @@ been removed: triangles with synthetic map colours are no longer used.
   so texture packs are used. Model/atlas caches are reset when resource packs
   change. For some complex shapes, flowers, fluids and block entities, the
   representation is still approximate.
-* The mesher culls internal faces and uses LOD cube sizes of 2, 4, or 8 blocks
+* The mesher culls internal faces and uses LOD cube sizes of 1, 2, or 4 blocks
   according to distance. Near distance chunks are rendered **only by the
   original Minecraft/Sodium renderer**, avoiding double-rendering.
 * Each four-by-four-chunk group is a reusable GPU buffer. At most one far tile
@@ -30,8 +30,8 @@ been removed: triangles with synthetic map colours are no longer used.
   64-chunk radius, at most one asynchronous FULL-chunk request at a time and
   one new attempt every four server ticks. Existing generated terrain is loaded.
 * The persistent distant voxel cache lives in the save's
-  `sofronpack-extended-world/*.voxel.v3.bin` files, separately by dimension.
-  It uses compressed material indices, versioned records, checksums and per-chunk real biome grass, foliage and water tints. Old
+  `sofronpack-extended-world/*.voxel.v4.bin` files, separately by dimension.
+  It uses compressed material indices, full block-state property strings, versioned records, checksums and per-chunk real biome grass, foliage and water tints. Old
   `*.surface.bin` heightfields are **not** used, so they can safely be ignored.
 * Loaded nearby chunks are resampled at a limited rate. Distant cached chunks
   stay frozen until they return to the normal view radius.
@@ -43,12 +43,12 @@ been removed: triangles with synthetic map colours are no longer used.
 
 The voxel renderer is substantially more faithful to Minecraft blocks than
 the old four-colour surface LOD, but **not yet identical to Voxy's detail or
-performance**. The 2-block minimum resolution, simplified handling of
+performance**. The 1-block near-LOD resolution, simplified handling of
 non-cubic models and transparency, and approximate biome tinting still differ
 from Voxy. Tests required before release-grade use: in-world visual review
 across biomes, trees, water, structures and transitions, Iris, Sodium,
 OpenGL/Vulkan, FPS, VRAM, and persistent-world reload regression.
 
-The previous triangular, map-coloured LOD is removed from this version; old surface and voxel-v2 caches are ignored and rebuilt in the new v3 format. Enable the
+The previous triangular, map-coloured LOD is removed from this version; old surface and older voxel-v2/v3 caches are ignored and rebuilt in the new 1-block v4 format. Enable the
 feature through the **Większy świat** toggle below the normal render-distance
 option in Sodium's General Video Settings.
