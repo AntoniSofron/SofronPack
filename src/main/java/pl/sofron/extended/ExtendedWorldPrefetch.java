@@ -55,7 +55,7 @@ public final class ExtendedWorldPrefetch {
         ServerLevel level = player.level();
         if (level == null) return;
 
-        int cx = player.chunkPosition().x, cz = player.chunkPosition().z;
+        int cx = player.chunkPosition().x(), cz = player.chunkPosition().z();
         if (centerX != cx || centerZ != cz) {
             centerX = cx;
             centerZ = cz;
