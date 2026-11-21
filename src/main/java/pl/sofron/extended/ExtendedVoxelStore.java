@@ -257,16 +257,14 @@ public final class ExtendedVoxelStore {
         return capture(level, chunk).encode();
     }
 
-    public static CapturedVoxel capture(ServerLevel level, LevelChunk chunk) {
+    public static CapturedVoxel capture(ServerLevel level, net.minecraft.world.level.chunk.ChunkAccess chunk) {
         int chunkX = chunk.getPos().x(), chunkZ = chunk.getPos().z();
         int minimum = level.getMinY();
         int count = chunk.getSections().length * 16 / CELL;
         short[] cells = new short[GRID * GRID * count];
-        Map<String, Integer> mapping = new HashMap<>();
-        IdentityHashMap<BlockState, String> stateNames = new IdentityHashMap<>();
+        IdentityHashMap<BlockState, Short> mapping = new IdentityHashMap<>();
         List<String> palette = new ArrayList<>();
         palette.add("minecraft:air");
-        mapping.put("minecraft:air", 0);
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
         int index = 0;
         for (int yi = 0; yi < count; yi++) {
@@ -284,18 +282,17 @@ public final class ExtendedVoxelStore {
                     // coordinates: no 2-block averaging, synthetic colours
                     // or diagonally interpolated heightfield.
                     BlockState state = section.getBlockState(x, localY, z);
-                    int material = 0;
-                    if (!state.isAir() && (state.getRenderShape() != RenderShape.INVISIBLE || !state.getFluidState().isEmpty())) {
-                        String id = stateNames.computeIfAbsent(state, ExtendedVoxelStore::serializeState);
-                        Integer mapped = mapping.get(id);
-                        if (mapped == null) {
-                            mapped = palette.size();
-                            mapping.put(id, mapped);
-                            palette.add(id);
+                    Short material = mapping.get(state);
+                    if (material == null) {
+                        material = 0;
+                        if (!state.isAir() && (state.getRenderShape() != RenderShape.INVISIBLE
+                                || !state.getFluidState().isEmpty())) {
+                            material = (short) palette.size();
+                            palette.add(serializeState(state));
                         }
-                        material = mapped;
+                        mapping.put(state, material);
                     }
-                    cells[index++] = (short) material;
+                    cells[index++] = material;
                 }
             }
         }
@@ -305,7 +302,7 @@ public final class ExtendedVoxelStore {
         pos.set(chunkX * 16 + 8, chunk.getHeight(
                 net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, 8, 8),
                 chunkZ * 16 + 8);
-        var biome = level.getBiome(pos).value();
+        var biome = chunk.getNoiseBiome(pos.getX() >> 2, pos.getY() >> 2, pos.getZ() >> 2).value();
         return new CapturedVoxel(chunkX, chunkZ, minimum, count,
                 biome.getGrassColor(pos.getX(), pos.getZ()),
                 biome.getFoliageColor(), biome.getWaterColor(),

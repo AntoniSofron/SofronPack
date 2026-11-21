@@ -25,7 +25,8 @@ import pl.sofron.atmosphere.AtmospherePresets;
 public abstract class ExtendedWorldFogMixin {
     @Unique private static boolean sofron$logged;
 
-    @Inject(method = "setupFog", at = @At("RETURN"))
+    // Sodium snapshots these fields at RETURN with the default injection order (1000).
+    @Inject(method = "setupFog", at = @At("RETURN"), order = 900)
     private void sofron$extendTerrainFog(Camera camera, int renderDistanceInChunks,
             DeltaTracker deltaTracker, float darkenWorldAmount, ClientLevel level,
             CallbackInfoReturnable<FogData> cir) {

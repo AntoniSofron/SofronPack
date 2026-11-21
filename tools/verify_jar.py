@@ -123,9 +123,10 @@ with zipfile.ZipFile(jar) as z:
     assert "int pass = band * 2" in pathlib.Path(
         "src/main/java/pl/sofron/extended/client/ExtendedWorldLodRenderer.java").read_text()
     assert b"sofronFogStrength(FogEnvironmentalEnd)" in extended_shader
-    cloud_vertex = z.read("assets/minecraft/shaders/core/sofronpack/clouds.vsh")
-    assert b"0.60 * underside" in cloud_vertex
-    assert b"ColorModulator.rgb" in cloud_vertex
+    with zipfile.ZipFile("dist/26.3-SofronPack-v0.1.33.jar") as reference:
+        for ext in ("vsh", "fsh"):
+            entry = f"assets/minecraft/shaders/core/sofronpack/clouds.{ext}"
+            assert z.read(entry) == reference.read(entry)
     assert b"sofronPackDarkLight" in z.read(
         "assets/sofronpack/shaders/include/darker_light.glsl")
     assert b"sofronPackDarkLight" in z.read(

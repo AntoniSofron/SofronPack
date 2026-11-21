@@ -121,17 +121,6 @@ public final class ExtendedWorldPrefetch {
             int last = ExtendedLodStages.endExclusive(stageIndex);
             if (cursor < first) cursor = first;
             if (cursor >= last) {
-                if (pending > 0) {
-                    // Wait for this band to finish rather than dispatching the
-                    // next one and starving the closest visible terrain.
-                    cursor = first;
-                    break;
-                }
-                int missing = firstMissing(level, cx, cz, first, last);
-                if (missing >= 0) {
-                    cursor = missing; // Retry failed/previously pending cells.
-                    break;
-                }
                 stageIndex++;
                 if (stageIndex < ExtendedLodStages.count())
                     cursor = ExtendedLodStages.startInclusive(stageIndex);
@@ -141,7 +130,7 @@ public final class ExtendedWorldPrefetch {
             long offset = OFFSETS[cursor++];
             inspected++;
             int dx = (int)(offset >> 32), dz = (int)offset;
-            int x = cx + dx, z = cz + dz;
+            int x = scanAnchorX + dx, z = scanAnchorZ + dz;
             long key = pack(x, z);
             if (ExtendedVoxelStore.has(x, z) || IN_FLIGHT.contains(key)) continue;
             IN_FLIGHT.add(key);
@@ -157,7 +146,7 @@ public final class ExtendedWorldPrefetch {
                     continue;
                 }
                 var future = ((ExtendedChunkFutureAccess)level.getChunkSource())
-                        .sofron$getChunkFuture(x, z, ChunkStatus.FULL, true);
+                        .sofron$getChunkFuture(x, z, ChunkStatus.FEATURES, true);
                 future.whenComplete((result, error) -> server.execute(() -> {
                     boolean queued = false;
                     try {
@@ -166,10 +155,8 @@ public final class ExtendedWorldPrefetch {
                         // fully generated source chunks for async compression.
                         final boolean[] scheduled = {false};
                         result.ifSuccess(chunk -> {
-                            if (chunk instanceof LevelChunk full) {
-                                encodeAndPublish(server, expectedLevel, full, key);
-                                scheduled[0] = true;
-                            }
+                            encodeAndPublish(server, expectedLevel, chunk, key);
+                            scheduled[0] = true;
                         });
                         queued = scheduled[0];
                     } catch (RuntimeException failure) {
@@ -185,17 +172,6 @@ public final class ExtendedWorldPrefetch {
         }
     }
 
-    private static int firstMissing(ServerLevel level, int cx, int cz, int begin, int end) {
-        for (int i = begin; i < end; i++) {
-            long offset = OFFSETS[i];
-            int x = cx + (int)(offset >> 32);
-            int z = cz + (int)offset;
-            if (!ExtendedVoxelStore.has(x, z) && !IN_FLIGHT.contains(pack(x, z)))
-                return i;
-        }
-        return -1;
-    }
-
     private static void finishRequest(ServerLevel expected, long key) {
         if (expected != lastLevel) return;
         IN_FLIGHT.remove(key);
@@ -203,7 +179,7 @@ public final class ExtendedWorldPrefetch {
     }
 
     private static void encodeAndPublish(MinecraftServer server, ServerLevel level,
-                                         LevelChunk chunk, long key) {
+                                         net.minecraft.world.level.chunk.ChunkAccess chunk, long key) {
         var captured = ExtendedVoxelStore.capture(level, chunk);
         CompletableFuture.supplyAsync(captured::encode, ENCODERS)
                 .whenComplete((encoded, error) -> server.execute(() -> {
@@ -233,7 +209,7 @@ public final class ExtendedWorldPrefetch {
             // unchanged 3D volume on every pass of the nearby scanner.
             if (ExtendedVoxelStore.has(x, z) && (nearbyCursor & 15) != 0) continue;
             LevelChunk chunk = level.getChunkSource().getChunkNow(x, z);
-            if (chunk == null) continue;
+            if (chunk == null || IN_FLIGHT.contains(pack(x, z))) continue;
             var captured = ExtendedVoxelStore.capture(level, chunk);
             nearbyPending++;
             try {

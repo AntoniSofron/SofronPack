@@ -25,8 +25,8 @@ float sofronExtendedFog(float distanceChunks, float strength) {
     float d = mix(96.0, 56.0, strength);
     float e = mix(128.0, 64.0, strength);
 
-    if (distanceChunks < a) return 0.0;
-    if (distanceChunks < b) return sofronFogSegment(distanceChunks, a, b, 0.0, 0.13);
+    if (distanceChunks < a) return sofronFogSegment(distanceChunks, 0.0, a, 0.0, 0.02);
+    if (distanceChunks < b) return sofronFogSegment(distanceChunks, a, b, 0.02, 0.13);
     if (distanceChunks < c) return sofronFogSegment(distanceChunks, b, c, 0.13, 0.55);
     if (distanceChunks < d) return sofronFogSegment(distanceChunks, c, d, 0.55, 0.85);
     if (distanceChunks < e) return sofronFogSegment(distanceChunks, d, e, 0.85, 1.0);

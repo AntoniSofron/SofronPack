@@ -23,6 +23,14 @@ void main() {
     if (FogRenderDistanceEnd >= 2047.5 &&
             horizontalChunks < FogRenderDistanceStart / 16.0) discard;
 
+    if (FogRenderDistanceEnd >= 2047.5) {
+        float start = FogRenderDistanceStart / 16.0;
+        float coverage = smoothstep(start, start * (8.0 / 7.0), horizontalChunks);
+        ivec2 pixel = ivec2(gl_FragCoord.xy);
+        int rank = ((pixel.x & 1) * 2 + (pixel.y & 1) * 3) & 3;
+        if (coverage < (float(rank) + 0.5) * 0.25) discard;
+    }
+
     // Same four-zone function as the native Sodium terrain shader.
     float fog = FogRenderDistanceEnd >= 2047.5
             ? sofronExtendedFog(horizontalChunks, sofronFogStrength(FogEnvironmentalEnd))

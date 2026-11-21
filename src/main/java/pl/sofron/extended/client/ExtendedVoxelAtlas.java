@@ -59,6 +59,19 @@ public final class ExtendedVoxelAtlas implements ExtendedVoxelMesher.MaterialRes
         return faces[faceIndex(direction)];
     }
 
+    /** Resolve live game models here before handing immutable UV tables to the worker. */
+    ExtendedVoxelMesher.MaterialResolver snapshot(pl.sofron.extended.ExtendedVoxelStore.VoxelChunk[] chunks) {
+        Map<String, ExtendedVoxelMesher.MaterialUV[]> table = new HashMap<>();
+        for (var chunk : chunks) {
+            if (chunk == null) continue;
+            for (String name : chunk.palette()) {
+                if (!name.equals("minecraft:air"))
+                    table.computeIfAbsent(name, id -> materials.computeIfAbsent(id, this::extract));
+            }
+        }
+        return (name, direction) -> table.get(name)[faceIndex(direction)];
+    }
+
     private ExtendedVoxelMesher.MaterialUV[] extract(String name) {
         ExtendedVoxelMesher.MaterialUV[] result = new ExtendedVoxelMesher.MaterialUV[6];
         BlockState state;
