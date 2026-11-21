@@ -44,6 +44,10 @@ public final class ExtendedWorldPrefetch {
     });
     private static TicketType generationTicket;
     private static final LinkedHashSet<Long> recentlyLoaded = new LinkedHashSet<>();
+    // Dirty live chunks take priority over background regeneration. An unload can
+    // commit the last edit while an older compression task is still in flight.
+    private static final Set<Long> finalOnUnload = new HashSet<>();
+    private static final LinkedHashSet<Long> edited = new LinkedHashSet<>();
     private static long epoch;
     private static int ticks, cursor, nearbyCursor, stageIndex;
     private static int pending, nearbyPending;
@@ -58,6 +62,11 @@ public final class ExtendedWorldPrefetch {
 
     private ExtendedWorldPrefetch() {}
 
+    public static void blockChanged(LevelChunk chunk) {
+        if (chunk.getLevel() == lastLevel && ExtendedWorldConfig.get().enabled)
+            edited.add(pack(chunk.getPos().x(), chunk.getPos().z()));
+    }
+
     public static void register() {
         generationTicket = Registry.register(BuiltInRegistries.TICKET_TYPE,
                 Identifier.parse("sofronpack:distant_generation"), new TicketType(0L, TicketType.FLAG_LOADING));
@@ -66,6 +75,16 @@ public final class ExtendedWorldPrefetch {
                 if (recentlyLoaded.size() >= 2048) recentlyLoaded.removeFirst();
                 recentlyLoaded.add(pack(chunk.getPos().x(), chunk.getPos().z()));
             }
+        });
+        ServerChunkEvents.CHUNK_UNLOAD.register((level, chunk) -> {
+            if (level != lastLevel || !ExtendedWorldConfig.get().enabled) return;
+            long key = pack(chunk.getPos().x(), chunk.getPos().z());
+            boolean dirty = edited.remove(key);
+            boolean awaitingCapture = recentlyLoaded.remove(key);
+            if (!dirty && !awaitingCapture && !IN_FLIGHT.contains(key)
+                    && ExtendedVoxelStore.has(chunk.getPos().x(), chunk.getPos().z())) return;
+            ExtendedVoxelStore.put(ExtendedVoxelStore.sample(level, chunk));
+            if (IN_FLIGHT.contains(key)) finalOnUnload.add(key);
         });
         ServerTickEvents.END_SERVER_TICK.register(ExtendedWorldPrefetch::tick);
         ServerLifecycleEvents.SERVER_STOPPING.register(server -> {
@@ -76,6 +95,8 @@ public final class ExtendedWorldPrefetch {
             cursor = nearbyCursor = ticks = stageIndex = 0;
             IN_FLIGHT.clear();
             recentlyLoaded.clear();
+            edited.clear();
+            finalOnUnload.clear();
             epoch++;
             centerX = centerZ = scanAnchorX = scanAnchorZ = Integer.MIN_VALUE;
         });
@@ -100,6 +121,8 @@ public final class ExtendedWorldPrefetch {
             pending = nearbyPending = 0;
             IN_FLIGHT.clear();
             recentlyLoaded.clear();
+            edited.clear();
+            finalOnUnload.clear();
             epoch++;
         }
 
@@ -215,6 +238,7 @@ public final class ExtendedWorldPrefetch {
     private static void finishRequest(ServerLevel expected, long key) {
         if (expected != lastLevel) return;
         IN_FLIGHT.remove(key);
+        finalOnUnload.remove(key);
         pending = Math.max(0, pending - 1);
     }
 
@@ -228,7 +252,7 @@ public final class ExtendedWorldPrefetch {
                         if (requestEpoch != epoch) return;
                         if (error != null) {
                             System.err.println("[SofronPack] Distant voxel encode: " + error.getMessage());
-                        } else if (encoded != null) {
+                        } else if (encoded != null && !finalOnUnload.contains(key)) {
                             ExtendedVoxelStore.put(encoded);
                         }
                     } finally {
@@ -243,7 +267,12 @@ public final class ExtendedWorldPrefetch {
         int total = size * size;
         for (int i = 0; i < budget && nearbyPending < 4; i++) {
             int x, z;
-            if (!recentlyLoaded.isEmpty()) {
+            if (!edited.isEmpty()) {
+                long changed = edited.removeFirst();
+                if (IN_FLIGHT.contains(changed)) { edited.add(changed); break; }
+                x = (int)(changed >> 32);
+                z = (int)changed;
+            } else if (!recentlyLoaded.isEmpty()) {
                 long loaded = recentlyLoaded.removeFirst();
                 x = (int)(loaded >> 32);
                 z = (int)loaded;
@@ -267,11 +296,12 @@ public final class ExtendedWorldPrefetch {
                                 if (failure != null) {
                                     System.err.println("[SofronPack] Nearby voxel encode: "
                                             + failure.getMessage());
-                                } else if (encoded != null) {
+                                } else if (encoded != null && !finalOnUnload.contains(key)) {
                                     ExtendedVoxelStore.put(encoded);
                                 }
                             } finally {
                                 if (requestEpoch == epoch) {
+                                    finalOnUnload.remove(key);
                                     IN_FLIGHT.remove(key);
                                     nearbyPending = Math.max(0, nearbyPending - 1);
                                 }

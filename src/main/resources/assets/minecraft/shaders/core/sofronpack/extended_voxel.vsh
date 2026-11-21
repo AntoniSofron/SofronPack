@@ -31,7 +31,10 @@ void main() {
     tileXZ = Position.xz;
     tileUv = vec4(0.0);
     int emission = 0;
-    if (Color.a < 0.999) {
+    int material = int(round(Color.a * 255.0));
+    if (material >= 128 && material <= 143) {
+        emission = material - 128;
+    } else if (material < 255) {
         vec2 u = unpackRange(UV0.x), v = unpackRange(UV0.y);
         tileUv = vec4(u.x, v.x, u.y - u.x, v.y - v.x);
         int flags = 254 - int(round(Color.a * 255.0));
