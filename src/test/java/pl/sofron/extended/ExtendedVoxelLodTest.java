@@ -1,6 +1,8 @@
 package pl.sofron.extended;
 
 import net.minecraft.core.Direction;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.RotatedPillarBlock;
 import org.junit.jupiter.api.Test;
 import java.util.Arrays;
 import static org.junit.jupiter.api.Assertions.*;
@@ -24,6 +26,19 @@ class ExtendedVoxelLodTest {
         assertEquals(0x31a444, restored.grassTint());
         assertEquals(0x406a39, restored.foliageTint());
         assertEquals(0x256db1, restored.waterTint());
+    }
+
+    @Test void materialPaletteKeepsLogOrientationRatherThanJustBlockId() {
+        var oakX = Blocks.OAK_LOG.defaultBlockState()
+                .setValue(RotatedPillarBlock.AXIS, Direction.Axis.X);
+        var oakZ = Blocks.OAK_LOG.defaultBlockState()
+                .setValue(RotatedPillarBlock.AXIS, Direction.Axis.Z);
+        var x = ExtendedVoxelStore.serializeState(oakX);
+        var z = ExtendedVoxelStore.serializeState(oakZ);
+        assertTrue(x.startsWith("minecraft:oak_log["));
+        assertTrue(x.contains("axis=x"));
+        assertTrue(z.contains("axis=z"));
+        assertNotEquals(x, z, "Real block-state variants must not collapse");
     }
 
     @Test void independentStoneVoxelHasSixSquareTexturedFaces() {
