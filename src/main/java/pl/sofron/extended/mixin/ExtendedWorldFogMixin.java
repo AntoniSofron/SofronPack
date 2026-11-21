@@ -51,9 +51,9 @@ public abstract class ExtendedWorldFogMixin {
         // extended horizon, while preserving the genuine biome, cave and
         // weather fog computed earlier by AtmospherePresets.
         float influence = Math.clamp(AtmospherePresets.distantFogBlend(), 0f, 1f);
-        fog.environmentalStart = Math.lerp(start, fog.environmentalStart, influence);
+        fog.environmentalStart = start + (fog.environmentalStart - start) * influence;
         fog.environmentalEnd = Math.max(fog.environmentalStart + 2f,
-                Math.lerp(end, fog.environmentalEnd, influence));
+                end + (fog.environmentalEnd - end) * influence);
         if (!sofron$logged) {
             sofron$logged = true;
             System.out.println("[SofronPack] Unified Extended World fog active: normal + LOD terrain, 128 chunks");

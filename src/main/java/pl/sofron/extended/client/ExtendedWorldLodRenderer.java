@@ -313,6 +313,17 @@ public final class ExtendedWorldLodRenderer {
                 ExtendedVoxelStore::get, ATLAS,
                 (chunkX, chunkZ) -> client != null &&
                         client.getChunkSource().getChunk(chunkX, chunkZ, ChunkStatus.FULL, false) != null);
+        // A very sparse or extremely high-altitude scene can have no block
+        // exactly on the 4-block sampling grid. Fall back to full resolution
+        // rather than leaving that tile permanently invisible.
+        if (mesh.quads() == 0 && detail != wantedDetail) {
+            detail = wantedDetail;
+            mesh = ExtendedVoxelMesher.build(tx, tz, cx, cz, near, FAR, detail,
+                    ExtendedVoxelStore::get, ATLAS,
+                    (chunkX, chunkZ) -> client != null &&
+                            client.getChunkSource().getChunk(chunkX, chunkZ,
+                                    ChunkStatus.FULL, false) != null);
+        }
         // Never retire the visible mesh before the replacement is ready.
         // If source data is temporarily missing, preserve the prior buffer.
         if (mesh.quads() == 0) return;

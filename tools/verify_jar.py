@@ -105,7 +105,7 @@ with zipfile.ZipFile(jar) as z:
     assert b"FogColor.rgb" in extended_shader
     assert b"FogEnvironmentalStart" in extended_shader
     assert b"FogEnvironmentalEnd" in extended_shader
-    assert b"FogRenderDistanceEnd" not in extended_shader
+    assert b"FogRenderDistanceEnd" in extended_shader
     assert b"sphericalBlocks" in extended_shader
     assert b"cylindricalBlocks" in extended_shader
     assert b"FogRenderDistanceStart" in extended_shader
