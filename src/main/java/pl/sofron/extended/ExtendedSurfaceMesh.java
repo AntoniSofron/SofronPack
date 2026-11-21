@@ -22,6 +22,8 @@ public final class ExtendedSurfaceMesh {
 
     private static final class Columns {
         final VoxelChunk source;
+        final String[] palette;
+        final int minimum, grass, foliage, water;
         // Store the winning full-resolution column index for each coarser footprint.
         final short[][] winner = {new short[256], new short[64], new short[16]};
         final int[] height = new int[256];
@@ -29,6 +31,8 @@ public final class ExtendedSurfaceMesh {
 
         Columns(VoxelChunk source) {
             this.source = source;
+            palette = source.palette();
+            minimum = source.minY(); grass = source.grassTint(); foliage = source.foliageTint(); water = source.waterTint();
             short[] cells = source.unpack();
             for (int column = 0; column < 256; column++) {
                 winner[0][column] = (short) column;
@@ -42,6 +46,27 @@ public final class ExtendedSurfaceMesh {
                     break;
                 }
             }
+            reduce();
+        }
+
+        Columns(ExtendedTerrainPreview.Tile tile, int chunkX, int chunkZ) {
+            source = null;
+            palette = ExtendedTerrainPreview.MATERIALS;
+            int ox = (chunkX & 3) * 16, oz = (chunkZ & 3) * 16;
+            minimum = tile.minimum;
+            grass = foliage = tile.grass(ox + 8, oz + 8);
+            water = tile.water(ox + 8, oz + 8);
+            for (int i = 0; i < 256; i++) {
+                winner[0][i] = (short)i;
+                int x = ox + (i & 15), z = oz + (i >> 4);
+                int ground = tile.ground(x, z);
+                height[i] = Math.max(ground, tile.sea);
+                side[i] = top[i] = (short)tile.material(x, z, ground);
+            }
+            reduce();
+        }
+
+        private void reduce() {
             // Occupied-child reduction follows Voxy's hierarchical mip selection.
             // At the surface, retain the highest occupied child through both levels.
             for (int level = 1; level <= 2; level++) {
@@ -64,10 +89,20 @@ public final class ExtendedSurfaceMesh {
     }
 
     public Mesh build(long detailMap, VoxelChunk[] chunks, MaterialResolver materials) {
+        return build(detailMap, chunks, materials, 0, 0, null);
+    }
+
+    public Mesh build(long detailMap, VoxelChunk[] chunks, MaterialResolver materials,
+                      int tx, int tz, ExtendedTerrainPreview.Tile[] previews) {
         Columns[] data = new Columns[chunks.length];
         for (int i = 0; i < chunks.length; i++) {
             VoxelChunk chunk = chunks[i];
-            if (chunk == null) continue;
+            if (chunk == null) {
+                if (previews != null && previews[i] != null)
+                    data[i] = new Columns(previews[i], tx * TILE + i % (TILE + 2) - 1,
+                            tz * TILE + i / (TILE + 2) - 1);
+                continue;
+            }
             long key = ExtendedVoxelStore.pack(chunk.chunkX(), chunk.chunkZ());
             Columns columns = cache.get(key);
             if (columns == null || columns.source != chunk) {
@@ -86,10 +121,10 @@ public final class ExtendedSurfaceMesh {
             var tops = new ScanMesher2D() {
                 @Override protected void emitQuad(int x, int z, int length, int width, long key) {
                     int column = own.column(x * detail, z * detail, detail);
-                    String name = own.source.palette()[own.top[column]];
+                    String name = own.palette[own.top[column]];
                     var uv = materials.face(name, Direction.UP);
                     if (uv == null) return;
-                    int tint = color(own.source, name, uv.tint());
+                    int tint = color(own.grass, own.foliage, own.water, name, uv.tint());
                     int x0 = ox + (x + 1 - length) * detail, x1 = ox + (x + 1) * detail;
                     int z0 = oz + (z + 1 - width) * detail, z1 = oz + (z + 1) * detail;
                     float u = packUv(uv.u0(), uv.u1()), v = packUv(uv.v0(), uv.v1());
@@ -122,7 +157,7 @@ public final class ExtendedSurfaceMesh {
                                 bottom = Math.min(bottom, next.height[next.column(ex, ez, 1)]);
                             }
                         }
-                        bottom = Math.max(own.source.minY(), bottom);
+                        bottom = Math.max(own.minimum, bottom);
                         if (bottom < h) face(own, h - bottom > 1 ? own.side[column] : own.top[column],
                                 x, bottom, z, detail, h - bottom, f, materials);
                     }
@@ -143,17 +178,17 @@ public final class ExtendedSurfaceMesh {
 
     private void face(Columns own, short id, int x, int y, int z, int width, int height, int face,
                       MaterialResolver materials) {
-        String name = own.source.palette()[id];
+        String name = own.palette[id];
         var uv = materials.face(name, DIRECTIONS[face]);
         if (uv == null) return;
-        int tint = color(own.source, name, uv.tint());
+        int tint = color(own.grass, own.foliage, own.water, name, uv.tint());
         ExtendedVoxelMesher.emit(staging, x, y, z, width, height, face, uv, tint);
     }
-    static int color(VoxelChunk own, String name, int tint) {
+    static int color(int grass, int foliage, int water, String name, int tint) {
         if (tint != -1) return tint;
-        if (name.contains("water")) return own.waterTint();
-        if (name.contains("leaves") || name.contains("vine")) return own.foliageTint();
-        return own.grassTint();
+        if (name.contains("water")) return water;
+        if (name.contains("leaves") || name.contains("vine")) return foliage;
+        return grass;
     }
 
     // Two 15-bit atlas coordinates in a finite, normal float vertex attribute.

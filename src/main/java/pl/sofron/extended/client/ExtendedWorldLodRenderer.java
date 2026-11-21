@@ -18,6 +18,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import pl.sofron.extended.ExtendedSurfaceMesh;
 import pl.sofron.extended.ExtendedVolumeMesh;
+import pl.sofron.extended.ExtendedTerrainPreview;
 import java.util.Set;
 import net.caffeinemc.mods.sodium.client.render.chunk.ChunkRenderMatrices;
 import net.caffeinemc.mods.sodium.client.render.chunk.terrain.DefaultTerrainRenderPasses;
@@ -62,7 +63,7 @@ public final class ExtendedWorldLodRenderer {
     private static final long FRAME_MESH_BUDGET_NS = 5_000_000L;
     // A 128-chunk radius can require many more visible tiles than 64.
     // Evicting after only 384 tiles caused distant regions to vanish.
-    private static final int MAX_GPU_TILES = 3_072;
+    private static final int MAX_GPU_TILES = 3_600;
     private static final ExtendedVoxelAtlas ATLAS = new ExtendedVoxelAtlas();
     private static final int MAX_QUADS = ExtendedVoxelMesher.MAX_QUADS;
     private static final Map<Long, GpuTile> MESHES = new HashMap<>();
@@ -125,7 +126,7 @@ public final class ExtendedWorldLodRenderer {
             centerX = cx; centerZ = cz; lastRenderDistance = distance;
             for (int tx = minTX; tx <= maxTX; tx++) for (int tz = minTZ; tz <= maxTZ; tz++) {
                 long key = ExtendedVoxelStore.pack(tx, tz);
-                if (tileEntirelyInsideHandoff(tx, tz, cx, cz, distance)) continue;
+                if (outsideHorizon(tx, tz, cx, cz) || tileEntirelyInsideHandoff(tx, tz, cx, cz, distance)) continue;
                 GpuTile current = MESHES.get(key);
                 long wantedDetail = detailAt(tx, tz, cx, cz);
                 boolean detailChanged = current != null && current.detail() != wantedDetail;
@@ -162,8 +163,16 @@ public final class ExtendedWorldLodRenderer {
                     if (nx >= minTX && nx <= maxTX && nz >= minTZ && nz <= maxTZ)
                         DIRTY.add(ExtendedVoxelStore.pack(nx, nz));
         }
-        DIRTY.removeIf(key -> tileEntirelyInsideHandoff(
-                (int)(key >> 32), (int)(long)key, cx, cz, distance));
+        for (int i = 0; i < 256; i++) {
+            Long key = ExtendedTerrainPreview.pollChanged();
+            if (key == null) break;
+            int x = (int)(key >> 32), z = (int)(long)key;
+            if (x >= minTX && x <= maxTX && z >= minTZ && z <= maxTZ) DIRTY.add(key);
+        }
+        DIRTY.removeIf(key -> {
+            int x = (int)(key >> 32), z = (int)(long)key;
+            return outsideHorizon(x, z, cx, cz) || tileEntirelyInsideHandoff(x, z, cx, cz, distance);
+        });
         try {
             finishMeshes(minTX, maxTX, minTZ, maxTZ, cx, cz);
             ensureIndices();
@@ -362,25 +371,31 @@ public final class ExtendedWorldLodRenderer {
         long key = ExtendedVoxelStore.pack(tx, tz);
         long detail = detailAt(tx, tz, cx, cz);
         boolean preview = !MESHES.containsKey(key);
-        if (preview) detail = 0x1_aaaa_aaaaL;
+
         var chunks = new ExtendedVoxelStore.VoxelChunk[(TILE + 2) * (TILE + 2)];
         int[] levels = new int[chunks.length];
+        var predictions = new ExtendedTerrainPreview.Tile[chunks.length];
+        int real = 0;
         int i = 0;
         for (int z = -1; z <= TILE; z++) for (int x = -1; x <= TILE; x++) {
             int chunkX = tx * TILE + x, chunkZ = tz * TILE + z;
             chunks[i] = ExtendedVoxelStore.get(chunkX, chunkZ);
+            if (chunks[i] == null) predictions[i] = ExtendedTerrainPreview.get(chunkX, chunkZ);
+            else if (x >= 0 && z >= 0 && x < TILE && z < TILE) real++;
             levels[i++] = ExtendedLodLevels.ringFor(Math.max(Math.abs(cx - chunkX), Math.abs(cz - chunkZ)));
         }
         var materials = ATLAS.snapshot(chunks);
         var surface = surfaces;
         var volume = volumes;
-        long resolution = detail;
+        if (preview && real > 0) detail = 0x1_aaaa_aaaaL;
+        boolean decorated = real == TILE * TILE;
+        long resolution = real == 0 ? 0xaaaa_aaaaL : detail;
         var task = CompletableFuture.supplyAsync(() -> {
-            if (!preview) {
+            if (!preview && decorated) {
                 var mesh = volume.build(chunks, levels, materials);
                 if (mesh != null) return mesh;
             }
-            return surface.build(resolution, chunks, materials);
+            return surface.build(resolution, chunks, materials, tx, tz, predictions);
         }, WORKER);
         pending.put(key, new Pending(detail, task));
     }
@@ -428,7 +443,14 @@ public final class ExtendedWorldLodRenderer {
                 GpuBuffer.USAGE_INDEX | GpuBuffer.USAGE_COPY_DST, buffer);
     }
 
+    private static boolean outsideHorizon(int tx, int tz, int cx, int cz) {
+        int dx = Math.max(0, Math.abs(tx * TILE + TILE / 2 - cx) - TILE / 2 - 1);
+        int dz = Math.max(0, Math.abs(tz * TILE + TILE / 2 - cz) - TILE / 2 - 1);
+        return dx * dx + dz * dz > FAR * FAR;
+    }
+
     private static boolean hasChunkData(int tx, int tz) {
+        if (ExtendedTerrainPreview.get(tx * TILE, tz * TILE) != null) return true;
         for (int dz = 0; dz < TILE; dz++) {
             for (int dx = 0; dx < TILE; dx++) {
                 if (ExtendedVoxelStore.has(tx * TILE + dx, tz * TILE + dz)) return true;

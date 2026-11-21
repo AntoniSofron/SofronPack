@@ -62,6 +62,8 @@ public final class ExtendedVoxelAtlas implements ExtendedVoxelMesher.MaterialRes
     /** Resolve live game models here before handing immutable UV tables to the worker. */
     ExtendedVoxelMesher.MaterialResolver snapshot(pl.sofron.extended.ExtendedVoxelStore.VoxelChunk[] chunks) {
         Map<String, ExtendedVoxelMesher.MaterialUV[]> table = new HashMap<>();
+        for (String name : pl.sofron.extended.ExtendedTerrainPreview.MATERIALS)
+            if (!name.equals("minecraft:air")) table.put(name, materials.computeIfAbsent(name, this::extract));
         for (var chunk : chunks) {
             if (chunk == null) continue;
             for (String name : chunk.palette()) {

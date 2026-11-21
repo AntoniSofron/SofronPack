@@ -170,7 +170,7 @@ public final class ExtendedVolumeMesh {
             var uv = materials.face(name, FACES[face]);
             if (uv == null) return;
             if (staging.remaining() < 4 * ExtendedVoxelMesher.VERTEX_BYTES) { overflow = true; return; }
-            int tint = ExtendedSurfaceMesh.color(v.source, name, uv.tint());
+            int tint = ExtendedSurfaceMesh.color(v.source.grassTint(), v.source.foliageTint(), v.source.waterTint(), name, uv.tint());
             int shade = SHADE[face];
             float u = ExtendedSurfaceMesh.packUv(uv.u0(), uv.u1()), t = ExtendedSurfaceMesh.packUv(uv.v0(), uv.v1());
             int plane = slice + (face == 0 || face == 3 || face == 5 ? step : 0);

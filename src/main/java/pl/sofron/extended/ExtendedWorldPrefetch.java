@@ -69,6 +69,7 @@ public final class ExtendedWorldPrefetch {
         });
         ServerTickEvents.END_SERVER_TICK.register(ExtendedWorldPrefetch::tick);
         ServerLifecycleEvents.SERVER_STOPPING.register(server -> {
+            ExtendedTerrainPreview.clear();
             ExtendedVoxelStore.close();
             pending = nearbyPending = 0;
             lastLevel = null;
@@ -83,7 +84,10 @@ public final class ExtendedWorldPrefetch {
     private static void tick(MinecraftServer server) {
         // The integrated server shares the database with its own client.
         // Never generate chunks without authority on an external server.
-        if (!server.isSingleplayer() || !ExtendedWorldConfig.get().enabled) return;
+        if (!server.isSingleplayer() || !ExtendedWorldConfig.get().enabled) {
+            ExtendedTerrainPreview.clear();
+            return;
+        }
         if (server.getPlayerList().getPlayers().isEmpty()) return;
         ServerPlayer player = server.getPlayerList().getPlayers().getFirst();
         ServerLevel level = player.level();
@@ -100,6 +104,7 @@ public final class ExtendedWorldPrefetch {
         }
 
         int cx = player.chunkPosition().x(), cz = player.chunkPosition().z();
+        ExtendedTerrainPreview.move(level, cx, cz);
         if (cx != centerX || cz != centerZ) {
             // Recenter the ordered ring scheduler only after 8 chunks of
             // accumulated travel, not after each adjacent-chunk movement.
