@@ -30,6 +30,32 @@ class ExtendedSurfaceMeshTest {
         assertTrue(dirtTop[0]);
     }
 
+    @Test void stoneCliffRemainsVisibleBehindTallerNeighboringLeaves() {
+        short[] cells = new short[4096];
+        for (int y = 0; y < 6; y++) cells[y * 256 + 17] = 1;
+        cells[18] = 1;
+        cells[8 * 256 + 18] = 2;
+        var chunks = new ExtendedVoxelStore.VoxelChunk[36];
+        chunks[7] = ExtendedVoxelStore.encode(0, 0, 0, 16, 0, 0, 0,
+                new String[]{"minecraft:air", "minecraft:stone", "minecraft:oak_leaves"}, cells);
+        var mesh = new ExtendedSurfaceMesh().build(0, chunks, (name, face) ->
+                new ExtendedVoxelMesher.MaterialUV(0, 0, 1, 1, 0xffffff, name.endsWith("leaves")));
+        var vertices = mesh.vertices();
+        boolean found = false;
+        for (int i = 0; i < vertices.limit(); i += 4 * ExtendedVoxelMesher.VERTEX_BYTES) {
+            boolean onCliff = true;
+            float bottom = 100, top = -100;
+            for (int j = 0; j < 4; j++) {
+                int at = i + j * ExtendedVoxelMesher.VERTEX_BYTES;
+                onCliff &= vertices.getFloat(at) == 2f;
+                bottom = Math.min(bottom, vertices.getFloat(at + 4));
+                top = Math.max(top, vertices.getFloat(at + 4));
+            }
+            found |= onCliff && bottom == 1f && top == 6f;
+        }
+        assertTrue(found);
+    }
+
     @Test void levelWaterMeetsAtTheNativeHeightAcrossAChunkEdge() {
         short[] cells = new short[4096];
         java.util.Arrays.fill(cells, 0, 256, (short)1);
