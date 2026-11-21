@@ -52,15 +52,21 @@ public final class ExtendedVoxelMesher {
         if (detail != 1 && detail != 2 && detail != 4)
             throw new IllegalArgumentException("LOD resolution");
         if (far < 1 || far > 256) throw new IllegalArgumentException("radius");
-        Decoded[] chunks = new Decoded[TILE_CHUNKS * TILE_CHUNKS];
+        // Include one full neighbour-chunk halo to cull hidden faces at
+        // tile boundaries. Otherwise each 4x4 tile exposes vertical curtains
+        // of stone along its outer edge, even where a neighbouring tile exists.
+        int stride = TILE_CHUNKS + 2;
+        Decoded[] chunks = new Decoded[stride * stride];
         int minY = 0, yCount = 0;
-        for (int z = 0; z < TILE_CHUNKS; z++) {
-            for (int x = 0; x < TILE_CHUNKS; x++) {
+        for (int z = -1; z <= TILE_CHUNKS; z++) {
+            for (int x = -1; x <= TILE_CHUNKS; x++) {
                 var chunk = lookup.get(tileX * TILE_CHUNKS + x, tileZ * TILE_CHUNKS + z);
                 if (chunk != null) {
-                    chunks[z * TILE_CHUNKS + x] = new Decoded(chunk);
-                    minY = chunk.minY();
-                    yCount = chunk.yCount();
+                    chunks[(z + 1) * stride + (x + 1)] = new Decoded(chunk);
+                    if (x >= 0 && x < TILE_CHUNKS && z >= 0 && z < TILE_CHUNKS) {
+                        minY = chunk.minY();
+                        yCount = chunk.yCount();
+                    }
                 }
             }
         }
@@ -114,8 +120,8 @@ public final class ExtendedVoxelMesher {
                         // block-atlas sprites, not an arbitrary palette colour.
                         int tint = material.tint();
                         if (tint == -1) {
-                            Decoded owner = chunks[(z / ExtendedVoxelStore.GRID) * TILE_CHUNKS
-                                    + x / ExtendedVoxelStore.GRID];
+                            Decoded owner = chunks[(z / ExtendedVoxelStore.GRID + 1) * stride
+                                    + x / ExtendedVoxelStore.GRID + 1];
                             String name = id.substring(0, id.indexOf('[') < 0
                                     ? id.length() : id.indexOf('['))
                                     .toLowerCase(java.util.Locale.ROOT);
@@ -151,13 +157,15 @@ public final class ExtendedVoxelMesher {
     }
 
     private static String block(Decoded[] chunks, int x, int y, int z, int height, int side) {
-        if (x < 0 || z < 0 || y < 0 || x >= side || z >= side || y >= height)
+        int grid = ExtendedVoxelStore.GRID;
+        if (x < -grid || z < -grid || y < 0
+                || x >= side + grid || z >= side + grid || y >= height)
             return null;
-        int chunkX = x / ExtendedVoxelStore.GRID;
-        int chunkZ = z / ExtendedVoxelStore.GRID;
-        Decoded chunk = chunks[chunkZ * TILE_CHUNKS + chunkX];
+        int chunkX = Math.floorDiv(x, grid) + 1;
+        int chunkZ = Math.floorDiv(z, grid) + 1;
+        Decoded chunk = chunks[chunkZ * (TILE_CHUNKS + 2) + chunkX];
         if (chunk == null) return null;
-        int ax = x % ExtendedVoxelStore.GRID, az = z % ExtendedVoxelStore.GRID;
+        int ax = Math.floorMod(x, grid), az = Math.floorMod(z, grid);
         int index = (y * ExtendedVoxelStore.GRID + az) * ExtendedVoxelStore.GRID + ax;
         if (index >= chunk.cells.length) return null;
         int id = Short.toUnsignedInt(chunk.cells[index]);
