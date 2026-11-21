@@ -60,6 +60,10 @@ jobs:
             echo 'The 128-chunk, fogged GPU render hook was not reached while in the world'
             exit 1
           fi
+          if ! grep -q 'Unified Extended World fog active' triple-clouds-128-fog.log; then
+            echo 'The shared normal-chunk + LOD fog mixin was not activated'
+            exit 1
+          fi
           if ! grep -q 'Cloud bands active at Y=256,384,512' triple-clouds-128-fog.log; then
             echo 'The three-layer cloud renderer was not activated'
             exit 1
