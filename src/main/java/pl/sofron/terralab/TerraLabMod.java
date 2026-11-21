@@ -7,6 +7,7 @@ public final class TerraLabMod implements ModInitializer {
 
     @Override
     public void onInitialize() {
+        pl.sofron.extended.ExtendedWorldPrefetch.register();
         pl.sofron.terralab.soil.SoilBlocks.register();
         pl.sofron.terralab.rice.RiceContent.register();
         pl.sofron.terralab.food.FoodContent.register();
