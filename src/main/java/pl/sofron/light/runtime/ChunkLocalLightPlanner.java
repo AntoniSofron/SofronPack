@@ -16,16 +16,16 @@ public final class ChunkLocalLightPlanner {
     public static List<Page> pages(ChunkLightBuckets index, int chunkX, int chunkZ,
                                    List<LightSource> moving) {
         List<LightSource> relevant = new ArrayList<>(index.affecting(chunkX, chunkZ));
-        if (moving != null) {
+        if (moving != null && !moving.isEmpty()) {
+            double minX = chunkX * 16.0, maxX = minX + 16.0;
+            double minZ = chunkZ * 16.0, maxZ = minZ + 16.0;
             for (LightSource light : moving) {
-                double minX = chunkX * 16.0, maxX = minX + 16.0;
-                double minZ = chunkZ * 16.0, maxZ = minZ + 16.0;
                 double dx = light.x() - Math.clamp(light.x(), minX, maxX);
                 double dz = light.z() - Math.clamp(light.z(), minZ, maxZ);
                 if (dx * dx + dz * dz <= light.radius() * light.radius()) relevant.add(light);
             }
         }
-        relevant.sort(Comparator.comparingDouble(LightSource::x)
+        if (relevant.size() > 1) relevant.sort(Comparator.comparingDouble(LightSource::x)
             .thenComparingDouble(LightSource::z).thenComparingDouble(LightSource::y)
             .thenComparingDouble(LightSource::radius)
             .thenComparingDouble(LightSource::power));
