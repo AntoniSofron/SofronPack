@@ -138,8 +138,11 @@ public final class ExtendedVoxelMesher {
                 // Absolute 7/8 handoff: near LOD vanishes even if its old
                 // normal chunk isn't ready. The shader performs the same
                 // clipping every frame for previously uploaded GPU buffers.
+                // The shader uses Euclidean horizontal distance. Use the same
+                // shape for CPU culling, including diagonal handoff areas.
+                double horizontalChunks = Math.hypot(chunkX - cx, chunkZ - cz);
                 skip[z * TILE_CHUNKS + x] = radius > far
-                        || radius < ExtendedLodHandoff.nearStartChunks(near)
+                        || ExtendedLodHandoff.hidden(horizontalChunks, near)
                         || (radius <= near && normalChunkReady.test(chunkX, chunkZ));
             }
         }

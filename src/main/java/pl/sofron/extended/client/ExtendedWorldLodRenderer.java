@@ -306,7 +306,13 @@ public final class ExtendedWorldLodRenderer {
                 Math.max(Math.abs(x0 - cx), Math.abs(x1 - cx)),
                 Math.max(Math.abs(z0 - cz), Math.abs(z1 - cz)));
         float boundary = pl.sofron.extended.ExtendedLodHandoff.nearStartChunks(near);
-        return (minimum <= boundary + 2 && maximum >= boundary - 2)
+        int dx0 = Math.max(0, Math.max(x0 - cx, cx - x1));
+        int dz0 = Math.max(0, Math.max(z0 - cz, cz - z1));
+        int dx1 = Math.max(Math.abs(x0 - cx), Math.abs(x1 - cx));
+        int dz1 = Math.max(Math.abs(z0 - cz), Math.abs(z1 - cz));
+        double radialMin = Math.hypot(dx0, dz0);
+        double radialMax = Math.hypot(dx1, dz1);
+        return (radialMin <= boundary + 2 && radialMax >= boundary - 2)
                 || (minimum <= near + 2 && maximum >= near - 2)
                 || (minimum <= FAR + 1 && maximum >= FAR - 1);
     }

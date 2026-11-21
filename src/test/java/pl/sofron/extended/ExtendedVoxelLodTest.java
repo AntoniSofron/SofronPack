@@ -141,6 +141,20 @@ class ExtendedVoxelLodTest {
         assertTrue(visible.quads() > 0);
     }
 
+    @Test void diagonalHandoffUsesHorizontalRadiusNotSquareDistance() {
+        short[] cells = new short[ExtendedVoxelStore.GRID * ExtendedVoxelStore.GRID];
+        cells[0] = 1;
+        var one = ExtendedVoxelStore.encode(10, 10, 0, 1,
+                new String[]{"minecraft:air", "minecraft:stone"}, cells);
+        var uv = new ExtendedVoxelMesher.MaterialUV(0, 0, 1, 1, 0xffffff, false);
+        // sqrt(10^2+10^2) > 14: LOD must be allowed even
+        // though Chebyshev chunk distance is only 10.
+        var mesh = ExtendedVoxelMesher.build(2, 2, 0, 0, 16, 64, 1,
+                (x,z) -> x == 10 && z == 10 ? one : null,
+                (id,face) -> uv, (x,z) -> false);
+        assertTrue(mesh.quads() > 0, "Diagonal LOD must not have a radial handoff hole");
+    }
+
     @Test void normalRenderRangeKeepsPriority() {
         short[] cells = new short[ExtendedVoxelStore.GRID * ExtendedVoxelStore.GRID];
         Arrays.fill(cells, (short)1);
