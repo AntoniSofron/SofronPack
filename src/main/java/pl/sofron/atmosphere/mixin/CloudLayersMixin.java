@@ -40,6 +40,7 @@ abstract class CloudLayersMixin {
     @Unique private boolean sofron$layered;
     @Unique private float sofron$cameraY;
     @Unique private int sofron$range = -1;
+    @Unique private boolean sofron$loggedBands;
     @Unique private final Vector4f sofron$sky = new Vector4f();
 
     @Unique private static CloudLayersMixin sofron$state(CloudRenderer renderer) {
@@ -90,6 +91,13 @@ abstract class CloudLayersMixin {
                 range, camera, ticks + 19L * 400L, partial);
         sofron$prepareAuxiliary(sofron$high, color, status, CloudBandLayout.HIGH,
                 range, camera, ticks + 47L * 400L, partial);
+        if (!sofron$loggedBands) {
+            sofron$loggedBands = true;
+            System.out.println("[SofronPack] Cloud bands active at Y="
+                    + (int)CloudBandLayout.LOW + ","
+                    + (int)CloudBandLayout.MIDDLE + ","
+                    + (int)CloudBandLayout.HIGH);
+        }
     }
 
     // The resource pack doubles the vertical cell size in the vertex shader.
