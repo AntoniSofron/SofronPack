@@ -33,19 +33,27 @@ public final class ExtendedTerrainPreview {
     public static final class Tile {
         private final Sample[] samples;
         public final int minimum, sea;
-        Tile(Sample[] samples, int minimum, int sea) {
-            this.samples = samples; this.minimum = minimum; this.sea = sea;
+        private final int spacing, width;
+        Tile(Sample[] samples, int spacing, int minimum, int sea) {
+            this.samples = samples;
+            this.spacing = spacing;
+            this.width = 64 / spacing + 1;
+            this.minimum = minimum;
+            this.sea = sea;
         }
 
         public int ground(int x, int z) {
-            int i = (z >> 5) * 3 + (x >> 5);
-            int dx = x & 31, dz = z & 31;
-            int north = samples[i].ground * (32 - dx) + samples[i + 1].ground * dx;
-            int south = samples[i + 3].ground * (32 - dx) + samples[i + 4].ground * dx;
-            return (north * (32 - dz) + south * dz + 512) >> 10;
+            int i = z / spacing * width + x / spacing;
+            int dx = x % spacing, dz = z % spacing;
+            int north = samples[i].ground * (spacing - dx) + samples[i + 1].ground * dx;
+            int south = samples[i + width].ground * (spacing - dx) + samples[i + width + 1].ground * dx;
+            int area = spacing * spacing;
+            return Math.floorDiv(north * (spacing - dz) + south * dz + area / 2, area);
         }
 
-        private Sample nearest(int x, int z) { return samples[((z + 16) >> 5) * 3 + ((x + 16) >> 5)]; }
+        private Sample nearest(int x, int z) {
+            return samples[(z + spacing / 2) / spacing * width + (x + spacing / 2) / spacing];
+        }
         int material(int x, int z, int ground) { return ground < sea ? 4 : nearest(x, z).material; }
         int grass(int x, int z) { return nearest(x, z).grass; }
         int water(int x, int z) { return nearest(x, z).water; }
@@ -70,11 +78,10 @@ public final class ExtendedTerrainPreview {
             heights = LevelHeightAccessor.create(level.getMinY(), level.getHeight());
         }
 
-        Sample sample(int gx, int gz) {
-            long key = ExtendedVoxelStore.pack(gx, gz);
+        Sample sample(int x, int z) {
+            long key = ExtendedVoxelStore.pack(x, z);
             Sample result = samples.get(key);
             if (result != null) return result;
-            int x = gx * 32, z = gz * 32;
             int h = generator.getBaseHeight(x, z, Heightmap.Types.OCEAN_FLOOR_WG, heights, random);
             var biome = biomes.getNoiseBiome(x >> 2, h >> 2, z >> 2).value();
             float temp = biome.getBaseTemperature();
@@ -83,6 +90,35 @@ public final class ExtendedTerrainPreview {
             samples.put(key, result);
             if (samples.size() > 24000) samples.pollFirstEntry();
             return result;
+        }
+
+        void refine(long target, int cx, int cz, int spacing) {
+            for (long offset : ORDER) {
+                if (active != this || target != center) return;
+                int dx = (int)(offset >> 32), dz = (int)offset;
+                // Spend the densest height probes inside the first 48 chunks.
+                if (spacing == 8 && Math.max(Math.abs(dx), Math.abs(dz)) > 12) return;
+                int tx = cx + dx, tz = cz + dz;
+                long key = ExtendedVoxelStore.pack(tx, tz);
+                Tile previous = tiles.get(key);
+                if (previous != null && previous.spacing <= spacing) continue;
+                if (spacing < 32 && fullyCaptured(tx, tz)) continue;
+                int width = 64 / spacing + 1;
+                var nodes = new Sample[width * width];
+                for (int z = 0; z < width; z++) {
+                    if (active != this || target != center) return;
+                    for (int x = 0; x < width; x++)
+                        nodes[z * width + x] = sample(tx * 64 + spacing * x, tz * 64 + spacing * z);
+                }
+                tiles.put(key, new Tile(nodes, spacing, heights.getMinY(), generator.getSeaLevel()));
+                changes.add(key);
+            }
+        }
+
+        private boolean fullyCaptured(int tx, int tz) {
+            for (int z = 0; z < 4; z++) for (int x = 0; x < 4; x++)
+                if (!ExtendedVoxelStore.has(tx * 4 + x, tz * 4 + z)) return false;
+            return true;
         }
 
         void generate() {
@@ -94,17 +130,8 @@ public final class ExtendedTerrainPreview {
                     int cx = (int)(target >> 32), cz = (int)target;
                     tiles.keySet().removeIf(k -> Math.abs((int)(k >> 32) - cx) > RADIUS + 2
                             || Math.abs((int)(long)k - cz) > RADIUS + 2);
-                    for (long offset : ORDER) {
-                        if (active != this || target != center) break;
-                        int tx = cx + (int)(offset >> 32), tz = cz + (int)offset;
-                        long key = ExtendedVoxelStore.pack(tx, tz);
-                        if (tiles.containsKey(key)) continue;
-                        var nodes = new Sample[9];
-                        for (int z = 0; z < 3; z++) for (int x = 0; x < 3; x++)
-                            nodes[z * 3 + x] = sample(tx * 2 + x, tz * 2 + z);
-                        tiles.put(key, new Tile(nodes, heights.getMinY(), generator.getSeaLevel()));
-                        changes.add(key);
-                    }
+                    for (int spacing = 32; spacing >= 8 && active == this && target == center; spacing /= 2)
+                        refine(target, cx, cz, spacing);
                     if (target == center) completedCenter = target;
                 } while (active == this && target != center);
             } catch (RuntimeException error) {
