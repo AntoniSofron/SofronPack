@@ -29,7 +29,7 @@ with zipfile.ZipFile(jar) as z:
     for class_name in (
         "pl/sofron/extended/ExtendedWorldConfig.class",
         "pl/sofron/extended/ExtendedWorldPrefetch.class",
-        "pl/sofron/extended/ExtendedWorldSodiumOptionsMixin.class",
+        "pl/sofron/extended/mixin/ExtendedWorldSodiumOptionsMixin.class",
     ):
         assert class_name in files, class_name
     for required in (
