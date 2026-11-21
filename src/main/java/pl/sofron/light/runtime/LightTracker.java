@@ -38,6 +38,7 @@ public final class LightTracker {
             .thenComparingDouble(entry -> entry.source().z());
 
     private final Set<SourceKey> previousSelected = new HashSet<>();
+    private static final RgbLight FIRE_COLOR = new RgbLight(1f, .42f, .12f);
 
     public List<LightSource> sources() { return sources; }
     public void reset() {
@@ -70,7 +71,7 @@ public final class LightTracker {
                 nearbyEntities.add(entity);
                 if (cfg.burningEntities && entity.isOnFire()) {
                     found.add(new LightSource(x, y + entity.getBbHeight() * .5, z,
-                        (float)cfg.dynamicLightRadius, .9f, new RgbLight(1f,.42f,.12f)));
+                        (float)cfg.dynamicLightRadius, .9f, FIRE_COLOR));
                 }
                 if (cfg.droppedItems && entity instanceof ItemEntity drop) {
                     addStack(found, drop.getItem(), x, y + .15, z, cfg);
@@ -86,6 +87,12 @@ public final class LightTracker {
             chunkIndex.tick(client, cfg);
         } else {
             chunkIndex.clear();
+        }
+        if (movingEnd == 0) {
+            movingCount = 0;
+            previousSelected.clear();
+            sources = List.of();
+            return;
         }
         // Compute hysteresis keys and distances once, rather than repeatedly
         // constructing strings during every comparison in TimSort.
