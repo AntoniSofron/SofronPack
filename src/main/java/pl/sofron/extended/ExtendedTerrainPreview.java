@@ -61,7 +61,8 @@ public final class ExtendedTerrainPreview {
         final LinkedHashMap<Long, Sample> samples = new LinkedHashMap<>(2048, .75f, true);
         BiomeResolver biomes;
         volatile long center = Long.MIN_VALUE;
-        volatile boolean running;
+        volatile long completedCenter = Long.MIN_VALUE;
+        volatile boolean running, failed;
         Session(ServerLevel level) {
             this.level = level;
             generator = level.getChunkSource().getGenerator();
@@ -104,8 +105,10 @@ public final class ExtendedTerrainPreview {
                         tiles.put(key, new Tile(nodes, heights.getMinY(), generator.getSeaLevel()));
                         changes.add(key);
                     }
+                    if (target == center) completedCenter = target;
                 } while (active == this && target != center);
             } catch (RuntimeException error) {
+                failed = true;
                 System.err.println("[SofronPack] Background horizon sampling: " + error.getMessage());
             } finally { running = false; }
         }
@@ -119,7 +122,7 @@ public final class ExtendedTerrainPreview {
         Session s = active;
         if (s == null || s.level != level) active = s = new Session(level);
         long center = ExtendedVoxelStore.pack(Math.floorDiv(cx, 4), Math.floorDiv(cz, 4));
-        if (s.center == center && (s.running || s.tiles.containsKey(center))) return;
+        if (s.failed || (s.center == center && (s.running || s.completedCenter == center))) return;
         s.center = center;
         if (!s.running) {
             s.running = true;

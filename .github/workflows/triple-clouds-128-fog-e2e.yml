@@ -26,7 +26,7 @@ jobs:
       - name: Prepare software graphics device
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq xvfb xdotool imagemagick mesa-utils libgl1-mesa-dri libglx-mesa0 mesa-vulkan-drivers libvulkan1
+          sudo apt-get install -y -qq xvfb mesa-utils libgl1-mesa-dri libglx-mesa0 mesa-vulkan-drivers libvulkan1
           mkdir -p run/mods
           cp libs/sodium-fabric-0.9.2+mc26.3.jar run/mods/
       - name: Build a real Minecraft single-player save
@@ -35,7 +35,7 @@ jobs:
           mkdir -p run/saves run/config
           cp -a run/sofronpack-wild-rice-smoke run/saves/SofronLodE2E
           printf '{"enabled":true}\n' > run/config/sofronpack-extended-world.json
-          printf 'renderDistance:32\nsimulationDistance:4\n' >> run/options.txt
+          printf 'renderDistance:32\nsimulationDistance:5\n' >> run/options.txt
           test -f run/saves/SofronLodE2E/level.dat
       - name: Boot directly into the world with textured LOD enabled
         run: |
