@@ -19,7 +19,7 @@ float sofronSmooth(float d, float start, float end, float low, float high) {
 
 float sofronLodFog(float chunks) {
     if (chunks < 16.0) return 0.0;
-    if (chunks < 32.0) return sofronSmooth(chunks, 16.0, 32.0, 0.02, 0.13);
+    if (chunks < 32.0) return sofronSmooth(chunks, 16.0, 32.0, 0.0, 0.13);
     if (chunks < 64.0) return sofronSmooth(chunks, 32.0, 64.0, 0.13, 0.55);
     if (chunks < 96.0) return sofronSmooth(chunks, 64.0, 96.0, 0.55, 0.85);
     if (chunks < 128.0) return sofronSmooth(chunks, 96.0, 128.0, 0.85, 1.0);
