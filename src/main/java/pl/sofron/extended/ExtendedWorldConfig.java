@@ -12,7 +12,7 @@ import java.nio.file.StandardCopyOption;
 
 /** One user setting, independent of the normal render/simulation distances. */
 public final class ExtendedWorldConfig {
-    public static final int DISTANT_RADIUS_CHUNKS = 64;
+    public static final int DISTANT_RADIUS_CHUNKS = 128;
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final Path PATH = FabricLoader.getInstance().getConfigDir()
             .resolve("sofronpack-extended-world.json");
