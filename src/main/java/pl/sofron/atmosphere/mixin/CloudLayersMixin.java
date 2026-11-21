@@ -17,6 +17,8 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.Constant;
+import org.spongepowered.asm.mixin.injection.ModifyConstant;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
@@ -64,6 +66,13 @@ abstract class CloudLayersMixin {
         sofron$upperFirst = Math.abs(camera.y - 512) > Math.abs(camera.y - height);
         // A fixed phase offset positions the upper banks above different gaps.
         sofron$upper.prepare(color, status, 512f, range, camera, ticks + 47L * 400L, partial);
+    }
+
+    // The pack doubles vertical cell size in the vertex shader. Match CPU face selection.
+    @ModifyConstant(method = "prepare(ILnet/minecraft/client/CloudStatus;FILnet/minecraft/world/phys/Vec3;JF)V",
+            constant = @Constant(floatValue = 4f, ordinal = 0))
+    private float sofron$cloudThickness(float original) {
+        return original * 2f;
     }
 
     @Redirect(method = {"render(Lnet/minecraft/client/CloudStatus;Lcom/mojang/renderpearl/api/commands/RenderPass;)V", "renderOit"},
