@@ -25,7 +25,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 public final class ExtendedWorldPrefetch {
     private static final int RADIUS = ExtendedWorldConfig.DISTANT_RADIUS_CHUNKS;
     private static final long[] OFFSETS = spiralOffsets(RADIUS);
-    private static final int MAX_PENDING = 12;
+    private static final int MAX_PENDING = Math.clamp(Runtime.getRuntime().availableProcessors() * 2, 8, 32);
     private static final AtomicInteger ENCODER_THREADS = new AtomicInteger();
     private static final ExecutorService ENCODERS = Executors.newFixedThreadPool(2, task -> {
         Thread thread = new Thread(task, "SofronPack-LOD-Encode-" + ENCODER_THREADS.incrementAndGet());
@@ -66,14 +66,14 @@ public final class ExtendedWorldPrefetch {
         ServerLevel level = player.level();
 
         if (level != lastLevel) {
+            ExtendedVoxelStore.open(server.getWorldPath(LevelResource.ROOT), level.dimension().identifier().toString());
             lastLevel = level;
             centerX = centerZ = scanAnchorX = scanAnchorZ = Integer.MIN_VALUE;
             cursor = nearbyCursor = stageIndex = 0;
             pending = nearbyPending = 0;
             IN_FLIGHT.clear();
         }
-        ExtendedVoxelStore.open(server.getWorldPath(LevelResource.ROOT),
-                level.dimension().identifier().toString());
+
         int cx = player.chunkPosition().x(), cz = player.chunkPosition().z();
         if (cx != centerX || cz != centerZ) {
             // Recenter the ordered ring scheduler only after 8 chunks of
@@ -107,8 +107,7 @@ public final class ExtendedWorldPrefetch {
         if (busyServer && ticks % 4 != 0) return;
         int submitBudget = busyServer ? 1 : stageIndex == 0 ? 8 : stageIndex == 1 ? 6 : 4;
         int submitted = 0, inspected = 0;
-        // Strict near-first stage boundaries. A later band cannot be queued
-        // before the preceding band has finished persisting its snapshots.
+        // Submit near to far without blocking all later rings on one slow future.
         while (submitted < submitBudget && pending < MAX_PENDING && inspected < 4096) {
             if (stageIndex >= ExtendedLodStages.count()) {
                 // All seven bands have been processed. Do not spin through
@@ -180,8 +179,8 @@ public final class ExtendedWorldPrefetch {
 
     private static void encodeAndPublish(MinecraftServer server, ServerLevel level,
                                          net.minecraft.world.level.chunk.ChunkAccess chunk, long key) {
-        var captured = ExtendedVoxelStore.capture(level, chunk);
-        CompletableFuture.supplyAsync(captured::encode, ENCODERS)
+        var captured = ExtendedVoxelStore.captureSections(level, chunk);
+        CompletableFuture.supplyAsync(captured, ENCODERS)
                 .whenComplete((encoded, error) -> server.execute(() -> {
                     try {
                         if (level != lastLevel) return;
@@ -210,10 +209,10 @@ public final class ExtendedWorldPrefetch {
             if (ExtendedVoxelStore.has(x, z) && (nearbyCursor & 15) != 0) continue;
             LevelChunk chunk = level.getChunkSource().getChunkNow(x, z);
             if (chunk == null || IN_FLIGHT.contains(pack(x, z))) continue;
-            var captured = ExtendedVoxelStore.capture(level, chunk);
+            var captured = ExtendedVoxelStore.captureSections(level, chunk);
             nearbyPending++;
             try {
-                CompletableFuture.supplyAsync(captured::encode, ENCODERS)
+                CompletableFuture.supplyAsync(captured, ENCODERS)
                         .whenComplete((encoded, failure) -> server.execute(() -> {
                             try {
                                 if (level != lastLevel) return;

@@ -123,10 +123,14 @@ with zipfile.ZipFile(jar) as z:
     assert "int pass = band * 2" in pathlib.Path(
         "src/main/java/pl/sofron/extended/client/ExtendedWorldLodRenderer.java").read_text()
     assert b"sofronFogStrength(FogEnvironmentalEnd)" in extended_shader
-    with zipfile.ZipFile("dist/26.3-SofronPack-v0.1.33.jar") as reference:
-        for ext in ("vsh", "fsh"):
-            entry = f"assets/minecraft/shaders/core/sofronpack/clouds.{ext}"
-            assert z.read(entry) == reference.read(entry)
+    # Original three-layer 0.1.33 build (17a6daf), distinct from main's same-name JAR.
+    import hashlib
+    for ext, digest in {
+        "fsh": "43ed2380a75b100339989bea92ba093d5733c204da8d13375d9297c771443d3b",
+        "vsh": "79b86b8b33f359c6d5707fcbb4734f097a2b58a9d8ddf19201af300a9e31cc3d",
+    }.items():
+        entry = f"assets/minecraft/shaders/core/sofronpack/clouds.{ext}"
+        assert hashlib.sha256(z.read(entry)).hexdigest() == digest
     assert b"sofronPackDarkLight" in z.read(
         "assets/sofronpack/shaders/include/darker_light.glsl")
     assert b"sofronPackDarkLight" in z.read(
@@ -137,7 +141,7 @@ with zipfile.ZipFile(jar) as z:
     assert b"cylindricalBlocks" in lod_vertex
     lod_renderer = pathlib.Path(
         "src/main/java/pl/sofron/extended/client/ExtendedWorldLodRenderer.java").read_text()
-    assert "relative, new Vector4f(1f, 1f, 1f, 1f)" in lod_renderer
+    assert "readyColumns.getOrDefault(key, 0)" in lod_renderer
     assert "AtmospherePresets.distantFogBlend()" not in lod_renderer
     fog_mixin_source = pathlib.Path(
         "src/main/java/pl/sofron/extended/mixin/ExtendedWorldFogMixin.java").read_text()

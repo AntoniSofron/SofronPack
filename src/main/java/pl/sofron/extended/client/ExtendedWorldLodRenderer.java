@@ -55,7 +55,7 @@ public final class ExtendedWorldLodRenderer {
         return thread;
     });
     private static ExtendedSurfaceMesh surfaces = new ExtendedSurfaceMesh();
-    private record Pending(int detail, CompletableFuture<ExtendedVoxelMesher.Mesh> result) {}
+    private record Pending(long detail, CompletableFuture<ExtendedVoxelMesher.Mesh> result) {}
     private static final Map<Long, Pending> pending = new HashMap<>();
     private static final long FRAME_MESH_BUDGET_NS = 5_000_000L;
     // A 128-chunk radius can require many more visible tiles than 64.
@@ -73,11 +73,13 @@ public final class ExtendedWorldLodRenderer {
     private static long worldGeneration = Long.MIN_VALUE;
     private static int centerX = Integer.MIN_VALUE, centerZ = Integer.MIN_VALUE;
     private static int lastRenderDistance;
+    private static final Map<Long, Integer> readyColumns = new HashMap<>();
+    private static int readyCursor;
     private static boolean failed;
     private static boolean loggedFirstUpload;
     private static boolean loggedFirstDraw;
 
-    private record GpuTile(GpuBuffer buffer, int quads, int detail) implements AutoCloseable {
+    private record GpuTile(GpuBuffer buffer, int quads, long detail) implements AutoCloseable {
         @Override public void close() { buffer.close(); }
     }
 
@@ -115,6 +117,7 @@ public final class ExtendedWorldLodRenderer {
         int distance = Math.max(2, mc.options.getEffectiveRenderDistance());
         int minTX = Math.floorDiv(cx - FAR, TILE), maxTX = Math.floorDiv(cx + FAR, TILE);
         int minTZ = Math.floorDiv(cz - FAR, TILE), maxTZ = Math.floorDiv(cz + FAR, TILE);
+        updateNormalCoverage(mc, cx, cz, distance);
         if (centerX != cx || centerZ != cz || lastRenderDistance != distance) {
             boolean first = centerX == Integer.MIN_VALUE || lastRenderDistance != distance;
             centerX = cx; centerZ = cz; lastRenderDistance = distance;
@@ -122,11 +125,7 @@ public final class ExtendedWorldLodRenderer {
                 long key = ExtendedVoxelStore.pack(tx, tz);
                 if (tileEntirelyInsideHandoff(tx, tz, cx, cz, distance)) continue;
                 GpuTile current = MESHES.get(key);
-                int dx = Math.abs(tx * TILE + TILE / 2 - cx);
-                int dz = Math.abs(tz * TILE + TILE / 2 - cz);
-                int wantedDetail = ExtendedLodLevels.voxelSize(Math.max(dx, dz));
-                // A tile changes resolution in real time as the camera
-                // crosses any of the 32/48/64/96-chunk detail boundaries.
+                long wantedDetail = detailAt(tx, tz, cx, cz);
                 boolean detailChanged = current != null && current.detail() != wantedDetail;
                 if ((current == null || first || detailChanged) && hasChunkData(tx, tz)) {
                     DIRTY.add(key);
@@ -253,7 +252,7 @@ public final class ExtendedWorldLodRenderer {
                 var transform = RenderSystem.getDynamicUniforms().writeTransform(
                         // Full material alpha: fog is now calculated
                         // exclusively from the shared Minecraft Fog uniforms.
-                        relative, new Vector4f(1f, 1f, 1f, 1f),
+                        relative, new Vector4f(1f, 1f, 1f, readyColumns.getOrDefault(key, 0)),
                         new Vector3f(
                                 (float)((long)tx * TILE * 16 - camera.x),
                                 (float)-camera.y,
@@ -284,7 +283,8 @@ public final class ExtendedWorldLodRenderer {
     private static void uploadFarProjection(Minecraft mc) {
         Matrix4f projection = new Matrix4f(mc.gameRenderer.gameRenderState()
                 .levelRenderState.cameraRenderState.projectionMatrix);
-        float near = 0.05f, far = FAR * 16f + 512f;
+        // Leave the overlapping native geometry in front in the shared depth buffer.
+        float near = 0.025f, far = FAR * 16f + 512f;
         boolean reversed = DepthStencilState.DEFAULT.depthTest()
                 .equals(CompareOp.GREATER_THAN_OR_EQUAL);
         if (reversed) {
@@ -306,34 +306,69 @@ public final class ExtendedWorldLodRenderer {
         encoder.submit();
     }
 
+    /** Keep distant coverage until Sodium has built the ordinary surface section. */
+    private static void updateNormalCoverage(Minecraft mc, int cx, int cz, int near) {
+        int minX = Math.floorDiv(cx - near, TILE), minZ = Math.floorDiv(cz - near, TILE);
+        int width = Math.floorDiv(cx + near, TILE) - minX + 1;
+        int depth = Math.floorDiv(cz + near, TILE) - minZ + 1;
+        if (centerX != cx || centerZ != cz || lastRenderDistance != near) {
+            readyColumns.keySet().removeIf(key -> {
+                int x = (int)(key >> 32) - minX, z = (int)(long)key - minZ;
+                return x < 0 || z < 0 || x >= width || z >= depth;
+            });
+        }
+        var sodium = net.caffeinemc.mods.sodium.client.render.SodiumWorldRenderer.instanceNullable();
+        for (int i = 0; i < Math.min(16, width * depth); i++) {
+            int index = readyCursor = (readyCursor + 1) % (width * depth);
+            int tx = minX + index % width, tz = minZ + index / width;
+            int mask = 0;
+            for (int z = 0; z < TILE; z++) for (int x = 0; x < TILE; x++) {
+                int chunkX = tx * TILE + x, chunkZ = tz * TILE + z;
+                var chunk = mc.level.getChunkSource().getChunk(chunkX, chunkZ, ChunkStatus.FULL, false);
+                if (chunk == null || sodium == null) continue;
+                int surface = chunk.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, 8, 8);
+                if (sodium.isSectionReady(chunkX, surface >> 4, chunkZ)) mask |= 1 << (z * TILE + x);
+            }
+            long key = ExtendedVoxelStore.pack(tx, tz);
+            Integer old = readyColumns.put(key, mask);
+            if (mask != 0xffff && (old == null || old != mask)
+                    && !MESHES.containsKey(key) && hasChunkData(tx, tz)) DIRTY.add(key);
+        }
+    }
+
     private static boolean tileEntirelyInsideHandoff(int tx, int tz,
                                                        int cx, int cz, int renderDistance) {
         int left = tx * TILE - cx, right = (tx + 1) * TILE - cx;
         int top = tz * TILE - cz, bottom = (tz + 1) * TILE - cz;
         double maxX = Math.max(Math.abs(left), Math.abs(right));
         double maxZ = Math.max(Math.abs(top), Math.abs(bottom));
-        return Math.hypot(maxX, maxZ)
+        return readyColumns.getOrDefault(ExtendedVoxelStore.pack(tx, tz), 0) == 0xffff
+                && Math.hypot(maxX, maxZ)
                 < pl.sofron.extended.ExtendedLodHandoff.nearStartChunks(renderDistance);
     }
 
-    private static int detailAt(int tx, int tz, int cx, int cz) {
-        return ExtendedLodLevels.voxelSize(Math.max(
-                Math.abs(tx * TILE + TILE / 2 - cx), Math.abs(tz * TILE + TILE / 2 - cz)));
+    private static long detailAt(int tx, int tz, int cx, int cz) {
+        long levels = 0;
+        for (int z = 0; z < TILE; z++) for (int x = 0; x < TILE; x++) {
+            int radius = Math.max(Math.abs(tx * TILE + x - cx), Math.abs(tz * TILE + z - cz));
+            levels |= (long)ExtendedLodLevels.ringFor(radius) << (2 * (z * TILE + x));
+        }
+        return levels;
     }
 
     private static void scheduleTile(int tx, int tz, int cx, int cz) {
         long key = ExtendedVoxelStore.pack(tx, tz);
-        int detail = detailAt(tx, tz, cx, cz);
-        if (!MESHES.containsKey(key)) detail = 4;
+        long detail = detailAt(tx, tz, cx, cz);
+        if (!MESHES.containsKey(key)) detail = 0xaaaa_aaaaL;
         var chunks = new ExtendedVoxelStore.VoxelChunk[(TILE + 2) * (TILE + 2)];
         int i = 0;
         for (int z = -1; z <= TILE; z++) for (int x = -1; x <= TILE; x++)
             chunks[i++] = ExtendedVoxelStore.get(tx * TILE + x, tz * TILE + z);
         var materials = ATLAS.snapshot(chunks);
         var builder = surfaces;
-        int resolution = detail;
+        long resolution = detail;
         var task = CompletableFuture.supplyAsync(
-                () -> builder.build(tx, tz, resolution, chunks, materials), WORKER);
+                () -> builder.build(resolution, chunks, materials), WORKER);
         pending.put(key, new Pending(detail, task));
     }
 
@@ -425,6 +460,7 @@ public final class ExtendedWorldLodRenderer {
     private static void clearMeshes() {
         for (Pending job : pending.values()) job.result.cancel(false);
         pending.clear();
+        readyColumns.clear();
         surfaces = new ExtendedSurfaceMesh();
         for (GpuTile tile : MESHES.values()) tile.close();
         MESHES.clear();

@@ -12,18 +12,27 @@ layout(location = 2) in float horizontalChunks;
 layout(location = 3) in float sphericalBlocks;
 layout(location = 4) in float cylindricalBlocks;
 
+layout(location = 5) flat in vec4 tileUv;
+layout(location = 6) in vec2 tileXZ;
+layout(location = 7) flat in int readyMask;
 layout(location = 0) out vec4 fragColor;
 
 void main() {
-    vec4 sampled = texture(Sampler0, texCoord0) * vertexColor;
+    vec4 sampled = tileUv.z > 0.0
+            ? textureGrad(Sampler0, tileUv.xy + fract(texCoord0) * tileUv.zw,
+                    dFdx(texCoord0) * tileUv.zw, dFdy(texCoord0) * tileUv.zw)
+            : texture(Sampler0, texCoord0);
+    sampled *= vertexColor;
     if (sampled.a < 0.05) discard;
 
     // Dynamic per-pixel handoff: an old cached buffer must stop drawing the
     // instant the camera moves inside 7/8 of the normal render distance.
-    if (FogRenderDistanceEnd >= 2047.5 &&
+    ivec2 cell = clamp(ivec2(floor(tileXZ / 16.0)), ivec2(0), ivec2(3));
+    bool normalReady = (readyMask & (1 << (cell.y * 4 + cell.x))) != 0;
+    if (normalReady && FogRenderDistanceEnd >= 2047.5 &&
             horizontalChunks < FogRenderDistanceStart / 16.0) discard;
 
-    if (FogRenderDistanceEnd >= 2047.5) {
+    if (normalReady && FogRenderDistanceEnd >= 2047.5) {
         float start = FogRenderDistanceStart / 16.0;
         float coverage = smoothstep(start, start * (8.0 / 7.0), horizontalChunks);
         ivec2 pixel = ivec2(gl_FragCoord.xy);
