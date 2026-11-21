@@ -45,7 +45,7 @@ public final class DynamicVoxelController {
         int x=client.player.blockPosition().getX(), y=client.player.blockPosition().getY()+1,
             z=client.player.blockPosition().getZ();
         if (registry.sources().isEmpty()) { field=null; previous=List.of(); age=0; environmentDirty=true; return; }
-        List<DynamicVoxelField.Emitter> emitters=new ArrayList<>();
+        List<DynamicVoxelField.Emitter> emitters=new ArrayList<>(registry.sources().size());
         for(var s:registry.sources()){
             emitters.add(new DynamicVoxelField.Emitter((int)Math.floor(s.x()),(int)Math.floor(s.y()),
                (int)Math.floor(s.z()),s.vanillaLevel(),s.red(),s.green(),s.blue(),s.tintRadius()));
