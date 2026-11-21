@@ -1,6 +1,7 @@
 package pl.sofron.extended;
 
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+import pl.sofron.extended.mixin.ExtendedChunkFutureAccess;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.server.MinecraftServer;
