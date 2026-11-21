@@ -7,8 +7,13 @@ import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;
 
-/** Omit leaf detail geometry from distant new meshes. Rebuild those sections
- * ahead of the exact eight-chunk visibility boundary controlled by the shader. */
+/**
+ * The vanilla cube is NEVER hidden. Only decorative top/bottom planes from
+ * the near-leaf model are omitted when far away. A cached near mesh is also
+ * clipped at exactly eight chunks in block_layer_opaque.vsh; otherwise an
+ * old mesh might retain extra planes after the player walks away.
+ * This CPU pre-culling uses a one-chunk safety margin for section rebuilds.
+ */
 public final class LeafDetailRange {
     private static ClientLevel level;
     private static int playerX, playerZ;
