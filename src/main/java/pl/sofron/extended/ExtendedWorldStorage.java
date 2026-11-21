@@ -16,6 +16,7 @@ import java.nio.file.Files;
 import java.nio.channels.FileChannel;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.nio.file.StandardCopyOption;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -111,11 +112,36 @@ public final class ExtendedWorldStorage {
 
         void close() {
             if (writer == null) return;
-            try { writer.close(); }
-            catch (IOException e) {
+            try {
+                writer.close();
+                writer = null;
+                // Updates to nearby chunks append new revisions. Compact only
+                // on world close, and only when the log has grown substantially
+                // beyond its unique set of surfaces.
+                long minimum = HEADER_BYTES + (long)chunks.size() * RECORD_BYTES;
+                if (Files.size(file) > Math.max(minimum * 3L, minimum + 4_194_304L)) {
+                    compact();
+                }
+            } catch (IOException e) {
                 System.err.println("[SofronPack] Extended World save failed: " + e.getMessage());
             }
-            writer = null;
+        }
+
+        void compact() throws IOException {
+            Path temporary = file.resolveSibling(file.getFileName() + ".compact");
+            try (DataOutputStream out = new DataOutputStream(new BufferedOutputStream(
+                    Files.newOutputStream(temporary, StandardOpenOption.CREATE,
+                            StandardOpenOption.TRUNCATE_EXISTING), 32768))) {
+                out.writeInt(MAGIC);
+                out.writeInt(VERSION);
+                for (SurfaceChunk chunk : chunks.values()) writeChunk(out, chunk);
+            }
+            try {
+                Files.move(temporary, file, StandardCopyOption.ATOMIC_MOVE,
+                        StandardCopyOption.REPLACE_EXISTING);
+            } catch (java.nio.file.AtomicMoveNotSupportedException unsupported) {
+                Files.move(temporary, file, StandardCopyOption.REPLACE_EXISTING);
+            }
         }
     }
 
