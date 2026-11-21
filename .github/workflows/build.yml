@@ -1,7 +1,7 @@
 name: Build
 on:
   push:
-    branches: [main, 'optimization/**', 'feature/**']
+    branches: [main, 'optimization/**', 'feature/**', 'fix/**']
     paths:
       - 'src/**'
       - 'gradle/**'

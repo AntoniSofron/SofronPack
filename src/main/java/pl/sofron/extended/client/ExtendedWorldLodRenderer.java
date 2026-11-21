@@ -24,6 +24,9 @@ import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
 import pl.sofron.extended.ExtendedWorldConfig;
+import pl.sofron.extended.ExtendedLodLevels;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.chunk.status.ChunkStatus;
 import pl.sofron.extended.ExtendedVoxelMesher;
 import pl.sofron.extended.ExtendedVoxelStore;
 import net.minecraft.resources.Identifier;
@@ -41,8 +44,11 @@ import com.mojang.renderpearl.api.textures.FilterMode;
 public final class ExtendedWorldLodRenderer {
     private static final int TILE = ExtendedVoxelMesher.TILE_CHUNKS;
     private static final int FAR = ExtendedWorldConfig.DISTANT_RADIUS_CHUNKS;
-    private static final int UPLOADS_PER_FRAME = 1;
-    private static final int MAX_GPU_TILES = 384;
+    private static final int UPLOADS_PER_FRAME = 8;
+    private static final long FRAME_MESH_BUDGET_NS = 5_000_000L;
+    // A 128-chunk radius can require many more visible tiles than 64.
+    // Evicting after only 384 tiles caused distant regions to vanish.
+    private static final int MAX_GPU_TILES = 3_072;
     private static final ExtendedVoxelAtlas ATLAS = new ExtendedVoxelAtlas();
     private static final int MAX_QUADS = ExtendedVoxelMesher.MAX_QUADS;
     private static final Map<Long, GpuTile> MESHES = new HashMap<>();
@@ -107,6 +113,12 @@ public final class ExtendedWorldLodRenderer {
                     DIRTY.add(key);
                 }
             }
+            // Avoid retaining coordinates from worlds/areas the player has
+            // left. They were previously scanned again on every frame.
+            DIRTY.removeIf(key -> {
+                int tx = (int)(key >> 32), tz = (int)(long)key;
+                return tx < minTX || tx > maxTX || tz < minTZ || tz > maxTZ;
+            });
             Iterator<Map.Entry<Long, GpuTile>> it = MESHES.entrySet().iterator();
             while (it.hasNext()) {
                 Map.Entry<Long, GpuTile> entry = it.next();
@@ -128,6 +140,19 @@ public final class ExtendedWorldLodRenderer {
             if (tx >= minTX && tx <= maxTX && tz >= minTZ && tz <= maxTZ)
                 DIRTY.add(ExtendedVoxelStore.pack(tx, tz));
         }
+        // Invalidate LOD around normal client chunks that have just arrived
+        // or been unloaded. Otherwise cached meshes can remain blank while the
+        // camera stands still waiting for the network's chunk stream.
+        var clientChunks = mc.level.getChunkSource();
+        for (long packed : clientChunks.addedLoadedChunks()) {
+            int x = ChunkPos.getX(packed), z = ChunkPos.getZ(packed);
+            DIRTY.add(ExtendedVoxelStore.pack(Math.floorDiv(x, TILE), Math.floorDiv(z, TILE)));
+        }
+        for (long packed : clientChunks.removedLoadedChunks()) {
+            int x = ChunkPos.getX(packed), z = ChunkPos.getZ(packed);
+            DIRTY.add(ExtendedVoxelStore.pack(Math.floorDiv(x, TILE), Math.floorDiv(z, TILE)));
+        }
+
         try {
             ensureIndices();
             uploadFarProjection(mc);
@@ -135,7 +160,11 @@ public final class ExtendedWorldLodRenderer {
             // caused important close LOD chunks to appear after far-off ones.
             var view = mc.gameRenderer.mainCamera().forwardVector();
             double px = cameraX, pz = cameraZ;
+            long meshDeadline = System.nanoTime() + FRAME_MESH_BUDGET_NS;
             for (int rebuilt = 0; rebuilt < UPLOADS_PER_FRAME; rebuilt++) {
+                // Spend spare frame time on small far tiles; avoid 8 heavy
+                // near-resolution rebuilds stalling the render thread.
+                if (rebuilt > 0 && System.nanoTime() >= meshDeadline) break;
                 Long best = null;
                 double nearest = Double.POSITIVE_INFINITY;
                 for (long key : DIRTY) {
@@ -190,7 +219,11 @@ public final class ExtendedWorldLodRenderer {
                         (float)((long)tz * TILE * 16 - camera.z));
                 var transform = RenderSystem.getDynamicUniforms().writeTransform(
                         relative, new Vector4f(1f, 1f, 1f, 1f),
-                        new Vector3f(), new Matrix4f());
+                        new Vector3f(
+                                (float)((long)tx * TILE * 16 - camera.x),
+                                (float)-camera.y,
+                                (float)((long)tz * TILE * 16 - camera.z)),
+                        new Matrix4f());
                 pass.setUniform("DynamicTransforms", transform);
                 pass.setVertexBuffer(0, tile.buffer.slice());
                 pass.drawIndexed(tile.quads * 6, 1, 0, 0, 0);
@@ -210,7 +243,7 @@ public final class ExtendedWorldLodRenderer {
 
     /**
      * Vanilla projection clips terrain at the ordinary view radius. A separate
-     * 64-chunk LOD projection extends that far plane without altering near
+     * 128-chunk LOD projection extends that far plane without altering near
      * terrain, camera FOV, chunk simulation or game options.
      */
     private static void uploadFarProjection(Minecraft mc) {
@@ -255,9 +288,12 @@ public final class ExtendedWorldLodRenderer {
         int dx = Math.abs(tx * TILE + TILE / 2 - cx);
         int dz = Math.abs(tz * TILE + TILE / 2 - cz);
         int range = Math.max(dx, dz);
-        int detail = range <= 28 ? 1 : range <= 48 ? 2 : 4;
+        int detail = ExtendedLodLevels.voxelSize(range);
+        var client = Minecraft.getInstance().level;
         var mesh = ExtendedVoxelMesher.build(tx, tz, cx, cz, near, FAR, detail,
-                ExtendedVoxelStore::get, ATLAS);
+                ExtendedVoxelStore::get, ATLAS,
+                (chunkX, chunkZ) -> client != null &&
+                        client.getChunkSource().getChunk(chunkX, chunkZ, ChunkStatus.FULL, false) != null);
         GpuTile previous = MESHES.remove(ExtendedVoxelStore.pack(tx, tz));
         if (previous != null) previous.close();
         if (mesh.quads() == 0) return;
@@ -317,7 +353,13 @@ public final class ExtendedWorldLodRenderer {
         }
         if (worst != null) {
             GpuTile evicted = MESHES.remove(worst);
-            if (evicted != null) evicted.close();
+            if (evicted != null) {
+                evicted.close();
+                // Do not permanently lose already generated chunks when the
+                // GPU cache reaches its bound. Schedule a fresh mesh if the
+                // camera later turns back toward this tile.
+                DIRTY.add(worst);
+            }
         }
     }
 

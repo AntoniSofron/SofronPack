@@ -6,6 +6,7 @@ import java.nio.ByteOrder;
 import java.util.LinkedHashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.function.BiPredicate;
 
 /**
  * Chunk-voxel surface extraction: emits axis-aligned, opaque Minecraft-style
@@ -81,11 +82,20 @@ public final class ExtendedVoxelMesher {
     private ExtendedVoxelMesher() {}
 
     /**
-     * @param detail 1 for exact 1-block voxels, 2 and 4 for distant simplified cubes
+     * @param detail 1 / 2 / 4 / 8 / 16 block voxels by distance
      */
     public static Mesh build(int tileX, int tileZ, int cx, int cz, int near, int far,
                              int detail, ChunkLookup lookup, MaterialResolver materials) {
-        if (detail != 1 && detail != 2 && detail != 4)
+        // Preserve backwards-compatible test behavior: normal near chunks are
+        // assumed ready until a client-specific predicate is supplied.
+        return build(tileX, tileZ, cx, cz, near, far, detail, lookup, materials,
+                (chunkX, chunkZ) -> true);
+    }
+
+    public static Mesh build(int tileX, int tileZ, int cx, int cz, int near, int far,
+                             int detail, ChunkLookup lookup, MaterialResolver materials,
+                             BiPredicate<Integer, Integer> normalChunkReady) {
+        if (detail != 1 && detail != 2 && detail != 4 && detail != 8 && detail != 16)
             throw new IllegalArgumentException("LOD resolution");
         if (far < 1 || far > 256) throw new IllegalArgumentException("radius");
         // Include one full neighbour-chunk halo to cull hidden faces at
@@ -125,7 +135,11 @@ public final class ExtendedVoxelMesher {
                     int chunkX = tileX * TILE_CHUNKS + x / ExtendedVoxelStore.GRID;
                     int chunkZ = tileZ * TILE_CHUNKS + z / ExtendedVoxelStore.GRID;
                     int radius = Math.max(Math.abs(chunkX - cx), Math.abs(chunkZ - cz));
-                    if (radius <= near || radius > far) continue;
+                    // Retain cached LOD if a normal chunk has not arrived at
+                    // the client yet. This prevents the empty hard-edged gap
+                    // when vanilla chunks are still streaming in.
+                    if (radius > far || (radius <= near &&
+                            normalChunkReady.test(chunkX, chunkZ))) continue;
 
                     String id = block(chunks, x, y, z, yCount, side);
                     if (id == null || id.equals("minecraft:air")) continue;

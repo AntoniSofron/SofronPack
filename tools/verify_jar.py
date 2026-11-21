@@ -86,6 +86,27 @@ with zipfile.ZipFile(jar) as z:
     for mixin in atmosphere_mixins["client"]:
         path = "pl/sofron/atmosphere/mixin/" + mixin + ".class"
         assert path in files, path
+
+    # Regression guard: the actual shipped JAR must contain THREE bright cloud
+    # layers plus the 128-chunk fogged voxel shader (not just source files).
+    for path in (
+        "pl/sofron/atmosphere/CloudBandLayout.class",
+        "pl/sofron/extended/ExtendedLodFog.class",
+        "pl/sofron/extended/ExtendedLodLevels.class",
+    ):
+        assert path in files, path
+    for extension in ("vsh", "fsh"):
+        path = f"assets/minecraft/shaders/core/sofronpack/extended_voxel.{extension}"
+        assert path in files, path
+    assert b"FogColor.rgb" in z.read(
+        "assets/minecraft/shaders/core/sofronpack/extended_voxel.fsh")
+    assert b"horizontalChunks" in z.read(
+        "assets/minecraft/shaders/core/sofronpack/extended_voxel.vsh")
+    cloud_source = pathlib.Path(
+        "src/main/java/pl/sofron/atmosphere/CloudBandLayout.java").read_text()
+    assert "LOW = 256.0f" in cloud_source
+    assert "MIDDLE = 384.0f" in cloud_source
+    assert "HIGH = 512.0f" in cloud_source
     original_mixins = json.loads(z.read("sofron.mixins.json"))
     assert not any("atmosphere" in name for name in original_mixins["client"])
     atmosphere_source = pathlib.Path("src/main/java/pl/sofron/atmosphere/AtmospherePresets.java").read_text(encoding="utf-8")
