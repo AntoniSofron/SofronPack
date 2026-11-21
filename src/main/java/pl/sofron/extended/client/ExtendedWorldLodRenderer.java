@@ -182,9 +182,16 @@ public final class ExtendedWorldLodRenderer {
                     double dx = (long)tx * TILE * 16 + TILE * 8 - px;
                     double dz = (long)tz * TILE * 16 + TILE * 8 - pz;
                     double distanceSq = dx * dx + dz * dz;
-                    // Fill holes FIRST with cheap coarse meshes before
-                    // spending multiple frames refining already-visible tiles.
-                    int pass = MESHES.containsKey(key) ? 1 : 0;
+                    // Prioritise close previews, then refine close terrain,
+                    // then fill farther regions and refine those. Without
+                    // spatially bounded passes, *any* missing distant tile
+                    // could starve near-field resolution upgrades indefinitely.
+                    int radiusChunks = Math.max(
+                            Math.abs(tx * TILE + TILE / 2 - cx),
+                            Math.abs(tz * TILE + TILE / 2 - cz));
+                    int pass = MESHES.containsKey(key)
+                            ? (radiusChunks <= 64 ? 1 : 3)
+                            : (radiusChunks <= 64 ? 0 : 2);
                     if (pass < bestPass || (pass == bestPass && distanceSq < nearest)) {
                         bestPass = pass;
                         nearest = distanceSq;
