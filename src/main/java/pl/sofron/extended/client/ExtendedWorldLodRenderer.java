@@ -5,6 +5,8 @@ import com.mojang.renderpearl.api.buffers.GpuBuffer;
 import com.mojang.renderpearl.api.commands.RenderPass;
 import com.mojang.renderpearl.api.device.GpuDevice;
 import com.mojang.renderpearl.api.pipeline.IndexType;
+import com.mojang.renderpearl.api.pipeline.DepthStencilState;
+import com.mojang.renderpearl.api.pipeline.CompareOp;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.HashMap;
@@ -18,7 +20,6 @@ import net.caffeinemc.mods.sodium.client.render.chunk.terrain.TerrainRenderPass;
 import net.caffeinemc.mods.sodium.client.render.viewport.CameraTransform;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.RenderPipelines;
-import net.minecraft.world.level.ChunkPos;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
@@ -45,6 +46,8 @@ public final class ExtendedWorldLodRenderer {
 
     private static GpuDevice device;
     private static GpuBuffer quadIndices;
+    private static GpuBuffer longProjection;
+    private static final ByteBuffer PROJECTION_STAGING = ByteBuffer.allocateDirect(64).order(ByteOrder.nativeOrder());
     private static long worldGeneration = Long.MIN_VALUE;
     private static int centerX = Integer.MIN_VALUE, centerZ = Integer.MIN_VALUE;
     private static int lastRenderDistance;
@@ -56,39 +59,43 @@ public final class ExtendedWorldLodRenderer {
 
     private ExtendedWorldLodRenderer() {}
 
-    public static void render(RenderPass pass, ChunkRenderMatrices matrices,
-                              TerrainRenderPass terrainPass, CameraTransform camera) {
-        if (terrainPass != DefaultTerrainRenderPasses.CUTOUT || pass == null) return;
+    /**
+     * Called before Minecraft opens any RenderPass. GPU uploads and buffer
+     * retirement must never happen inside a live Vulkan render pass.
+     */
+    public static void prepareFrame(double cameraX, double cameraZ) {
         Minecraft mc = Minecraft.getInstance();
         if (!ExtendedWorldConfig.get().enabled || mc.level == null
                 || mc.getSingleplayerServer() == null || mc.player == null) {
-            if (!MESHES.isEmpty()) close();
+            if (device != null) close();
             return;
         }
-
+        if (failed) {
+            if (device != null) close();
+            return;
+        }
         GpuDevice now = RenderSystem.getDevice();
         if (device != now || worldGeneration != ExtendedWorldStorage.generation()) {
             close();
             device = now;
             worldGeneration = ExtendedWorldStorage.generation();
         }
-        if (failed || ExtendedWorldStorage.count() == 0) return;
+        if (ExtendedWorldStorage.count() == 0) return;
 
-        int cx = Math.floorDiv(camera.intX, 16);
-        int cz = Math.floorDiv(camera.intZ, 16);
+        int cx = ((int)Math.floor(cameraX)) >> 4;
+        int cz = ((int)Math.floor(cameraZ)) >> 4;
         int distance = Math.max(2, mc.options.getEffectiveRenderDistance());
         int minTX = Math.floorDiv(cx - FAR, TILE), maxTX = Math.floorDiv(cx + FAR, TILE);
         int minTZ = Math.floorDiv(cz - FAR, TILE), maxTZ = Math.floorDiv(cz + FAR, TILE);
-
-        // Maintain a stable GPU cache: moving by one chunk does not cause
-        // hundreds of distant surfaces to be rebuilt.
         if (centerX != cx || centerZ != cz || lastRenderDistance != distance) {
             boolean first = centerX == Integer.MIN_VALUE || lastRenderDistance != distance;
             centerX = cx; centerZ = cz; lastRenderDistance = distance;
             for (int tx = minTX; tx <= maxTX; tx++) for (int tz = minTZ; tz <= maxTZ; tz++) {
                 long key = ExtendedWorldStorage.pack(tx, tz);
-                if (!MESHES.containsKey(key) || first || intersectsMovingRings(tx, tz, cx, cz, distance))
+                if (!MESHES.containsKey(key) || first ||
+                        intersectsMovingRings(tx, tz, cx, cz, distance)) {
                     DIRTY.add(key);
+                }
             }
             Iterator<Map.Entry<Long, GpuTile>> it = MESHES.entrySet().iterator();
             while (it.hasNext()) {
@@ -101,19 +108,19 @@ public final class ExtendedWorldLodRenderer {
             }
         }
 
-        // The server publishes only changed source chunks, not full mesh data.
+        // Publish surface changes to the GPU gradually; do not iterate every
+        // saved chunk or upload the whole LOD mesh when one surface changes.
         for (int i = 0; i < 2048; i++) {
             Long changed = ExtendedWorldStorage.pollChanged();
             if (changed == null) break;
             int x = (int)(changed >> 32), z = (int)(long)changed;
             int tx = Math.floorDiv(x, TILE), tz = Math.floorDiv(z, TILE);
-            if (tx >= minTX && tx <= maxTX && tz >= minTZ && tz <= maxTZ) {
+            if (tx >= minTX && tx <= maxTX && tz >= minTZ && tz <= maxTZ)
                 DIRTY.add(ExtendedWorldStorage.pack(tx, tz));
-            }
         }
-
         try {
             ensureIndices();
+            uploadFarProjection(mc);
             int rebuilt = 0;
             Iterator<Long> pending = DIRTY.iterator();
             while (pending.hasNext() && rebuilt < UPLOADS_PER_FRAME) {
@@ -124,14 +131,30 @@ public final class ExtendedWorldLodRenderer {
                 rebuildTile(tx, tz, cx, cz, distance);
                 rebuilt++;
             }
-            if (MESHES.isEmpty()) return;
+        } catch (RuntimeException | LinkageError problem) {
+            System.err.println("[SofronPack] Extended World GPU preparation failed: "
+                    + problem.getMessage());
+            close();
+            failed = true;
+        }
+    }
+
+    /**
+     * The draw callback only binds already-created resources. No mesh
+     * generation, buffer allocation or command submission occurs here.
+     */
+    public static void render(RenderPass pass, ChunkRenderMatrices matrices,
+                              TerrainRenderPass terrainPass, CameraTransform camera) {
+        if (terrainPass != DefaultTerrainRenderPasses.CUTOUT || pass == null
+                || failed || MESHES.isEmpty() || quadIndices == null || longProjection == null) return;
+        try {
             pass.setPipeline(RenderSystem.getCompiledPipeline(RenderPipelines.DEBUG_QUADS));
             RenderSystem.bindDefaultUniforms(pass);
+            pass.setUniform("Projection", longProjection.slice());
             pass.setIndexBuffer(quadIndices, IndexType.INT);
             for (Map.Entry<Long, GpuTile> entry : MESHES.entrySet()) {
                 long key = entry.getKey();
-                int tx = (int)(key >> 32), tz = (int)key;
-                if (tx < minTX || tx > maxTX || tz < minTZ || tz > maxTZ) continue;
+                int tx = (int)(key >> 32), tz = (int)(long)key;
                 GpuTile tile = entry.getValue();
                 if (tile.quads == 0) continue;
                 Matrix4f relative = new Matrix4f(matrices.modelView()).translate(
@@ -146,12 +169,41 @@ public final class ExtendedWorldLodRenderer {
                 pass.drawIndexed(tile.quads * 6, 1, 0, 0, 0);
             }
         } catch (RuntimeException | LinkageError problem) {
+            // Defer freeing GPU buffers until the beginning of the next frame.
             failed = true;
-            System.err.println("[SofronPack] Native Extended World renderer disabled: "
+            System.err.println("[SofronPack] Extended World draw disabled: "
                     + problem.getMessage());
-            close();
-            failed = true;
         }
+    }
+
+    /**
+     * Vanilla projection clips terrain at the ordinary view radius. A separate
+     * 64-chunk LOD projection extends that far plane without altering near
+     * terrain, camera FOV, chunk simulation or game options.
+     */
+    private static void uploadFarProjection(Minecraft mc) {
+        Matrix4f projection = new Matrix4f(mc.gameRenderer.gameRenderState()
+                .levelRenderState.cameraRenderState.projectionMatrix);
+        float near = 0.05f, far = FAR * 16f + 512f;
+        boolean reversed = DepthStencilState.DEFAULT.depthTest()
+                .equals(CompareOp.GREATER_THAN_OR_EQUAL);
+        if (reversed) {
+            float tmp = near; near = far; far = tmp;
+        }
+        boolean zeroToOne = device.getDeviceInfo().isZZeroToOne();
+        projection.m22((zeroToOne ? far : far + near) / (near - far));
+        projection.m32((zeroToOne ? far : far + far) * near / (near - far));
+        PROJECTION_STAGING.clear();
+        projection.get(0, PROJECTION_STAGING);
+        PROJECTION_STAGING.position(0);
+        PROJECTION_STAGING.limit(64);
+        if (longProjection == null) {
+            longProjection = device.createBuffer(() -> "SofronPack LOD projection",
+                    GpuBuffer.USAGE_UNIFORM | GpuBuffer.USAGE_COPY_DST, 64);
+        }
+        var encoder = device.createCommandEncoder();
+        encoder.writeToBuffer(longProjection.slice(), PROJECTION_STAGING);
+        encoder.submit();
     }
 
     private static boolean intersectsMovingRings(int tx, int tz, int cx, int cz, int near) {
@@ -197,7 +249,9 @@ public final class ExtendedWorldLodRenderer {
         MESHES.clear();
         DIRTY.clear();
         if (quadIndices != null) quadIndices.close();
+        if (longProjection != null) longProjection.close();
         quadIndices = null;
+        longProjection = null;
         device = null;
         worldGeneration = Long.MIN_VALUE;
         centerX = centerZ = Integer.MIN_VALUE;
