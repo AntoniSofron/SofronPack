@@ -13,6 +13,9 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.PriorityQueue;
+import java.util.Comparator;
+import org.joml.FrustumIntersection;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -68,6 +71,16 @@ public final class ExtendedWorldLodRenderer {
     private static final int MAX_QUADS = ExtendedVoxelMesher.MAX_QUADS;
     private static final Map<Long, GpuTile> MESHES = new HashMap<>();
     private static final Set<Long> DIRTY = new HashSet<>();
+
+    private record Candidate(long key, int priority, long distance) {}
+    private static final PriorityQueue<Candidate> candidates = new PriorityQueue<>(
+            Comparator.comparingInt(Candidate::priority).thenComparingLong(Candidate::distance));
+    private static final Set<Long> queued = new HashSet<>();
+    private static float queueLookX, queueLookZ;
+    private static int queueX = Integer.MIN_VALUE, queueZ;
+    private static final Matrix4f farProjection = new Matrix4f();
+    private static final Matrix4f identityTexture = new Matrix4f();
+    private static final FrustumIntersection frustum = new FrustumIntersection();
 
     private static GpuDevice device;
     private static GpuBuffer quadIndices;
@@ -131,7 +144,7 @@ public final class ExtendedWorldLodRenderer {
                 long wantedDetail = detailAt(tx, tz, cx, cz);
                 boolean detailChanged = current != null && current.detail() != wantedDetail;
                 if ((current == null || first || detailChanged) && hasChunkData(tx, tz)) {
-                    DIRTY.add(key);
+                    markDirty(key);
                 }
             }
             // Avoid retaining coordinates from worlds/areas the player has
@@ -161,18 +174,14 @@ public final class ExtendedWorldLodRenderer {
             for (int nz = Math.floorDiv(z - 1, TILE); nz <= Math.floorDiv(z + 1, TILE); nz++)
                 for (int nx = Math.floorDiv(x - 1, TILE); nx <= Math.floorDiv(x + 1, TILE); nx++)
                     if (nx >= minTX && nx <= maxTX && nz >= minTZ && nz <= maxTZ)
-                        DIRTY.add(ExtendedVoxelStore.pack(nx, nz));
+                        markDirty(ExtendedVoxelStore.pack(nx, nz));
         }
         for (int i = 0; i < 256; i++) {
             Long key = ExtendedTerrainPreview.pollChanged();
             if (key == null) break;
             int x = (int)(key >> 32), z = (int)(long)key;
-            if (x >= minTX && x <= maxTX && z >= minTZ && z <= maxTZ) DIRTY.add(key);
+            if (x >= minTX && x <= maxTX && z >= minTZ && z <= maxTZ) markDirty(key);
         }
-        DIRTY.removeIf(key -> {
-            int x = (int)(key >> 32), z = (int)(long)key;
-            return outsideHorizon(x, z, cx, cz) || tileEntirelyInsideHandoff(x, z, cx, cz, distance);
-        });
         try {
             finishMeshes(minTX, maxTX, minTZ, maxTZ, cx, cz);
             ensureIndices();
@@ -180,44 +189,28 @@ public final class ExtendedWorldLodRenderer {
             // Pick the nearest visible dirty tile. Random HashSet iteration
             // caused important close LOD chunks to appear after far-off ones.
             var view = mc.gameRenderer.mainCamera().forwardVector();
-            double px = cameraX, pz = cameraZ;
+            if (queueX != cx || queueZ != cz || Math.abs(queueLookX - view.x()) > .05f
+                    || Math.abs(queueLookZ - view.z()) > .05f) {
+                queueX = cx; queueZ = cz;
+                queueLookX = view.x(); queueLookZ = view.z();
+                queued.clear();
+                candidates.clear();
+                for (long key : DIRTY) enqueue(key);
+            }
             long meshDeadline = System.nanoTime() + FRAME_MESH_BUDGET_NS;
-            for (int rebuilt = 0; rebuilt < UPLOADS_PER_FRAME && pending.size() < 2; rebuilt++) {
-                // Spend spare frame time on small far tiles; avoid 8 heavy
-                // near-resolution rebuilds stalling the render thread.
-                if (rebuilt > 0 && System.nanoTime() >= meshDeadline) break;
-                Long best = null;
-                int bestPass = Integer.MAX_VALUE;
-                double nearest = Double.POSITIVE_INFINITY;
-                for (long key : DIRTY) {
-                    if (pending.containsKey(key)) continue;
-                    int tx = (int)(key >> 32), tz = (int)key;
-                    if (tx < minTX || tx > maxTX || tz < minTZ || tz > maxTZ) continue;
-                    if (!isInView(tx, tz, px, pz, view.x(), view.z())) continue;
-                    double dx = (long)tx * TILE * 16 + TILE * 8 - px;
-                    double dz = (long)tz * TILE * 16 + TILE * 8 - pz;
-                    double distanceSq = dx * dx + dz * dz;
-                    // Prioritise close previews, then refine close terrain,
-                    // then fill farther regions and refine those. Without
-                    // spatially bounded passes, *any* missing distant tile
-                    // could starve near-field resolution upgrades indefinitely.
-                    int radiusChunks = Math.max(
-                            Math.abs(tx * TILE + TILE / 2 - cx),
-                            Math.abs(tz * TILE + TILE / 2 - cz));
-                    // 8,16,32,48,64,96,128 bands, each with preview first
-                    // and refinement second; preserves near-first appearance.
-                    int band = pl.sofron.extended.ExtendedLodStages.indexForRadius(radiusChunks);
-                    int pass = band * 2 + (MESHES.containsKey(key) ? 1 : 0);
-                    if (pass < bestPass || (pass == bestPass && distanceSq < nearest)) {
-                        bestPass = pass;
-                        nearest = distanceSq;
-                        best = key;
-                    }
-                }
-                if (best == null) break;
-                DIRTY.remove(best);
-                scheduleTile((int)(best >> 32), (int)(long)best, cx, cz);
+            for (int rebuilt = 0; rebuilt < UPLOADS_PER_FRAME && pending.size() < 2; ) {
+                var candidate = candidates.poll();
+                if (candidate == null) break;
+                long key = candidate.key();
+                queued.remove(key);
+                if (!DIRTY.contains(key) || pending.containsKey(key)) continue;
+                int tx = (int)(key >> 32), tz = (int)key;
+                DIRTY.remove(key);
+                if (outsideHorizon(tx, tz, cx, cz) || tileEntirelyInsideHandoff(tx, tz, cx, cz, distance)) continue;
+                scheduleTile(tx, tz, cx, cz);
+                rebuilt++;
                 trimGpuCache(cx, cz);
+                if (System.nanoTime() >= meshDeadline) break;
             }
         } catch (RuntimeException | LinkageError problem) {
             System.err.println("[SofronPack] Extended World GPU preparation failed: "
@@ -244,16 +237,18 @@ public final class ExtendedWorldLodRenderer {
             pass.setUniform("Sampler0", blockAtlas,
                     RenderSystem.getSamplerCache().getClampToEdge(FilterMode.LINEAR));
             pass.setIndexBuffer(quadIndices, IndexType.INT);
-            var forward = Minecraft.getInstance().gameRenderer.mainCamera().forwardVector();
+            var mc = Minecraft.getInstance();
+            int cameraCX = ((int)Math.floor(camera.x)) >> 4, cameraCZ = ((int)Math.floor(camera.z)) >> 4;
+            int distance = Math.max(2, mc.options.getEffectiveRenderDistance());
+            float low = (float)(mc.level.getMinY() - camera.y);
+            float high = low + mc.level.getHeight();
+            frustum.set(new Matrix4f(farProjection).mul(matrices.modelView()), false);
             for (Map.Entry<Long, GpuTile> entry : MESHES.entrySet()) {
                 long key = entry.getKey();
                 int tx = (int)(key >> 32), tz = (int)(long)key;
-                if (!isInView(tx, tz, camera.x, camera.z, forward.x(), forward.z())) continue;
-                int cameraCX = ((int)Math.floor(camera.x)) >> 4;
-                int cameraCZ = ((int)Math.floor(camera.z)) >> 4;
-                if (tileEntirelyInsideHandoff(tx, tz, cameraCX, cameraCZ,
-                        Math.max(2, Minecraft.getInstance().options.getEffectiveRenderDistance())))
-                    continue;
+                float x = (float)((long)tx * TILE * 16 - camera.x), z = (float)((long)tz * TILE * 16 - camera.z);
+                if (!frustum.testAab(x, low, z, x + TILE * 16, high, z + TILE * 16)
+                        || tileEntirelyInsideHandoff(tx, tz, cameraCX, cameraCZ, distance)) continue;
                 GpuTile tile = entry.getValue();
                 if (tile.quads == 0) continue;
                 Matrix4f relative = new Matrix4f(matrices.modelView()).translate(
@@ -268,7 +263,7 @@ public final class ExtendedWorldLodRenderer {
                                 (float)((long)tx * TILE * 16 - camera.x),
                                 (float)-camera.y,
                                 (float)((long)tz * TILE * 16 - camera.z)),
-                        new Matrix4f());
+                        identityTexture);
                 pass.setUniform("DynamicTransforms", transform);
                 pass.setVertexBuffer(0, tile.buffer.slice());
                 pass.drawIndexed(tile.quads * 6, 1, 0, 0, 0);
@@ -304,6 +299,8 @@ public final class ExtendedWorldLodRenderer {
         boolean zeroToOne = device.getDeviceInfo().isZZeroToOne();
         projection.m22((zeroToOne ? far : far + near) / (near - far));
         projection.m32((zeroToOne ? far : far + far) * near / (near - far));
+        if (longProjection != null && projection.equals(farProjection)) return;
+        farProjection.set(projection);
         PROJECTION_STAGING.clear();
         projection.get(0, PROJECTION_STAGING);
         PROJECTION_STAGING.position(0);
@@ -343,7 +340,7 @@ public final class ExtendedWorldLodRenderer {
             long key = ExtendedVoxelStore.pack(tx, tz);
             Integer old = readyColumns.put(key, mask);
             if (mask != 0xffff && (old == null || old != mask)
-                    && !MESHES.containsKey(key) && hasChunkData(tx, tz)) DIRTY.add(key);
+                    && !MESHES.containsKey(key) && hasChunkData(tx, tz)) markDirty(key);
         }
     }
 
@@ -356,6 +353,23 @@ public final class ExtendedWorldLodRenderer {
         return readyColumns.getOrDefault(ExtendedVoxelStore.pack(tx, tz), 0) == 0xffff
                 && Math.hypot(maxX, maxZ)
                 < pl.sofron.extended.ExtendedLodHandoff.nearStartChunks(renderDistance);
+    }
+
+    private static void markDirty(long key) {
+        DIRTY.add(key);
+        enqueue(key);
+    }
+
+    private static void enqueue(long key) {
+        if (queueX == Integer.MIN_VALUE || queued.contains(key) || pending.containsKey(key)) return;
+        int tx = (int)(key >> 32), tz = (int)key;
+        if (outsideHorizon(tx, tz, queueX, queueZ)
+                || !isInView(tx, tz, queueX * 16d + 8, queueZ * 16d + 8, queueLookX, queueLookZ)) return;
+        int dx = tx * TILE + TILE / 2 - queueX, dz = tz * TILE + TILE / 2 - queueZ;
+        int band = pl.sofron.extended.ExtendedLodStages.indexForRadius(Math.max(Math.abs(dx), Math.abs(dz)));
+        int pass = band * 2 + (MESHES.containsKey(key) ? 1 : 0);
+        queued.add(key);
+        candidates.add(new Candidate(key, pass, (long)dx * dx + (long)dz * dz));
     }
 
     private static long detailAt(int tx, int tz, int cx, int cz) {
@@ -410,6 +424,7 @@ public final class ExtendedWorldLodRenderer {
             long key = entry.getKey();
             int tx = (int)(key >> 32), tz = (int)key;
             if (tx < minX || tx > maxX || tz < minZ || tz > maxZ) continue;
+            if (DIRTY.contains(key)) enqueue(key);
             var mesh = job.result.join();
             if (mesh.quads() == 0) {
                 GpuTile previous = MESHES.remove(key);
@@ -420,7 +435,7 @@ public final class ExtendedWorldLodRenderer {
                     GpuBuffer.USAGE_VERTEX | GpuBuffer.USAGE_COPY_DST, mesh.vertices());
             GpuTile previous = MESHES.put(key, new GpuTile(buffer, mesh.quads(), job.detail));
             if (previous != null) previous.close();
-            if (job.detail != detailAt(tx, tz, cx, cz)) DIRTY.add(key);
+            if (job.detail != detailAt(tx, tz, cx, cz)) markDirty(key);
             if (!loggedFirstUpload) {
                 loggedFirstUpload = true;
                 System.out.println("[SofronPack] Textured Extended World LOD GPU tile uploaded: "
@@ -487,7 +502,7 @@ public final class ExtendedWorldLodRenderer {
                 // Do not permanently lose already generated chunks when the
                 // GPU cache reaches its bound. Schedule a fresh mesh if the
                 // camera later turns back toward this tile.
-                DIRTY.add(worst);
+                markDirty(worst);
             }
         }
     }
@@ -501,6 +516,9 @@ public final class ExtendedWorldLodRenderer {
         for (GpuTile tile : MESHES.values()) tile.close();
         MESHES.clear();
         DIRTY.clear();
+        candidates.clear();
+        queued.clear();
+        queueX = Integer.MIN_VALUE;
     }
 
     /** Release all device resources from the render thread. */

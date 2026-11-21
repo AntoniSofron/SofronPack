@@ -18,7 +18,7 @@ public final class ExtendedWorldConfig {
             .resolve("sofronpack-extended-world.json");
     private static final ExtendedWorldConfig INSTANCE = read();
 
-    public boolean enabled = false;
+    public volatile boolean enabled = false;
 
     private ExtendedWorldConfig() {}
 
