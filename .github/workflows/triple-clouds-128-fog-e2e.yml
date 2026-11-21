@@ -46,16 +46,16 @@ jobs:
           code=$?
           set -e
           echo "Exit code: $code"
-          grep -E 'SofronPack|Voxel LOD|Extended World|Joining|Loading|graphics backend|Exception|ERROR' native-lod-client.log | tail -n 95 || true
-          if grep -E 'Mixin apply failed|InvalidMixinException|Native Extended World renderer disabled|Extended World GPU preparation failed|Extended World draw disabled|Crash Report' native-lod-client.log; then
+          grep -E 'SofronPack|Voxel LOD|Extended World|Joining|Loading|graphics backend|Exception|ERROR' triple-clouds-128-fog.log | tail -n 95 || true
+          if grep -E 'Mixin apply failed|InvalidMixinException|Native Extended World renderer disabled|Extended World GPU preparation failed|Extended World draw disabled|Crash Report' triple-clouds-128-fog.log; then
             echo 'LOADING OR GPU RENDER FAILURE'
             exit 1
           fi
-          if ! grep -q '\[SofronPack\] Voxel LOD: restored' native-lod-client.log; then
+          if ! grep -q '\[SofronPack\] Voxel LOD: restored' triple-clouds-128-fog.log; then
             echo 'Integrated single-player world was not loaded, or voxel cache failed to initialize'
             exit 1
           fi
-          if ! grep -q 'Textured Extended World GPU draw issued' native-lod-client.log; then
+          if ! grep -q 'Textured Extended World GPU draw issued' triple-clouds-128-fog.log; then
             echo 'The 128-chunk, fogged GPU render hook was not reached while in the world'
             exit 1
           fi
@@ -74,6 +74,6 @@ jobs:
         with:
           name: triple-clouds-128-fog-in-world-log
           path: |
-            native-lod-client.log
+            triple-clouds-128-fog.log
             wild-rice-smoke.log
           if-no-files-found: ignore
