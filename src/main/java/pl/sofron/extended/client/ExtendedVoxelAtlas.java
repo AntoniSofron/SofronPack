@@ -2,6 +2,8 @@ package pl.sofron.extended.client;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.geom.builders.UVPair;
+import net.minecraft.client.renderer.texture.TextureAtlas;
+import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
 import net.minecraft.client.renderer.block.dispatch.BlockStateModelPart;
 import net.minecraft.client.resources.model.geometry.BakedQuad;
@@ -79,7 +81,24 @@ public final class ExtendedVoxelAtlas implements ExtendedVoxelMesher.MaterialRes
                 var free = part.getQuads(null);
                 if (!free.isEmpty()) { quad = free.getFirst(); break; }
             }
-            if (quad == null) continue;
+            if (quad == null) {
+                // Fluid blocks have no baked block-state model, so load the
+                // genuine vanilla fluid sprite from the active texture pack.
+                String spriteName = name.contains("water") ? "minecraft:block/water_still" :
+                        name.contains("lava") ? "minecraft:block/lava_still" : null;
+                if (spriteName != null) {
+                    var texture = (TextureAtlas)Minecraft.getInstance().getTextureManager()
+                            .getTexture(Identifier.parse("minecraft:textures/atlas/blocks.png"));
+                    TextureAtlasSprite sprite = texture.getSprite(Identifier.parse(spriteName));
+                    if (sprite != null) {
+                        int tint = name.contains("water") ? 0x3F76E4 : 0xffffff;
+                        result[i] = new ExtendedVoxelMesher.MaterialUV(
+                                sprite.getU0(), sprite.getV0(), sprite.getU1(), sprite.getV1(),
+                                tint, true);
+                    }
+                }
+                continue;
+            }
             float u0 = Float.MAX_VALUE, v0 = Float.MAX_VALUE;
             float u1 = -Float.MAX_VALUE, v1 = -Float.MAX_VALUE;
             for (int vertex = 0; vertex < 4; vertex++) {
