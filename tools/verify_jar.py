@@ -23,7 +23,15 @@ with zipfile.ZipFile(jar) as z:
     assert mod["version"] == version
     assert len(mod["entrypoints"]["main"]) == 2
     assert len(mod["entrypoints"]["client"]) == 2
-    assert len(mod["mixins"]) == 3
+    assert len(mod["mixins"]) == 5
+    assert "sofron-extended.mixins.json" in mod["mixins"]
+    assert "sofron-extended-client.mixins.json" in mod["mixins"]
+    for class_name in (
+        "pl/sofron/extended/ExtendedWorldConfig.class",
+        "pl/sofron/extended/ExtendedWorldPrefetch.class",
+        "pl/sofron/extended/mixin/ExtendedWorldSodiumOptionsMixin.class",
+    ):
+        assert class_name in files, class_name
     for required in (
         "pl/sofron/terralab/TerraLabMod.class",
         "pl/sofron/terralab/rice/RiceCropBlock.class",
