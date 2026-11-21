@@ -24,8 +24,10 @@ import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
 import pl.sofron.extended.ExtendedWorldConfig;
-import pl.sofron.extended.ExtendedWorldMeshBuilder;
-import pl.sofron.extended.ExtendedWorldStorage;
+import pl.sofron.extended.ExtendedVoxelMesher;
+import pl.sofron.extended.ExtendedVoxelStore;
+import net.minecraft.resources.Identifier;
+import com.mojang.renderpearl.api.textures.FilterMode;
 
 /**
  * Native RenderPearl (OpenGL + Vulkan) renderer of compact distant surface
@@ -37,10 +39,11 @@ import pl.sofron.extended.ExtendedWorldStorage;
  * control; all meshing/uploads have a hard per-frame budget.
  */
 public final class ExtendedWorldLodRenderer {
-    private static final int TILE = ExtendedWorldMeshBuilder.TILE_CHUNKS;
+    private static final int TILE = ExtendedVoxelMesher.TILE_CHUNKS;
     private static final int FAR = ExtendedWorldConfig.DISTANT_RADIUS_CHUNKS;
-    private static final int UPLOADS_PER_FRAME = 3;
-    private static final int MAX_QUADS = ExtendedWorldMeshBuilder.MAX_QUADS;
+    private static final int UPLOADS_PER_FRAME = 1;
+    private static final ExtendedVoxelAtlas ATLAS = new ExtendedVoxelAtlas();
+    private static final int MAX_QUADS = ExtendedVoxelMesher.MAX_QUADS;
     private static final Map<Long, GpuTile> MESHES = new HashMap<>();
     private static final Set<Long> DIRTY = new HashSet<>();
 
@@ -75,12 +78,16 @@ public final class ExtendedWorldLodRenderer {
             return;
         }
         GpuDevice now = RenderSystem.getDevice();
-        if (device != now || worldGeneration != ExtendedWorldStorage.generation()) {
+        if (device != now || worldGeneration != ExtendedVoxelStore.generation()) {
             close();
             device = now;
-            worldGeneration = ExtendedWorldStorage.generation();
+            worldGeneration = ExtendedVoxelStore.generation();
         }
-        if (ExtendedWorldStorage.count() == 0) return;
+        if (ExtendedVoxelStore.count() == 0) return;
+        if (ATLAS.refreshModels()) {
+            clearMeshes();
+            centerX = centerZ = Integer.MIN_VALUE;
+        }
 
         int cx = ((int)Math.floor(cameraX)) >> 4;
         int cz = ((int)Math.floor(cameraZ)) >> 4;
@@ -91,7 +98,7 @@ public final class ExtendedWorldLodRenderer {
             boolean first = centerX == Integer.MIN_VALUE || lastRenderDistance != distance;
             centerX = cx; centerZ = cz; lastRenderDistance = distance;
             for (int tx = minTX; tx <= maxTX; tx++) for (int tz = minTZ; tz <= maxTZ; tz++) {
-                long key = ExtendedWorldStorage.pack(tx, tz);
+                long key = ExtendedVoxelStore.pack(tx, tz);
                 if (!MESHES.containsKey(key) || first ||
                         intersectsMovingRings(tx, tz, cx, cz, distance)) {
                     DIRTY.add(key);
@@ -111,12 +118,12 @@ public final class ExtendedWorldLodRenderer {
         // Publish surface changes to the GPU gradually; do not iterate every
         // saved chunk or upload the whole LOD mesh when one surface changes.
         for (int i = 0; i < 2048; i++) {
-            Long changed = ExtendedWorldStorage.pollChanged();
+            Long changed = ExtendedVoxelStore.pollChanged();
             if (changed == null) break;
             int x = (int)(changed >> 32), z = (int)(long)changed;
             int tx = Math.floorDiv(x, TILE), tz = Math.floorDiv(z, TILE);
             if (tx >= minTX && tx <= maxTX && tz >= minTZ && tz <= maxTZ)
-                DIRTY.add(ExtendedWorldStorage.pack(tx, tz));
+                DIRTY.add(ExtendedVoxelStore.pack(tx, tz));
         }
         try {
             ensureIndices();
@@ -148,9 +155,13 @@ public final class ExtendedWorldLodRenderer {
         if (terrainPass != DefaultTerrainRenderPasses.CUTOUT || pass == null
                 || failed || MESHES.isEmpty() || quadIndices == null || longProjection == null) return;
         try {
-            pass.setPipeline(RenderSystem.getCompiledPipeline(RenderPipelines.DEBUG_QUADS));
+            pass.setPipeline(RenderSystem.getCompiledPipeline(ExtendedVoxelPipeline.TERRAIN));
             RenderSystem.bindDefaultUniforms(pass);
             pass.setUniform("Projection", longProjection.slice());
+            var blockAtlas = Minecraft.getInstance().getTextureManager().getTexture(
+                    Identifier.parse("minecraft:textures/atlas/blocks.png")).getTexture();
+            pass.setUniform("Sampler0", blockAtlas,
+                    RenderSystem.getSamplerCache().getClampToEdge(FilterMode.LINEAR));
             pass.setIndexBuffer(quadIndices, IndexType.INT);
             for (Map.Entry<Long, GpuTile> entry : MESHES.entrySet()) {
                 long key = entry.getKey();
@@ -220,13 +231,18 @@ public final class ExtendedWorldLodRenderer {
     }
 
     private static void rebuildTile(int tx, int tz, int cx, int cz, int near) {
-        var mesh = ExtendedWorldMeshBuilder.build(tx, tz, cx, cz, near, FAR, ExtendedWorldStorage::get);
-        GpuTile previous = MESHES.remove(ExtendedWorldStorage.pack(tx, tz));
+        int dx = Math.abs(tx * TILE + TILE / 2 - cx);
+        int dz = Math.abs(tz * TILE + TILE / 2 - cz);
+        int range = Math.max(dx, dz);
+        int detail = range <= 28 ? 1 : range <= 48 ? 2 : 4;
+        var mesh = ExtendedVoxelMesher.build(tx, tz, cx, cz, near, FAR, detail,
+                ExtendedVoxelStore::get, ATLAS);
+        GpuTile previous = MESHES.remove(ExtendedVoxelStore.pack(tx, tz));
         if (previous != null) previous.close();
-        if (mesh.quadCount() == 0) return;
+        if (mesh.quads() == 0) return;
         GpuBuffer buffer = device.createBuffer(() -> "SofronPack Extended World tile",
                 GpuBuffer.USAGE_VERTEX | GpuBuffer.USAGE_COPY_DST, mesh.vertices());
-        MESHES.put(ExtendedWorldStorage.pack(tx, tz), new GpuTile(buffer, mesh.quadCount()));
+        MESHES.put(ExtendedVoxelStore.pack(tx, tz), new GpuTile(buffer, mesh.quads()));
     }
 
     private static void ensureIndices() {
@@ -243,11 +259,16 @@ public final class ExtendedWorldLodRenderer {
                 GpuBuffer.USAGE_INDEX | GpuBuffer.USAGE_COPY_DST, buffer);
     }
 
-    /** Release all device resources from the render thread. */
-    public static void close() {
+    private static void clearMeshes() {
         for (GpuTile tile : MESHES.values()) tile.close();
         MESHES.clear();
         DIRTY.clear();
+    }
+
+    /** Release all device resources from the render thread. */
+    public static void close() {
+        clearMeshes();
+        ATLAS.clear();
         if (quadIndices != null) quadIndices.close();
         if (longProjection != null) longProjection.close();
         quadIndices = null;
