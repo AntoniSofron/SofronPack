@@ -98,8 +98,20 @@ with zipfile.ZipFile(jar) as z:
     for extension in ("vsh", "fsh"):
         path = f"assets/minecraft/shaders/core/sofronpack/extended_voxel.{extension}"
         assert path in files, path
-    assert b"FogColor.rgb" in z.read(
-        "assets/minecraft/shaders/core/sofronpack/extended_voxel.fsh")
+    extended_shader = z.read("assets/minecraft/shaders/core/sofronpack/extended_voxel.fsh")
+    assert b"FogColor.rgb" in extended_shader
+    assert b"FogEnvironmentalStart" in extended_shader
+    assert b"FogEnvironmentalEnd" in extended_shader
+    assert b"FogRenderDistanceEnd" in extended_shader
+    assert b"weatherStrength" in extended_shader
+    cloud_vertex = z.read("assets/minecraft/shaders/core/sofronpack/clouds.vsh")
+    assert b"0.82 * underside" in cloud_vertex
+    assert b"ColorModulator.rgb" in cloud_vertex
+    assert b"sofronPackDarkLight" in z.read(
+        "assets/sofronpack/shaders/include/darker_light.glsl")
+    assert b"sofronPackDarkLight" in z.read(
+        "assets/minecraft/shaders/core/lightmap.fsh")
+    assert b"GameTime" in z.read("assets/minecraft/shaders/core/stars.fsh")
     assert b"horizontalChunks" in z.read(
         "assets/minecraft/shaders/core/sofronpack/extended_voxel.vsh")
     cloud_source = pathlib.Path(

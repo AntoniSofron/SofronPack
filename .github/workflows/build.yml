@@ -40,6 +40,11 @@ jobs:
           python3 scripts/check_grounded_mountains.py
       - name: Verify JAR
         run: python3 tools/verify_jar.py
+      - name: Stage the freshly compiled JAR
+        run: |
+          version=$(grep '^mod_version=' gradle.properties | cut -d= -f2-)
+          mkdir -p dist
+          cp "build/libs/26.3-SofronPack-v${version}.jar" dist/
       - name: Test wild rice
         timeout-minutes: 9
         run: python3 scripts/wild_rice_smoke.py
@@ -54,7 +59,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: 26.3-SofronPack-v${{ steps.version.outputs.version }}
-          path: dist/*.jar
+          path: dist/26.3-SofronPack-v${{ steps.version.outputs.version }}.jar
           if-no-files-found: error
           retention-days: 30
       - name: Archive JAR
