@@ -12,6 +12,7 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.Property;
 import net.minecraft.world.level.levelgen.SingleThreadedRandomSource;
 import pl.sofron.extended.ExtendedVoxelMesher;
 
@@ -61,9 +62,22 @@ public final class ExtendedVoxelAtlas implements ExtendedVoxelMesher.MaterialRes
     private ExtendedVoxelMesher.MaterialUV[] extract(String name) {
         ExtendedVoxelMesher.MaterialUV[] result = new ExtendedVoxelMesher.MaterialUV[6];
         BlockState state;
+        int bracket = name.indexOf('[');
+        String baseName = bracket < 0 ? name : name.substring(0, bracket);
         try {
-            var id = Identifier.parse(name);
+            var id = Identifier.parse(baseName);
             state = BuiltInRegistries.BLOCK.getValue(id).defaultBlockState();
+            if (bracket >= 0 && name.endsWith("]")) {
+                String attributes = name.substring(bracket + 1, name.length() - 1);
+                for (String assignment : attributes.split(",")) {
+                    int equal = assignment.indexOf('=');
+                    if (equal <= 0) continue;
+                    Property<?> property = state.getBlock().getStateDefinition()
+                            .getProperty(assignment.substring(0, equal));
+                    if (property != null) state = restoreState(
+                            state, property, assignment.substring(equal + 1));
+                }
+            }
         } catch (RuntimeException ex) {
             state = Blocks.STONE.defaultBlockState();
         }
@@ -84,14 +98,14 @@ public final class ExtendedVoxelAtlas implements ExtendedVoxelMesher.MaterialRes
             if (quad == null) {
                 // Fluid blocks have no baked block-state model, so load the
                 // genuine vanilla fluid sprite from the active texture pack.
-                String spriteName = name.contains("water") ? "minecraft:block/water_still" :
-                        name.contains("lava") ? "minecraft:block/lava_still" : null;
+                String spriteName = baseName.equals("minecraft:water") ? "minecraft:block/water_still" :
+                        baseName.equals("minecraft:lava") ? "minecraft:block/lava_still" : null;
                 if (spriteName != null) {
                     var texture = (TextureAtlas)Minecraft.getInstance().getTextureManager()
                             .getTexture(Identifier.parse("minecraft:textures/atlas/blocks.png"));
                     TextureAtlasSprite sprite = texture.getSprite(Identifier.parse(spriteName));
                     if (sprite != null) {
-                        int tint = name.contains("water") ? -1 : 0xffffff;
+                        int tint = baseName.equals("minecraft:water") ? -1 : 0xffffff;
                         result[i] = new ExtendedVoxelMesher.MaterialUV(
                                 sprite.getU0(), sprite.getV0(), sprite.getU1(), sprite.getV1(),
                                 tint, true);
@@ -120,6 +134,12 @@ public final class ExtendedVoxelAtlas implements ExtendedVoxelMesher.MaterialRes
                     u0 + eU, v0 + eV, u1 - eU, v1 - eV, tint, translucent);
         }
         return result;
+    }
+
+    /** Restore vanilla and modded block-state properties from persistent LOD. */
+    private static <T extends Comparable<T>> BlockState restoreState(
+            BlockState state, Property<T> property, String value) {
+        return property.getValue(value).map(parsed -> state.setValue(property, parsed)).orElse(state);
     }
 
     private static int faceIndex(Direction direction) {
