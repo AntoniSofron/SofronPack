@@ -91,7 +91,7 @@ public final class ExtendedVoxelAtlas implements ExtendedVoxelMesher.MaterialRes
                             .getTexture(Identifier.parse("minecraft:textures/atlas/blocks.png"));
                     TextureAtlasSprite sprite = texture.getSprite(Identifier.parse(spriteName));
                     if (sprite != null) {
-                        int tint = name.contains("water") ? 0x3F76E4 : 0xffffff;
+                        int tint = name.contains("water") ? -1 : 0xffffff;
                         result[i] = new ExtendedVoxelMesher.MaterialUV(
                                 sprite.getU0(), sprite.getV0(), sprite.getU1(), sprite.getV1(),
                                 tint, true);
@@ -112,13 +112,9 @@ public final class ExtendedVoxelAtlas implements ExtendedVoxelMesher.MaterialRes
             // high mip levels. Quad UVs are directly from the resource pack.
             float eU = (u1 - u0) / 256f;
             float eV = (v1 - v0) / 256f;
-            int tint = 0xffffff;
-            if (quad.materialInfo().isTinted()) {
-                String block = name.toLowerCase(java.util.Locale.ROOT);
-                if (block.contains("leaves") || block.contains("vine")) tint = 0x69A94E;
-                else if (block.contains("grass") || block.contains("fern")) tint = 0x81B657;
-                else if (block.contains("water")) tint = 0x3F76E4;
-            }
+            // -1 requests the stored, actual biome tint for each chunk.
+            // No fixed "fake grass/leaf colour" survives in the material table.
+            int tint = quad.materialInfo().isTinted() ? -1 : 0xffffff;
             boolean translucent = quad.materialInfo().layer() != ChunkSectionLayer.SOLID;
             result[i] = new ExtendedVoxelMesher.MaterialUV(
                     u0 + eU, v0 + eV, u1 - eU, v1 - eV, tint, translucent);
