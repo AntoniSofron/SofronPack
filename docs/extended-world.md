@@ -14,11 +14,12 @@ been removed: triangles with synthetic map colours are no longer used.
   so texture packs are used. Model/atlas caches are reset when resource packs
   change. For some complex shapes, flowers, fluids and block entities, the
   representation is still approximate.
-* The mesher culls internal faces and uses LOD cube sizes of 1, 2, or 4 blocks
+* The mesher culls internal faces and uses LOD cube sizes of 1, 2, 4, 8, or 16 blocks
   according to distance. Near distance chunks are rendered **only by the
   original Minecraft/Sodium renderer**, avoiding double-rendering.
-* Each four-by-four-chunk group is a reusable GPU buffer. At most one far tile
-  is rebuilt per frame; unchanged tiles are not re-uploaded. The renderer
+* Each four-by-four-chunk group is a reusable GPU buffer. The renderer
+  budgets up to 24 tile updates per frame with a 5 ms target for mesh work.
+  Previously visible buffers remain until their replacement is uploaded. The renderer
   uses RenderPearl and a depth-tested position/UV/colour pipeline sampling
   Minecraft's block texture atlas.
 * The far projection extends to 128 chunks without changing the normal render
@@ -26,9 +27,11 @@ been removed: triangles with synthetic map colours are no longer used.
 
 ## Persistence / gameplay
 
-* Integrated single-player worlds generate new full chunks gradually up to a
-  128-chunk radius, at most one asynchronous FULL-chunk request at a time and
-  one new attempt every four server ticks. Existing generated terrain is loaded.
+* Integrated single-player worlds generate FULL chunks gradually out to a
+  128-chunk radius, with at most 12 pending requests and a busy-server
+  backoff. Two daemon workers compress captured immutable voxel volumes,
+  keeping zlib off the integrated server's tick thread. Gameplay simulation
+  distance is unchanged.
 * The persistent distant voxel cache lives in the save's
   `sofronpack-extended-world/*.voxel.v4.bin` files, separately by dimension.
   It uses compressed material indices, full block-state property strings, versioned records, checksums and per-chunk real biome grass, foliage and water tints. Old
@@ -81,9 +84,10 @@ be 100x faster.
 ## Cloud layers
 
 The Overworld renders three independent textured cloud decks at Y=256, 384 and
-512. The cloud shader keeps them visibly pale/white, with a light pastel
-biome-sky influence only on the underside. The earlier 50% fog-colour wash was
-removed because it made clouds look like tinted sky.
+512. The upper surfaces remain bright; only the underside and lower part of
+the side walls gain a restrained biome-sky hue. The blend incorporates 70%
+white before applying at most 60% to the underside, so no full face is painted
+the raw sky colour.
 
 
 ## Shared biome/weather/cave fog (v0.1.36)
@@ -109,3 +113,42 @@ loading and simulation remain unchanged. Custom environmental fog still
 shortens visibility equally on both renderers. The environmental fog
 selection acts as a toggle, not a second opacity multiplier: smoothly
 blended biome fog distances are already taken into account on the CPU.
+
+## v0.1.37 — progressive first paint, single fog and bounded snapshot encoding
+
+* **Preview first:** when a tile is newly visible and its final voxel step
+  would be 1 or 2 blocks, the renderer initially uses 4-block voxels. This
+  performs up to 64x fewer voxel-grid visits for the *initial mesh only*;
+  the stored source volume remains exact. The mesh is then upgraded to its
+  correct distance-dependent resolution without requiring camera movement.
+  The scheduler prioritizes close previews, close upgrades, far previews,
+  then far upgrades. If a coarse sample contains no geometry, the mesher
+  retries at the exact detail so content is never permanently lost.
+* **Avoid temporary cliffs:** when the neighbouring coarse LOD chunk is
+  genuinely unknown (not merely air), side faces against it are omitted
+  rather than producing giant vertical stone curtains. Full-detail near
+  voxels retain their exact geometry.
+* **One fog environment:** both Minecraft/Sodium and the custom LOD shader
+  consume the same `FogEnvironmentalStart/End`,
+  `FogRenderDistanceStart/End`, and `FogColor`. The LOD additionally
+  maintains its user-requested 16/32/64/96/128 distance gradient.
+  Clear-sky vanilla haze is expanded to the 128-chunk horizon; real biome,
+  rain, thunder and cave fog still brings the end point closer. There is no
+  second LOD-only weather opacity switch, and distant textures retain full
+  alpha regardless of fog conditions.
+* **Independent compression:** source blocks and biome tint are copied on
+  the server thread, then compressed on two bounded daemon threads. Up to
+  12 full-generation tasks plus four near-cache snapshots can remain
+  pending. When the server is healthy, its already-loaded nearby cache can
+  be scanned at up to 2 captures/tick rather than 1 every 5 ticks; heavy
+  tick loads automatically restore the old conservative rate. Known
+  unchanged chunks are sampled infrequently to reduce wasted CPU work.
+* **Benchmark scope:** 64x is the reduction in grid visits for 1-block
+  to 4-block initial meshing; 10x is the increase in the scheduled
+  capture rate of already-loaded nearby chunks (from 4 to 40/sec at 20 TPS).
+  Neither is a measured claim that Minecraft's **new FULL chunk worldgen**
+  is 10x faster. Validate full-world streaming throughput, first visible
+  tile latency, frame times and VRAM on the target computer.
+
+The old distance and caching rules documented above describe historical
+implementations; v0.1.37 takes precedence where they differ.
