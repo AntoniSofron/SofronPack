@@ -56,6 +56,8 @@ public final class ExtendedWorldLodRenderer {
     private static int centerX = Integer.MIN_VALUE, centerZ = Integer.MIN_VALUE;
     private static int lastRenderDistance;
     private static boolean failed;
+    private static boolean loggedFirstUpload;
+    private static boolean loggedFirstDraw;
 
     private record GpuTile(GpuBuffer buffer, int quads) implements AutoCloseable {
         @Override public void close() { buffer.close(); }
@@ -192,6 +194,11 @@ public final class ExtendedWorldLodRenderer {
                 pass.setUniform("DynamicTransforms", transform);
                 pass.setVertexBuffer(0, tile.buffer.slice());
                 pass.drawIndexed(tile.quads * 6, 1, 0, 0, 0);
+                if (!loggedFirstDraw) {
+                    loggedFirstDraw = true;
+                    System.out.println("[SofronPack] Textured Extended World GPU draw issued: "
+                            + tile.quads + " square block faces");
+                }
             }
         } catch (RuntimeException | LinkageError problem) {
             // Defer freeing GPU buffers until the beginning of the next frame.
@@ -257,6 +264,11 @@ public final class ExtendedWorldLodRenderer {
         GpuBuffer buffer = device.createBuffer(() -> "SofronPack Extended World tile",
                 GpuBuffer.USAGE_VERTEX | GpuBuffer.USAGE_COPY_DST, mesh.vertices());
         MESHES.put(ExtendedVoxelStore.pack(tx, tz), new GpuTile(buffer, mesh.quads()));
+        if (!loggedFirstUpload) {
+            loggedFirstUpload = true;
+            System.out.println("[SofronPack] Textured Extended World LOD GPU tile uploaded: "
+                    + mesh.quads() + " square block faces");
+        }
     }
 
     private static void ensureIndices() {
@@ -328,5 +340,6 @@ public final class ExtendedWorldLodRenderer {
         worldGeneration = Long.MIN_VALUE;
         centerX = centerZ = Integer.MIN_VALUE;
         lastRenderDistance = 0;
+        loggedFirstUpload = loggedFirstDraw = false;
     }
 }
