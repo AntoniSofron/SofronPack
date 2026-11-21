@@ -11,7 +11,8 @@ public final class ExtendedWorldOptions {
 
     public static BooleanOptionBuilder build(ConfigBuilder builder) {
         var option = builder.createBooleanOption(Identifier.parse("sofronpack:extended_world"));
-        option.setName(Component.literal("Większy świat (64 chunki)"));
+        option.setName(Component.literal(ExtendedWorldVoxyBridge.available() ? "Większy świat (64 chunki)" : "Większy świat (wymaga Voxy)"));
+        option.setEnabled(ExtendedWorldVoxyBridge.available());
         option.setTooltip(Component.literal("Zwykły zasięg renderowania i aktualizacji pozostaje " +
                 "bez zmian. Odległy teren generuje się stopniowo i trafia do trwałego LOD. " +
                 "Tryb wymaga Voxy jako silnika LOD; nowy teren generowany jest tylko w " +
