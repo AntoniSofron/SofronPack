@@ -169,7 +169,7 @@ public final class AtmospherePresets {
 
     public static void addLayers(EnvironmentAttributeSystem.Builder builder, ClientLevel level) {
         if (!level.dimension().equals(net.minecraft.world.level.Level.OVERWORLD)) return;
-        builder.addConstantLayer(EnvironmentAttributes.CLOUD_HEIGHT, base -> 320f);
+        builder.addConstantLayer(EnvironmentAttributes.CLOUD_HEIGHT, base -> 256f);
         if (!ENABLED) return;
         builder.addPositionalLayer(EnvironmentAttributes.FOG_COLOR,
                 (base, pos, weights) -> mixColor(level, pos, base, false));
