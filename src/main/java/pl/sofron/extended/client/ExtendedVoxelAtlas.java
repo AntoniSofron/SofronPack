@@ -28,6 +28,7 @@ import java.util.Map;
  */
 public final class ExtendedVoxelAtlas implements ExtendedVoxelMesher.MaterialResolver {
     private final Map<String, ExtendedVoxelMesher.MaterialUV[]> materials = new HashMap<>();
+    private final Map<String, ExtendedVoxelMesher.ModelFace[]> shapes = new HashMap<>();
     private Object previousModels;
     private static final Direction[] FACES = {
             Direction.UP, Direction.DOWN, Direction.NORTH, Direction.SOUTH,
@@ -36,6 +37,7 @@ public final class ExtendedVoxelAtlas implements ExtendedVoxelMesher.MaterialRes
 
     public void clear() {
         materials.clear();
+        shapes.clear();
         previousModels = null;
     }
 
@@ -52,7 +54,7 @@ public final class ExtendedVoxelAtlas implements ExtendedVoxelMesher.MaterialRes
         Minecraft mc = Minecraft.getInstance();
         var models = mc.getModelManager().getBlockStateModelSet();
         if (previousModels != models) {
-            materials.clear();
+            clear();
             previousModels = models;
         }
         ExtendedVoxelMesher.MaterialUV[] faces = materials.computeIfAbsent(id, this::extract);
@@ -71,7 +73,15 @@ public final class ExtendedVoxelAtlas implements ExtendedVoxelMesher.MaterialRes
                     table.computeIfAbsent(name, id -> materials.computeIfAbsent(id, this::extract));
             }
         }
-        return (name, direction) -> table.get(name)[faceIndex(direction)];
+        Map<String, ExtendedVoxelMesher.ModelFace[]> models = new HashMap<>();
+        for (String id : table.keySet()) {
+            var shape = shapes.get(id);
+            if (shape != null) models.put(id, shape);
+        }
+        return new ExtendedVoxelMesher.MaterialResolver() {
+            public ExtendedVoxelMesher.MaterialUV face(String id, Direction dir) { return table.get(id)[faceIndex(dir)]; }
+            public ExtendedVoxelMesher.ModelFace[] model(String id) { return models.get(id); }
+        };
     }
 
     private ExtendedVoxelMesher.MaterialUV[] extract(String name) {
@@ -99,6 +109,23 @@ public final class ExtendedVoxelAtlas implements ExtendedVoxelMesher.MaterialRes
         var model = Minecraft.getInstance().getModelManager().getBlockStateModelSet().get(state);
         List<BlockStateModelPart> parts = new ArrayList<>();
         model.collectParts(new SingleThreadedRandomSource(42L), parts);
+        if (!parts.isEmpty() && !baseName.equals("minecraft:water") && !baseName.equals("minecraft:lava") && !baseName.equals("minecraft:bubble_column")) {
+            boolean simple = parts.size() == 1 && parts.getFirst().getQuads(null).isEmpty()
+                    && !name.contains("axis=x") && !name.contains("axis=z");
+            if (simple) for (Direction dir : FACES) {
+                var faces = parts.getFirst().getQuads(dir);
+                if (faces.size() != 1 || !wholeFace(faces.getFirst(), dir)) { simple = false; break; }
+            }
+            if (!simple) {
+                List<ExtendedVoxelMesher.ModelFace> baked = new ArrayList<>();
+                for (var part : parts) {
+                    for (Direction dir : FACES)
+                        for (var q : part.getQuads(dir)) baked.add(bake(q, dir, state.getLightEmission()));
+                    for (var q : part.getQuads(null)) baked.add(bake(q, null, state.getLightEmission()));
+                }
+                if (!baked.isEmpty()) shapes.put(name, baked.toArray(ExtendedVoxelMesher.ModelFace[]::new));
+            }
+        }
         for (int i = 0; i < FACES.length; i++) {
             Direction dir = FACES[i];
             BakedQuad quad = null;
@@ -151,6 +178,35 @@ public final class ExtendedVoxelAtlas implements ExtendedVoxelMesher.MaterialRes
                     u0 + eU, v0 + eV, u1 - eU, v1 - eV, tint, translucent, state.getLightEmission());
         }
         return result;
+    }
+
+    private static boolean wholeFace(BakedQuad q, Direction dir) {
+        if (q.direction() != dir) return false;
+        int corners = 0;
+        for (int i = 0; i < 4; i++) {
+            var v = q.position(i);
+            if ((v.x() != 0 && v.x() != 1) || (v.y() != 0 && v.y() != 1)
+                    || (v.z() != 0 && v.z() != 1)) return false;
+            float coordinate = v.x()*dir.getStepX() + v.y()*dir.getStepY() + v.z()*dir.getStepZ();
+            if (coordinate != Math.max(0, dir.getStepX()+dir.getStepY()+dir.getStepZ())) return false;
+            corners |= 1 << ((int)v.x() + 2*(int)v.y() + 4*(int)v.z());
+        }
+        return Integer.bitCount(corners) == 4;
+    }
+
+    private static ExtendedVoxelMesher.ModelFace bake(BakedQuad q, Direction cull, int emission) {
+        float[] vertices = new float[20];
+        for (int i = 0; i < 4; i++) {
+            var v = q.position(i);
+            int n = i * 5;
+            vertices[n] = v.x(); vertices[n+1] = v.y(); vertices[n+2] = v.z();
+            vertices[n+3] = UVPair.unpackU(q.packedUV(i));
+            vertices[n+4] = UVPair.unpackV(q.packedUV(i));
+        }
+        int shade = switch(q.direction()) { case UP -> 255; case DOWN -> 140;
+            case NORTH, SOUTH -> 209; default -> 179; };
+        return new ExtendedVoxelMesher.ModelFace(vertices, q.materialInfo().isTinted() ? -1 : 0xffffff,
+                shade, emission, cull);
     }
 
     /** Restore vanilla and modded block-state properties from persistent LOD. */

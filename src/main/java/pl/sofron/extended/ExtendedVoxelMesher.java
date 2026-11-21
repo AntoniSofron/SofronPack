@@ -30,9 +30,13 @@ public final class ExtendedVoxelMesher {
         }
     }
 
+    /** Baked positions and UVs in groups of four vertices (xyzuv). */
+    public record ModelFace(float[] vertices, int tint, int shade, int emission, Direction cull) {}
+
     @FunctionalInterface
     public interface MaterialResolver {
         MaterialUV face(String blockId, Direction direction);
+        default ModelFace[] model(String blockId) { return null; }
     }
 
     @FunctionalInterface

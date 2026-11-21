@@ -142,7 +142,7 @@ public final class ExtendedWorldLodRenderer {
                 if (outsideHorizon(tx, tz, cx, cz) || tileEntirelyInsideHandoff(tx, tz, cx, cz, distance)) continue;
                 GpuTile current = MESHES.get(key);
                 long wantedDetail = detailAt(tx, tz, cx, cz);
-                boolean detailChanged = current != null && current.detail() != wantedDetail;
+                boolean detailChanged = current != null && current.detail() != -2 && current.detail() != wantedDetail;
                 if ((current == null || first || detailChanged) && hasChunkData(tx, tz)) {
                     markDirty(key);
                 }
@@ -204,8 +204,8 @@ public final class ExtendedWorldLodRenderer {
                 queued.remove(key);
                 if (!DIRTY.contains(key) || pending.containsKey(key)) continue;
                 int tx = (int)(key >> 32), tz = (int)key;
-                DIRTY.remove(key);
                 if (outsideHorizon(tx, tz, cx, cz) || tileEntirelyInsideHandoff(tx, tz, cx, cz, distance)) continue;
+                DIRTY.remove(key);
                 scheduleTile(tx, tz, cx, cz);
                 rebuilt++;
                 trimGpuCache(cx, cz);
@@ -266,8 +266,12 @@ public final class ExtendedWorldLodRenderer {
                                 (float)((long)tz * TILE * 16 - camera.z)),
                         identityTexture);
                 pass.setUniform("DynamicTransforms", transform);
-                pass.setVertexBuffer(0, tile.buffer.slice());
-                pass.drawIndexed(tile.quads * 6, 1, 0, 0, 0);
+                int bytesPerQuad = 4 * ExtendedVoxelMesher.VERTEX_BYTES;
+                for (int first = 0; first < tile.quads; first += MAX_QUADS) {
+                    int count = Math.min(MAX_QUADS, tile.quads - first);
+                    pass.setVertexBuffer(0, tile.buffer.slice((long)first * bytesPerQuad, (long)count * bytesPerQuad));
+                    pass.drawIndexed(count * 6, 1, 0, 0, 0);
+                }
                 if (!loggedFirstDraw) {
                     loggedFirstDraw = true;
                     System.out.println("[SofronPack] Textured Extended World GPU draw issued: "
@@ -403,22 +407,29 @@ public final class ExtendedWorldLodRenderer {
             chunks[i] = ExtendedVoxelStore.get(chunkX, chunkZ);
             if (chunks[i] == null) predictions[i] = ExtendedTerrainPreview.get(chunkX, chunkZ);
             else if (x >= 0 && z >= 0 && x < TILE && z < TILE) real++;
-            levels[i++] = ExtendedLodLevels.ringFor(Math.max(Math.abs(cx - chunkX), Math.abs(cz - chunkZ)));
+            i++;
         }
         var materials = ATLAS.snapshot(chunks);
         var surface = surfaces;
         var volume = volumes;
-        if (preview && real > 0) detail = 0x1_aaaa_aaaaL;
-        boolean decorated = real == TILE * TILE;
+        boolean firstSurface = preview && real > 0 && real < TILE * TILE;
+        if (firstSurface) detail = 0x1_aaaa_aaaaL;
         long resolution = real == 0 ? 0xaaaa_aaaaL : detail;
+        int captured = real;
         var task = CompletableFuture.supplyAsync(() -> {
-            if (!preview && decorated) {
-                var mesh = volume.build(chunks, levels, materials);
-                if (mesh != null) return mesh;
-            }
-            return surface.build(resolution, chunks, materials, tx, tz, predictions);
+            if (firstSurface || captured == 0)
+                return surface.build(resolution, chunks, materials, tx, tz, predictions);
+            // Any finished chunk can refine independently of the other 15 in its tile.
+            var exact = volume.build(chunks, levels, materials);
+            if (captured == TILE * TILE) return exact;
+            var remaining = surface.buildMissing(resolution, chunks, materials, tx, tz, predictions);
+            if (remaining.quads() == 0) return exact;
+            var combined = ByteBuffer.allocateDirect(exact.vertices().remaining() + remaining.vertices().remaining())
+                    .order(ByteOrder.nativeOrder());
+            combined.put(exact.vertices()).put(remaining.vertices()).flip();
+            return new ExtendedVoxelMesher.Mesh(combined, exact.quads() + remaining.quads());
         }, WORKER);
-        pending.put(key, new Pending(detail, task));
+        pending.put(key, new Pending(captured == TILE * TILE ? -2 : detail, task));
     }
 
     private static void finishMeshes(int minX, int maxX, int minZ, int maxZ, int cx, int cz) {
@@ -442,7 +453,7 @@ public final class ExtendedWorldLodRenderer {
                     GpuBuffer.USAGE_VERTEX | GpuBuffer.USAGE_COPY_DST, mesh.vertices());
             GpuTile previous = MESHES.put(key, new GpuTile(buffer, mesh.quads(), job.detail));
             if (previous != null) previous.close();
-            if (job.detail != detailAt(tx, tz, cx, cz)) markDirty(key);
+            if (job.detail != -2 && job.detail != detailAt(tx, tz, cx, cz)) markDirty(key);
             if (!loggedFirstUpload) {
                 loggedFirstUpload = true;
                 System.out.println("[SofronPack] Textured Extended World LOD GPU tile uploaded: "

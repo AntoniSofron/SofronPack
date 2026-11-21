@@ -17,21 +17,24 @@ public final class ExtendedVolumeMesh {
             Direction.SOUTH, Direction.WEST, Direction.EAST};
     private static final int[] SHADE = {255, 140, 209, 209, 179, 179};
     private final LinkedHashMap<Long, Volume> cache = new LinkedHashMap<>(128, .75f, true);
-    private final ByteBuffer staging = ByteBuffer.allocate(ExtendedVoxelMesher.MAX_QUADS
+    private ByteBuffer staging = ByteBuffer.allocate(ExtendedVoxelMesher.MAX_QUADS
             * 4 * ExtendedVoxelMesher.VERTEX_BYTES).order(ByteOrder.nativeOrder());
 
     private static final class Volume {
         final VoxelChunk source;
         final short[][] cells = new short[3][];
         final int[] opacity;
+        final ExtendedVoxelMesher.ModelFace[][] shapes;
         final int top;
         Volume(VoxelChunk source, MaterialResolver materials) {
             this.source = source;
             cells[0] = source.unpack();
             opacity = new int[source.palette().length];
+            shapes = new ExtendedVoxelMesher.ModelFace[opacity.length][];
             for (int i = 1; i < opacity.length; i++) {
                 MaterialUV uv = materials.face(source.palette()[i], Direction.UP);
-                opacity[i] = uv == null ? 0 : uv.translucent() ? 1 : 2;
+                shapes[i] = materials.model(source.palette()[i]);
+                opacity[i] = shapes[i] != null ? 1 : uv == null ? 0 : uv.translucent() ? 1 : 2;
             }
             int end = cells[0].length;
             while (end > 0 && cells[0][end - 1] == 0) end--;
@@ -71,7 +74,13 @@ public final class ExtendedVolumeMesh {
         }
     }
 
-    /** Null asks the caller to retain a complete surface mesh for exceptionally complex tiles. */
+    private void reserveQuad() {
+        if (staging.remaining() >= 4 * ExtendedVoxelMesher.VERTEX_BYTES) return;
+        var larger = ByteBuffer.allocate(Math.multiplyExact(staging.capacity(), 2)).order(ByteOrder.nativeOrder());
+        larger.put(staging.flip());
+        staging = larger;
+    }
+
     public Mesh build(VoxelChunk[] chunks, int[] levels, MaterialResolver materials) {
         Volume[] data = new Volume[chunks.length];
         for (int i = 0; i < chunks.length; i++) {
@@ -107,6 +116,11 @@ public final class ExtendedVolumeMesh {
                             int z = (face < 2 ? row : face < 4 ? slice : col) * step;
                             short id = v.get(x, y, z, level);
                             if (id == 0 || v.opacity[id] == 0) { scan.putNext(0); continue; }
+                            if (level == 0 && v.shapes[id] != null) {
+                                if (face == 0) emitModel(data, owner, cx, cz, x, y, z, id);
+                                scan.putNext(0);
+                                continue;
+                            }
                             int nx = x, ny = y, nz = z;
                             switch (face) {
                                 case 0 -> ny++;
@@ -118,7 +132,7 @@ public final class ExtendedVolumeMesh {
                             }
                             int neighbor = owner + (nx >> 4) + (nz >> 4) * (TILE + 2);
                             Volume other = data[neighbor];
-                            boolean visible = other == null && ExtendedSurfaceMesh.water(v.source.palette()[id]);
+                            boolean visible = other == null;
                             if (other != null) {
                                 int adjacent = levels[neighbor];
                                 if (face >= 2 && adjacent < level) {
@@ -133,10 +147,8 @@ public final class ExtendedVolumeMesh {
                             scan.putNext(visible ? id : 0);
                         }
                         scan.endRow();
-                        if (scan.overflow) return null;
                     }
                     scan.finish();
-                    if (scan.overflow) return null;
                 }
             }
         }
@@ -144,6 +156,29 @@ public final class ExtendedVolumeMesh {
         var vertices = ByteBuffer.allocateDirect(staging.remaining()).order(ByteOrder.nativeOrder());
         vertices.put(staging).flip();
         return new Mesh(vertices, vertices.remaining() / (4 * ExtendedVoxelMesher.VERTEX_BYTES));
+    }
+
+    private void emitModel(Volume[] data, int owner, int cx, int cz, int x, int y, int z, short id) {
+        Volume v = data[owner];
+        for (var face : v.shapes[id]) {
+            var dir = face.cull();
+            if (dir != null) {
+                int nx = x + dir.getStepX(), nz = z + dir.getStepZ();
+                Volume next = data[owner + (nx >> 4) + (nz >> 4) * (TILE + 2)];
+                if (next != null && next.opacity[next.get(nx, y + dir.getStepY(), nz, 0)] == 2) continue;
+            }
+            reserveQuad();
+            int rgb = ExtendedSurfaceMesh.color(v.source.grassTint(), v.source.foliageTint(),
+                    v.source.waterTint(), v.source.palette()[id], face.tint());
+            var p = face.vertices();
+            for (int i = 0; i < 20; i += 5) {
+                staging.putFloat(cx * 16 + x + p[i]).putFloat(v.source.minY() + y + p[i+1])
+                        .putFloat(cz * 16 + z + p[i+2]).putFloat(p[i+3]).putFloat(p[i+4])
+                        .put((byte)((rgb >> 16 & 255) * face.shade() / 255))
+                        .put((byte)((rgb >> 8 & 255) * face.shade() / 255))
+                        .put((byte)((rgb & 255) * face.shade() / 255)).put((byte)(128 + face.emission()));
+            }
+        }
     }
 
     private static boolean exposed(Volume own, short id, Volume next, short other) {
@@ -156,7 +191,6 @@ public final class ExtendedVolumeMesh {
         final MaterialResolver materials;
         final int face, ox, oz, step;
         int slice;
-        boolean overflow;
 
         Plane(Volume v, MaterialResolver materials, int face, int ox, int oz, int step) {
             this.v = v; this.materials = materials; this.face = face;
@@ -167,7 +201,7 @@ public final class ExtendedVolumeMesh {
             String name = v.source.palette()[(int)key];
             var uv = materials.face(name, FACES[face]);
             if (uv == null) return;
-            if (staging.remaining() < 4 * ExtendedVoxelMesher.VERTEX_BYTES) { overflow = true; return; }
+            reserveQuad();
             int tint = ExtendedSurfaceMesh.color(v.source.grassTint(), v.source.foliageTint(), v.source.waterTint(), name, uv.tint());
             int shade = SHADE[face];
             float u = ExtendedSurfaceMesh.packUv(uv.u0(), uv.u1()), t = ExtendedSurfaceMesh.packUv(uv.v0(), uv.v1());

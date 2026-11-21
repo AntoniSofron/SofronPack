@@ -115,6 +115,16 @@ public final class ExtendedSurfaceMesh {
 
     public Mesh build(long detailMap, VoxelChunk[] chunks, MaterialResolver materials,
                       int tx, int tz, ExtendedTerrainPreview.Tile[] previews) {
+        return build(detailMap, chunks, materials, tx, tz, previews, false);
+    }
+
+    public Mesh buildMissing(long detailMap, VoxelChunk[] chunks, MaterialResolver materials,
+                             int tx, int tz, ExtendedTerrainPreview.Tile[] previews) {
+        return build(detailMap, chunks, materials, tx, tz, previews, true);
+    }
+
+    private Mesh build(long detailMap, VoxelChunk[] chunks, MaterialResolver materials,
+                       int tx, int tz, ExtendedTerrainPreview.Tile[] previews, boolean missingOnly) {
         Columns[] data = new Columns[chunks.length];
         for (int i = 0; i < chunks.length; i++) {
             VoxelChunk chunk = chunks[i];
@@ -138,7 +148,7 @@ public final class ExtendedSurfaceMesh {
             int detail = 1 << (int)((detailMap >>> (2 * (cz * TILE + cx))) & 3);
             int ox = cx * 16, oz = cz * 16;
             Columns own = owner(data, ox, oz);
-            if (own == null) continue;
+            if (own == null || (missingOnly && own.source != null)) continue;
             var tops = new ScanMesher2D() {
                 @Override protected void emitQuad(int x, int z, int length, int width, long key) {
                     int column = own.column(x * detail, z * detail, detail);
