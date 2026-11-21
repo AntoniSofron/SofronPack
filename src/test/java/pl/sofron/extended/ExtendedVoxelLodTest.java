@@ -26,6 +26,20 @@ class ExtendedVoxelLodTest {
         assertEquals(0x256db1, restored.waterTint());
     }
 
+    @Test void offThreadCapturedSnapshotProducesTheSamePersistentFormat() {
+        short[] cells = new short[ExtendedVoxelStore.GRID * ExtendedVoxelStore.GRID * 2];
+        cells[3] = 1;
+        cells[50] = 2;
+        var raw = new ExtendedVoxelStore.CapturedVoxel(15, -8, -64, 2,
+                0x45a457, 0x66a951, 0x3777e4,
+                new String[]{"minecraft:air", "minecraft:stone", "minecraft:oak_leaves"}, cells);
+        var encoded = java.util.concurrent.CompletableFuture.supplyAsync(raw::encode).join();
+        assertArrayEquals(cells, encoded.unpack());
+        assertEquals(15, encoded.chunkX());
+        assertEquals(-8, encoded.chunkZ());
+        assertArrayEquals(raw.palette(), encoded.palette());
+    }
+
     @Test void blockStatePaletteKeepsDistinctLogOrientationsAfterReload() throws Exception {
         short[] cells = new short[ExtendedVoxelStore.GRID * ExtendedVoxelStore.GRID];
         cells[0] = 1;

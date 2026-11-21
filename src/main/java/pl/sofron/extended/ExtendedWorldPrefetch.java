@@ -10,6 +10,11 @@ import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.level.storage.LevelResource;
 import pl.sofron.extended.mixin.ExtendedChunkFutureAccess;
 
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
+
 /**
  * The only producer of previously unseen distant terrain. Minecraft generates
  * real chunks once through its own asynchronous pipeline; SofronPack stores a
@@ -19,6 +24,12 @@ public final class ExtendedWorldPrefetch {
     private static final int RADIUS = ExtendedWorldConfig.DISTANT_RADIUS_CHUNKS;
     private static final long[] OFFSETS = spiralOffsets(RADIUS);
     private static final int MAX_PENDING = 12;
+    private static final AtomicInteger ENCODER_THREADS = new AtomicInteger();
+    private static final ExecutorService ENCODERS = Executors.newFixedThreadPool(2, task -> {
+        Thread thread = new Thread(task, "SofronPack-LOD-Encode-" + ENCODER_THREADS.incrementAndGet());
+        thread.setDaemon(true);
+        return thread;
+    });
     private static int ticks, cursor, nearbyCursor;
     private static int pending;
     private static int centerX = Integer.MIN_VALUE, centerZ = Integer.MIN_VALUE;
@@ -98,15 +109,36 @@ public final class ExtendedWorldPrefetch {
                     var future = ((ExtendedChunkFutureAccess)level.getChunkSource())
                             .sofron$getChunkFuture(x, z, ChunkStatus.FULL, true);
                     future.whenComplete((result, error) -> server.execute(() -> {
+                        // Keep the pending slot until the *entire* snapshot is
+                        // compressed and published. This bounds memory and
+                        // worker queue depth even during rapid camera motion.
+                        final boolean[] encoding = {false};
                         try {
                             if (expectedLevel != lastLevel || error != null || result == null) return;
                             result.ifSuccess(chunk -> {
                                 if (chunk instanceof LevelChunk full) {
-                                    ExtendedVoxelStore.put(ExtendedVoxelStore.sample(expectedLevel, full));
+                                    var captured = ExtendedVoxelStore.capture(expectedLevel, full);
+                                    CompletableFuture.supplyAsync(captured::encode, ENCODERS)
+                                            .whenComplete((encoded, failure) -> server.execute(() -> {
+                                                try {
+                                                    if (expectedLevel != lastLevel) return;
+                                                    if (failure != null) {
+                                                        System.err.println("[SofronPack] Distant voxel encode: "
+                                                                + failure.getMessage());
+                                                    } else if (encoded != null) {
+                                                        ExtendedVoxelStore.put(encoded);
+                                                    }
+                                                } finally {
+                                                    if (expectedLevel == lastLevel)
+                                                        pending = Math.max(0, pending - 1);
+                                                }
+                                            }));
+                                    encoding[0] = true;
                                 }
                             });
                         } finally {
-                            if (expectedLevel == lastLevel) pending = Math.max(0, pending - 1);
+                            if (!encoding[0] && expectedLevel == lastLevel)
+                                pending = Math.max(0, pending - 1);
                         }
                     }));
                 } catch (RuntimeException failure) {
