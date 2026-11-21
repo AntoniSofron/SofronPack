@@ -106,13 +106,13 @@ with zipfile.ZipFile(jar) as z:
     assert b"FogEnvironmentalStart" in extended_shader
     assert b"FogEnvironmentalEnd" in extended_shader
     assert b"FogRenderDistanceEnd" not in extended_shader
-    assert b"atmosphereBlend" in extended_shader
     assert b"sphericalBlocks" in extended_shader
-    assert b"environmentFog" in extended_shader
-    assert b"max(baseFog, unifiedEnvironment)" in extended_shader
-    assert b"step(0.001, atmosphereBlend)" in extended_shader
+    assert b"cylindricalBlocks" in extended_shader
+    assert b"FogRenderDistanceStart" in extended_shader
+    assert b"linear_fog_value" in extended_shader
+    assert b"max(baseFog, nativeFog)" in extended_shader
     cloud_vertex = z.read("assets/minecraft/shaders/core/sofronpack/clouds.vsh")
-    assert b"0.96 * underside" in cloud_vertex
+    assert b"0.60 * underside" in cloud_vertex
     assert b"ColorModulator.rgb" in cloud_vertex
     assert b"sofronPackDarkLight" in z.read(
         "assets/sofronpack/shaders/include/darker_light.glsl")
@@ -121,12 +121,13 @@ with zipfile.ZipFile(jar) as z:
     assert b"GameTime" in z.read("assets/minecraft/shaders/core/stars.fsh")
     lod_vertex = z.read("assets/minecraft/shaders/core/sofronpack/extended_voxel.vsh")
     assert b"horizontalChunks" in lod_vertex
-    assert b"atmosphereBlend = ColorModulator.a" in lod_vertex
+    assert b"cylindricalBlocks" in lod_vertex
     fog_mixin_source = pathlib.Path(
         "src/main/java/pl/sofron/extended/mixin/ExtendedWorldFogMixin.java").read_text()
-    assert "fog.renderDistanceStart = 16f * 16f" in fog_mixin_source
+    assert "fog.renderDistanceStart = start" in fog_mixin_source
+    assert "AtmospherePresets.distantFogBlend()" in fog_mixin_source
     assert "Unified Extended World fog active" in fog_mixin_source
-    assert "fog.renderDistanceEnd = ExtendedWorldConfig.DISTANT_RADIUS_CHUNKS * 16f" in fog_mixin_source
+    assert "fog.renderDistanceEnd = end" in fog_mixin_source
     assert b"sphericalBlocks = length(relative)" in lod_vertex
     atmosphere_source = pathlib.Path(
         "src/main/java/pl/sofron/atmosphere/AtmospherePresets.java").read_text()

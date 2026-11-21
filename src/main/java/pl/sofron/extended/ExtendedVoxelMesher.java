@@ -173,6 +173,11 @@ public final class ExtendedVoxelMesher {
                     float bz = z * ExtendedVoxelStore.CELL;
                     for (int face = 0; face < 6; face++) {
                         if ((visible & (1 << face)) == 0) continue;
+                        // Unknown neighbours are NOT air. Otherwise missing
+                        // distant snapshots paint huge vertical stone walls
+                        // around every partial tile during streaming.
+                        if (face >= 2 && unknownHorizontalNeighbour(
+                                chunks, x, z, detail, face, side)) continue;
                         var dir = switch (face) {
                             case 0 -> Direction.UP;
                             case 1 -> Direction.DOWN;
@@ -207,6 +212,18 @@ public final class ExtendedVoxelMesher {
         }
         data.flip();
         return new Mesh(data.slice().order(ByteOrder.nativeOrder()), rendered);
+    }
+
+    private static boolean unknownHorizontalNeighbour(
+            Decoded[] chunks, int x, int z, int detail, int face, int side) {
+        int xx = x + (face == 4 ? -detail : face == 5 ? detail : 0);
+        int zz = z + (face == 2 ? -detail : face == 3 ? detail : 0);
+        int grid = ExtendedVoxelStore.GRID;
+        if (xx < -grid || zz < -grid || xx >= side + grid || zz >= side + grid)
+            return true;
+        int localX = Math.floorDiv(xx, grid) + 1;
+        int localZ = Math.floorDiv(zz, grid) + 1;
+        return chunks[localZ * (TILE_CHUNKS + 2) + localX] == null;
     }
 
     /** Test presence of a block; water and leaves remain separate textured voxels. */

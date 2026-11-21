@@ -122,15 +122,16 @@ void main() {
     // The sky sample follows the blended surface biomes even while flying.
     // Only undersides and the lower portion of side faces take that hue.
     // Blending toward white keeps the cloud distinguishable from the sky.
+    // Only the bottom face and LOWER edge of the cloud sides take the
+    // current biome's sky hue. Even there, white remains the dominant
+    // component: the underside must be recognisably cloud, not sky.
     float underside = direction == 0 ? 1.0
         : direction == 1 ? 0.0
-        : 0.80 * (1.0 - faceVertex.y);
+        : 0.62 * (1.0 - faceVertex.y);
     vec3 sky = clamp(ColorModulator.rgb, vec3(0.0), vec3(1.0));
-    // A small white component keeps edges cloud-like while 80% of their
-    // underside hue follows the smoothly blended camera biome sky.
-    vec3 skyWhite = mix(sky, vec3(1.0), 0.20);
+    vec3 paleSky = mix(sky, vec3(1.0), 0.70);
     undersideTint = ColorModulator.a < 0.0
-        ? mix(vec3(1.0), skyWhite, 0.96 * underside)
+        ? mix(vec3(1.0), paleSky, 0.60 * underside)
         : vec3(1.0);
     PlayerPos = pos;
 

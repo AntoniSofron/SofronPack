@@ -84,6 +84,26 @@ class ExtendedVoxelLodTest {
         assertEquals(5, mesh.quads(), "Face shared with a neighbouring LOD tile must be culled");
     }
 
+    @Test void aMissingNeighbourDoesNotCreateAFalseStoneWall() {
+        int grid = ExtendedVoxelStore.GRID;
+        short[] cells = new short[grid * grid * 16];
+        // A full column at the eastern edge of a source chunk; the chunk
+        // east of it is not generated yet, so there is no wall to invent.
+        for (int y = 0; y < 16; y++) cells[(y * grid + 8) * grid + 15] = 1;
+        var voxel = ExtendedVoxelStore.encode(3, 0, 0, 16,
+                new String[]{"minecraft:air", "minecraft:stone"}, cells);
+        int[] eastFaces = {0};
+        var material = new ExtendedVoxelMesher.MaterialUV(0, 0, 1, 1, 0xffffff, false);
+        var result = ExtendedVoxelMesher.build(0, 0, 20, 20, 12, 64, 1,
+                (x, z) -> x == 3 && z == 0 ? voxel : null,
+                (name, face) -> {
+                    if (face == Direction.EAST) eastFaces[0]++;
+                    return material;
+                });
+        assertTrue(result.quads() > 0);
+        assertEquals(0, eastFaces[0], "Unloaded east neighbour must not become a vertical wall");
+    }
+
     @Test void normalRenderRangeKeepsPriority() {
         short[] cells = new short[ExtendedVoxelStore.GRID * ExtendedVoxelStore.GRID];
         Arrays.fill(cells, (short)1);

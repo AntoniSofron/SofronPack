@@ -173,6 +173,7 @@ public final class ExtendedWorldLodRenderer {
                 // near-resolution rebuilds stalling the render thread.
                 if (rebuilt > 0 && System.nanoTime() >= meshDeadline) break;
                 Long best = null;
+                int bestPass = Integer.MAX_VALUE;
                 double nearest = Double.POSITIVE_INFINITY;
                 for (long key : DIRTY) {
                     int tx = (int)(key >> 32), tz = (int)key;
@@ -181,7 +182,14 @@ public final class ExtendedWorldLodRenderer {
                     double dx = (long)tx * TILE * 16 + TILE * 8 - px;
                     double dz = (long)tz * TILE * 16 + TILE * 8 - pz;
                     double distanceSq = dx * dx + dz * dz;
-                    if (distanceSq < nearest) { nearest = distanceSq; best = key; }
+                    // Fill holes FIRST with cheap coarse meshes before
+                    // spending multiple frames refining already-visible tiles.
+                    int pass = MESHES.containsKey(key) ? 1 : 0;
+                    if (pass < bestPass || (pass == bestPass && distanceSq < nearest)) {
+                        bestPass = pass;
+                        nearest = distanceSq;
+                        best = key;
+                    }
                 }
                 if (best == null) break;
                 DIRTY.remove(best);
@@ -296,7 +304,10 @@ public final class ExtendedWorldLodRenderer {
         int dx = Math.abs(tx * TILE + TILE / 2 - cx);
         int dz = Math.abs(tz * TILE + TILE / 2 - cz);
         int range = Math.max(dx, dz);
-        int detail = ExtendedLodLevels.voxelSize(range);
+        int wantedDetail = ExtendedLodLevels.voxelSize(range);
+        long key = ExtendedVoxelStore.pack(tx, tz);
+        boolean firstPaint = !MESHES.containsKey(key);
+        int detail = firstPaint ? ExtendedLodLevels.firstPaintVoxelSize(range) : wantedDetail;
         var client = Minecraft.getInstance().level;
         var mesh = ExtendedVoxelMesher.build(tx, tz, cx, cz, near, FAR, detail,
                 ExtendedVoxelStore::get, ATLAS,
@@ -307,9 +318,13 @@ public final class ExtendedWorldLodRenderer {
         if (mesh.quads() == 0) return;
         GpuBuffer buffer = device.createBuffer(() -> "SofronPack Extended World tile",
                 GpuBuffer.USAGE_VERTEX | GpuBuffer.USAGE_COPY_DST, mesh.vertices());
-        GpuTile previous = MESHES.put(ExtendedVoxelStore.pack(tx, tz),
-                new GpuTile(buffer, mesh.quads(), detail));
+        GpuTile previous = MESHES.put(key, new GpuTile(buffer, mesh.quads(), detail));
         if (previous != null) previous.close();
+        if (detail != wantedDetail) {
+            // The cheap preview is visible now; refine when there are no
+            // missing visible tiles left to fill. No camera movement needed.
+            DIRTY.add(key);
+        }
         if (!loggedFirstUpload) {
             loggedFirstUpload = true;
             System.out.println("[SofronPack] Textured Extended World LOD GPU tile uploaded: "
