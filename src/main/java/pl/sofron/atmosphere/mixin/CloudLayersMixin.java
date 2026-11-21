@@ -21,49 +21,24 @@ import org.spongepowered.asm.mixin.injection.Constant;
 import org.spongepowered.asm.mixin.injection.ModifyConstant;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import pl.sofron.atmosphere.CloudBandLayout;
 
-/**
- * Three independent textured cloud volumes at Y=256, 384 and 512. All of them
- * reuse the existing pack-defined cloud texture and the current sky biome
- * sample. Auxiliary renderers never create their own children.
- */
 @Mixin(CloudRenderer.class)
 abstract class CloudLayersMixin {
     @Shadow private CloudRenderer.TextureData texture;
     @Shadow private int quadCount;
     @Shadow protected abstract void render(RenderPass pass, RenderPipeline pipeline);
 
-    @Unique private CloudRenderer sofron$middle;
-    @Unique private CloudRenderer sofron$high;
-    @Unique private boolean sofron$isAuxiliary;
+    @Unique private CloudRenderer[] sofron$extra;
+    @Unique private int sofron$farIndex;
+    @Unique private double sofron$cameraY;
+    @Unique private float sofron$baseHeight;
+    @Unique private boolean sofron$isExtra;
     @Unique private boolean sofron$layered;
-    @Unique private float sofron$cameraY;
     @Unique private int sofron$range = -1;
-    @Unique private boolean sofron$loggedBands;
     @Unique private final Vector4f sofron$sky = new Vector4f();
 
     @Unique private static CloudLayersMixin sofron$state(CloudRenderer renderer) {
         return (CloudLayersMixin)(Object)renderer;
-    }
-
-    @Unique private CloudRenderer sofron$createAuxiliary() {
-        CloudRenderer renderer = new CloudRenderer();
-        sofron$state(renderer).sofron$isAuxiliary = true;
-        return renderer;
-    }
-
-    @Unique private void sofron$prepareAuxiliary(CloudRenderer renderer,
-            int color, CloudStatus status, float height, int range, Vec3 camera,
-            long ticks, float partial) {
-        CloudLayersMixin child = sofron$state(renderer);
-        if (child.texture != texture) {
-            child.texture = texture;
-            renderer.markForRebuild();
-        }
-        child.sofron$sky.set(sofron$sky);
-        child.sofron$layered = true;
-        renderer.prepare(color, status, height, range, camera, ticks, partial);
     }
 
     @Inject(method = "prepare(ILnet/minecraft/client/CloudStatus;FILnet/minecraft/world/phys/Vec3;JF)V", at = @At("HEAD"))
@@ -73,35 +48,35 @@ abstract class CloudLayersMixin {
             ((CloudRenderer)(Object)this).markForRebuild();
             sofron$range = range;
         }
-        if (sofron$isAuxiliary) return;
+        if (sofron$isExtra) return;
         var client = Minecraft.getInstance();
-        sofron$layered = texture != null && client.level != null
-                && client.level.dimension().equals(Level.OVERWORLD);
+        sofron$layered = texture != null && client.level != null && client.level.dimension().equals(Level.OVERWORLD);
         if (!sofron$layered) return;
-        if (sofron$middle == null) sofron$middle = sofron$createAuxiliary();
-        if (sofron$high == null) sofron$high = sofron$createAuxiliary();
-
-        var sky = client.gameRenderer.mainCamera().attributeProbe()
-                .getValue(EnvironmentAttributes.SKY_COLOR, partial);
-        // A negative alpha signals that the cloud shader should apply a subtle
-        // palette-aware tint to the UNDERSIDE only, not paint the cloud like sky.
+        if (sofron$extra == null) {
+            System.out.println("[SofronPack] Cloud bands active at Y=256,384,512");
+            sofron$extra = new CloudRenderer[]{new CloudRenderer(), new CloudRenderer()};
+            for (var renderer : sofron$extra) sofron$state(renderer).sofron$isExtra = true;
+        }
+        var sky = client.gameRenderer.mainCamera().attributeProbe().getValue(EnvironmentAttributes.SKY_COLOR, partial);
         sofron$sky.set(sky, -1f);
-        sofron$cameraY = (float) camera.y;
-        sofron$prepareAuxiliary(sofron$middle, color, status, CloudBandLayout.MIDDLE,
-                range, camera, ticks + 19L * 400L, partial);
-        sofron$prepareAuxiliary(sofron$high, color, status, CloudBandLayout.HIGH,
-                range, camera, ticks + 47L * 400L, partial);
-        if (!sofron$loggedBands) {
-            sofron$loggedBands = true;
-            System.out.println("[SofronPack] Cloud bands active at Y="
-                    + (int)CloudBandLayout.LOW + ","
-                    + (int)CloudBandLayout.MIDDLE + ","
-                    + (int)CloudBandLayout.HIGH);
+        sofron$baseHeight = height;
+        sofron$cameraY = camera.y;
+        sofron$farIndex = sofron$distance(1) > sofron$distance(0) ? 1 : 0;
+        for (int i = 0; i < sofron$extra.length; i++) {
+            CloudRenderer renderer = sofron$extra[i];
+            var layer = sofron$state(renderer);
+            if (layer.texture != texture) {
+                layer.texture = texture;
+                renderer.markForRebuild();
+            }
+            layer.sofron$sky.set(sofron$sky);
+            layer.sofron$layered = true;
+            renderer.prepare(color, status, sofron$height(i), range, camera,
+                    ticks + (i == 0 ? 23L : 47L) * 400L, partial);
         }
     }
 
-    // The resource pack doubles the vertical cell size in the vertex shader.
-    // Match the corresponding CPU visibility / face selection.
+    // The pack doubles vertical cell size in the vertex shader. Match CPU face selection.
     @ModifyConstant(method = "prepare(ILnet/minecraft/client/CloudStatus;FILnet/minecraft/world/phys/Vec3;JF)V",
             constant = @Constant(floatValue = 4f, ordinal = 0))
     private float sofron$cloudThickness(float original) {
@@ -111,50 +86,41 @@ abstract class CloudLayersMixin {
     @Redirect(method = {"render(Lnet/minecraft/client/CloudStatus;Lcom/mojang/renderpearl/api/commands/RenderPass;)V", "renderOit"},
             at = @At(value = "FIELD", target = "Lnet/minecraft/client/renderer/CloudRenderer;quadCount:I"))
     private int sofron$visibleQuads(CloudRenderer renderer) {
-        if (!sofron$layered || sofron$isAuxiliary) return quadCount;
-        int count = quadCount;
-        if (sofron$middle != null) count = Math.max(count, sofron$state(sofron$middle).quadCount);
-        if (sofron$high != null) count = Math.max(count, sofron$state(sofron$high).quadCount);
-        return count;
+        if (sofron$layered && sofron$extra != null && quadCount == 0) {
+            for (var layer : sofron$extra) if (sofron$state(layer).quadCount > 0) return 1;
+        }
+        return quadCount;
     }
 
-    @Unique private void sofron$drawAux(RenderPass pass, RenderPipeline pipeline, int band) {
-        CloudRenderer aux = band == 1 ? sofron$middle : sofron$high;
-        if (aux != null && sofron$state(aux).quadCount > 0) {
-            sofron$state(aux).render(pass, pipeline);
+    @Unique private static float sofron$height(int index) {
+        return index == 0 ? 384f : 512f;
+    }
+
+    @Unique private double sofron$distance(int index) {
+        return Math.abs(sofron$cameraY - (sofron$height(index) + 4));
+    }
+
+    @Unique private void sofron$drawExtras(RenderPass pass, RenderPipeline pipeline, boolean beforeBase) {
+        double baseDistance = Math.abs(sofron$cameraY - (sofron$baseHeight + 4));
+        for (int order = 0; order < 2; order++) {
+            int index = order == 0 ? sofron$farIndex : 1 - sofron$farIndex;
+            if ((quadCount == 0 || sofron$distance(index) >= baseDistance) != beforeBase) continue;
+            var layer = sofron$state(sofron$extra[index]);
+            if (layer.quadCount > 0) layer.render(pass, pipeline);
         }
     }
 
     @Inject(method = "render(Lcom/mojang/renderpearl/api/commands/RenderPass;Lcom/mojang/renderpearl/api/pipeline/RenderPipeline;)V",
             at = @At("HEAD"), cancellable = true)
-    private void sofron$drawFarLayers(RenderPass pass, RenderPipeline pipeline, CallbackInfo ci) {
-        if (!sofron$layered || sofron$isAuxiliary || sofron$middle == null || sofron$high == null) return;
-        int[] order = CloudBandLayout.farToNear(sofron$cameraY);
-        if (quadCount == 0) {
-            // Vanilla would skip its own render. The other two layers may still
-            // contain visible banks of clouds and must NOT disappear.
-            for (int band : order) if (band != 0) sofron$drawAux(pass, pipeline, band);
-            ci.cancel();
-            return;
-        }
-        // Draw layers farther from the camera than the base before it, to
-        // preserve proper translucent back-to-front ordering in normal clouds.
-        for (int band : order) {
-            if (band == 0) break;
-            sofron$drawAux(pass, pipeline, band);
-        }
+    private void sofron$farLayer(RenderPass pass, RenderPipeline pipeline, CallbackInfo ci) {
+        if (!sofron$layered || sofron$extra == null) return;
+        sofron$drawExtras(pass, pipeline, true);
+        if (quadCount == 0) ci.cancel();
     }
 
-    @Inject(method = "render(Lcom/mojang/renderpearl/api/commands/RenderPass;Lcom/mojang/renderpearl/api/pipeline/RenderPipeline;)V",
-            at = @At("RETURN"))
-    private void sofron$drawNearLayers(RenderPass pass, RenderPipeline pipeline, CallbackInfo ci) {
-        if (!sofron$layered || sofron$isAuxiliary || sofron$middle == null || sofron$high == null
-                || quadCount == 0) return;
-        boolean baseDrawn = false;
-        for (int band : CloudBandLayout.farToNear(sofron$cameraY)) {
-            if (band == 0) { baseDrawn = true; continue; }
-            if (baseDrawn) sofron$drawAux(pass, pipeline, band);
-        }
+    @Inject(method = "render(Lcom/mojang/renderpearl/api/commands/RenderPass;Lcom/mojang/renderpearl/api/pipeline/RenderPipeline;)V", at = @At("RETURN"))
+    private void sofron$nearLayer(RenderPass pass, RenderPipeline pipeline, CallbackInfo ci) {
+        if (sofron$layered && sofron$extra != null && quadCount > 0) sofron$drawExtras(pass, pipeline, false);
     }
 
     @Redirect(method = "render(Lcom/mojang/renderpearl/api/commands/RenderPass;Lcom/mojang/renderpearl/api/pipeline/RenderPipeline;)V",
@@ -164,22 +130,16 @@ abstract class CloudLayersMixin {
     }
 
     @Inject(method = "endFrame", at = @At("TAIL"))
-    private void sofron$endFrame(CallbackInfo ci) {
-        if (sofron$layered && !sofron$isAuxiliary) {
-            if (sofron$middle != null) sofron$middle.endFrame();
-            if (sofron$high != null) sofron$high.endFrame();
-        }
+    private void sofron$rotate(CallbackInfo ci) {
+        if (sofron$extra != null && sofron$layered)
+            for (var layer : sofron$extra) layer.endFrame();
     }
 
     @Inject(method = "close", at = @At("TAIL"))
     private void sofron$close(CallbackInfo ci) {
-        if (sofron$middle != null) {
-            sofron$middle.close();
-            sofron$middle = null;
-        }
-        if (sofron$high != null) {
-            sofron$high.close();
-            sofron$high = null;
+        if (sofron$extra != null) {
+            for (var layer : sofron$extra) layer.close();
+            sofron$extra = null;
         }
     }
 }

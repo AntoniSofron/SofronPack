@@ -14,8 +14,8 @@ public final class ExtendedLodFog {
         double w = Float.isFinite(strength) ? Math.clamp(strength, 0f, 1f) : 0;
         double a = mix(16, 8, w), b = mix(32, 16, w), c = mix(64, 32, w);
         double d = mix(96, 56, w), e = mix(128, 64, w);
-        if (chunks < a) return 0f;
-        if (chunks < b) return segment(chunks, a, b, 0f, 0.13f);
+        if (chunks < a) return segment(chunks, 0, a, 0f, 0.02f);
+        if (chunks < b) return segment(chunks, a, b, 0.02f, 0.13f);
         if (chunks < c) return segment(chunks, b, c, 0.13f, 0.55f);
         if (chunks < d) return segment(chunks, c, d, 0.55f, 0.85f);
         if (chunks < e) return segment(chunks, d, e, 0.85f, 1f);

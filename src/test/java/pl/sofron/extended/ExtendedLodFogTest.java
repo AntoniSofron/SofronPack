@@ -5,8 +5,8 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class ExtendedLodFogTest {
     @Test void milestoneIntensityIsExactlySpecified() {
-        assertEquals(0f, ExtendedLodFog.opacity(15.99), 0.00001);
-        assertEquals(0f, ExtendedLodFog.opacity(16), 0.00001);
+        assertEquals(0f, ExtendedLodFog.opacity(0), 0.00001);
+        assertEquals(0.02f, ExtendedLodFog.opacity(16), 0.00001);
         assertEquals(0.13f, ExtendedLodFog.opacity(32), 0.00001);
         assertEquals(0.55f, ExtendedLodFog.opacity(64), 0.00001);
         assertEquals(0.85f, ExtendedLodFog.opacity(96), 0.00001);
@@ -15,7 +15,7 @@ class ExtendedLodFogTest {
     }
 
     @Test void badWeatherMovesAllBandsCloserButPreservesSmoothness() {
-        assertEquals(0f, ExtendedLodFog.opacity(8, 1f), .0001f);
+        assertEquals(0.02f, ExtendedLodFog.opacity(8, 1f), .0001f);
         assertEquals(.13f, ExtendedLodFog.opacity(16, 1f), .0001f);
         assertEquals(.55f, ExtendedLodFog.opacity(32, 1f), .0001f);
         assertEquals(.85f, ExtendedLodFog.opacity(56, 1f), .0001f);

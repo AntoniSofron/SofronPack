@@ -7,7 +7,8 @@
     "ExtendedWorldSodiumOptionsMixin",
     "ExtendedWorldSodiumRenderMixin",
     "ExtendedVoxelPipelineMixin",
-    "ExtendedWorldFogMixin"
+    "ExtendedWorldFogMixin",
+    "ExtendedFogCullingMixin"
   ],
   "injectors": {
     "defaultRequire": 0

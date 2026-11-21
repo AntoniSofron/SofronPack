@@ -18,7 +18,11 @@ public final class ExtendedVoxelMesher {
     public static final int MAX_QUADS = 32_768;
 
     public record MaterialUV(float u0, float v0, float u1, float v1,
-                             int tint, boolean translucent) {}
+                             int tint, boolean translucent, int emission) {
+        public MaterialUV(float u0, float v0, float u1, float v1, int tint, boolean translucent) {
+            this(u0, v0, u1, v1, tint, translucent, 0);
+        }
+    }
     public record Mesh(ByteBuffer vertices, int quads) {
         public Mesh {
             if (vertices.remaining() != quads * 4 * VERTEX_BYTES)
@@ -212,7 +216,7 @@ public final class ExtendedVoxelMesher {
                             data.flip();
                             return new Mesh(data.limit(MAX_QUADS * 4 * VERTEX_BYTES).slice().order(ByteOrder.nativeOrder()), MAX_QUADS);
                         }
-                        emit(data, bx, by, bz, voxelUnit, face, material, tint);
+                        emit(data, bx, by, bz, voxelUnit, voxelUnit, face, material, tint);
                     }
                 }
             }
@@ -266,7 +270,7 @@ public final class ExtendedVoxelMesher {
         return id < chunk.source.palette().length ? chunk.source.palette()[id] : null;
     }
 
-    private static void emit(ByteBuffer out, float x, float y, float z, float n,
+    static void emit(ByteBuffer out, float x, float y, float z, float n, float height,
                              int face, MaterialUV uv, int tint) {
         float shade = switch (face) {
             case 0 -> 1.0f;
@@ -281,7 +285,7 @@ public final class ExtendedVoxelMesher {
         for (int i = 0; i < 4; i++) {
             int bits = corners[i];
             out.putFloat(x + ((bits & 1) != 0 ? n : 0f));
-            out.putFloat(y + ((bits & 2) != 0 ? n : 0f));
+            out.putFloat(y + ((bits & 2) != 0 ? height : 0f));
             out.putFloat(z + ((bits & 4) != 0 ? n : 0f));
             out.putFloat(i < 2 ? uv.u0() : uv.u1());
             out.putFloat((i == 0 || i == 3) ? uv.v0() : uv.v1());

@@ -5,6 +5,8 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.level.block.RenderShape;
 import java.io.*;
 import java.nio.file.*;
@@ -254,26 +256,36 @@ public final class ExtendedVoxelStore {
     }
 
     public static VoxelChunk sample(ServerLevel level, LevelChunk chunk) {
-        return capture(level, chunk).encode();
+        return captureSections(level, chunk).get();
     }
 
-    public static CapturedVoxel capture(ServerLevel level, LevelChunk chunk) {
-        int chunkX = chunk.getPos().x(), chunkZ = chunk.getPos().z();
-        int minimum = level.getMinY();
-        int count = chunk.getSections().length * 16 / CELL;
+    /** Copy compact section palettes on the server thread. The encoder owns every copy. */
+    public static java.util.function.Supplier<VoxelChunk> captureSections(ServerLevel level, ChunkAccess chunk) {
+        int chunkX = chunk.getPos().x(), chunkZ = chunk.getPos().z(), minY = level.getMinY();
+        var live = chunk.getSections();
+        var sections = new LevelChunkSection[live.length];
+        for (int i = 0; i < live.length; i++)
+            if (!live[i].hasOnlyAir()) sections[i] = live[i].copy();
+        int x = chunkX * 16 + 8, z = chunkZ * 16 + 8;
+        int y = chunk.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, 8, 8);
+        var biome = chunk.getNoiseBiome(x >> 2, y >> 2, z >> 2).value();
+        int grass = biome.getGrassColor(x, z), foliage = biome.getFoliageColor(), water = biome.getWaterColor();
+        return () -> encodeSections(chunkX, chunkZ, minY, grass, foliage, water, sections);
+    }
+
+    private static VoxelChunk encodeSections(int chunkX, int chunkZ, int minimum,
+            int grass, int foliage, int water, LevelChunkSection[] sections) {
+        int count = sections.length * 16;
         short[] cells = new short[GRID * GRID * count];
-        Map<String, Integer> mapping = new HashMap<>();
-        IdentityHashMap<BlockState, String> stateNames = new IdentityHashMap<>();
+        IdentityHashMap<BlockState, Short> mapping = new IdentityHashMap<>();
         List<String> palette = new ArrayList<>();
         palette.add("minecraft:air");
-        mapping.put("minecraft:air", 0);
-        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
         int index = 0;
         for (int yi = 0; yi < count; yi++) {
             // Read directly from the chunk's 16x16x16 palette instead of
             // repeating BlockPos -> world chunk/section lookups 100k times.
-            var section = chunk.getSections()[(yi * CELL) / 16];
-            if (section.hasOnlyAir()) {
+            var section = sections[(yi * CELL) / 16];
+            if (section == null) {
                 index += GRID * GRID;
                 continue;
             }
@@ -284,31 +296,21 @@ public final class ExtendedVoxelStore {
                     // coordinates: no 2-block averaging, synthetic colours
                     // or diagonally interpolated heightfield.
                     BlockState state = section.getBlockState(x, localY, z);
-                    int material = 0;
-                    if (!state.isAir() && (state.getRenderShape() != RenderShape.INVISIBLE || !state.getFluidState().isEmpty())) {
-                        String id = stateNames.computeIfAbsent(state, ExtendedVoxelStore::serializeState);
-                        Integer mapped = mapping.get(id);
-                        if (mapped == null) {
-                            mapped = palette.size();
-                            mapping.put(id, mapped);
-                            palette.add(id);
+                    Short material = mapping.get(state);
+                    if (material == null) {
+                        material = 0;
+                        if (!state.isAir() && (state.getRenderShape() != RenderShape.INVISIBLE
+                                || !state.getFluidState().isEmpty())) {
+                            material = (short) palette.size();
+                            palette.add(serializeState(state));
                         }
-                        material = mapped;
+                        mapping.put(state, material);
                     }
-                    cells[index++] = (short) material;
+                    cells[index++] = material;
                 }
             }
         }
-        // The integrated server knows the real far-away biome. Keep its
-        // Minecraft foliage/grass/water tint in the persisted LOD snapshot,
-        // rather than inventing one constant color for every biome.
-        pos.set(chunkX * 16 + 8, chunk.getHeight(
-                net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, 8, 8),
-                chunkZ * 16 + 8);
-        var biome = level.getBiome(pos).value();
-        return new CapturedVoxel(chunkX, chunkZ, minimum, count,
-                biome.getGrassColor(pos.getX(), pos.getZ()),
-                biome.getFoliageColor(), biome.getWaterColor(),
+        return encode(chunkX, chunkZ, minimum, count, grass, foliage, water,
                 palette.toArray(String[]::new), cells);
     }
 

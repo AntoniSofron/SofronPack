@@ -59,6 +59,21 @@ public final class ExtendedVoxelAtlas implements ExtendedVoxelMesher.MaterialRes
         return faces[faceIndex(direction)];
     }
 
+    /** Resolve live game models here before handing immutable UV tables to the worker. */
+    ExtendedVoxelMesher.MaterialResolver snapshot(pl.sofron.extended.ExtendedVoxelStore.VoxelChunk[] chunks) {
+        Map<String, ExtendedVoxelMesher.MaterialUV[]> table = new HashMap<>();
+        for (String name : pl.sofron.extended.ExtendedTerrainPreview.MATERIALS)
+            if (!name.equals("minecraft:air")) table.put(name, materials.computeIfAbsent(name, this::extract));
+        for (var chunk : chunks) {
+            if (chunk == null) continue;
+            for (String name : chunk.palette()) {
+                if (!name.equals("minecraft:air"))
+                    table.computeIfAbsent(name, id -> materials.computeIfAbsent(id, this::extract));
+            }
+        }
+        return (name, direction) -> table.get(name)[faceIndex(direction)];
+    }
+
     private ExtendedVoxelMesher.MaterialUV[] extract(String name) {
         ExtendedVoxelMesher.MaterialUV[] result = new ExtendedVoxelMesher.MaterialUV[6];
         BlockState state;
@@ -95,20 +110,21 @@ public final class ExtendedVoxelAtlas implements ExtendedVoxelMesher.MaterialRes
                 var free = part.getQuads(null);
                 if (!free.isEmpty()) { quad = free.getFirst(); break; }
             }
-            if (quad == null) {
+            boolean water = baseName.equals("minecraft:water") || baseName.equals("minecraft:bubble_column");
+            if (water || baseName.equals("minecraft:lava") || quad == null) {
                 // Fluid blocks have no baked block-state model, so load the
                 // genuine vanilla fluid sprite from the active texture pack.
-                String spriteName = baseName.equals("minecraft:water") ? "minecraft:block/water_still" :
+                String spriteName = water ? "minecraft:block/water_still" :
                         baseName.equals("minecraft:lava") ? "minecraft:block/lava_still" : null;
                 if (spriteName != null) {
                     var texture = (TextureAtlas)Minecraft.getInstance().getTextureManager()
                             .getTexture(Identifier.parse("minecraft:textures/atlas/blocks.png"));
                     TextureAtlasSprite sprite = texture.getSprite(Identifier.parse(spriteName));
                     if (sprite != null) {
-                        int tint = baseName.equals("minecraft:water") ? -1 : 0xffffff;
+                        int tint = water ? -1 : 0xffffff;
                         result[i] = new ExtendedVoxelMesher.MaterialUV(
                                 sprite.getU0(), sprite.getV0(), sprite.getU1(), sprite.getV1(),
-                                tint, true);
+                                tint, true, state.getLightEmission());
                     }
                 }
                 continue;
@@ -131,7 +147,7 @@ public final class ExtendedVoxelAtlas implements ExtendedVoxelMesher.MaterialRes
             int tint = quad.materialInfo().isTinted() ? -1 : 0xffffff;
             boolean translucent = quad.materialInfo().layer() != ChunkSectionLayer.SOLID;
             result[i] = new ExtendedVoxelMesher.MaterialUV(
-                    u0 + eU, v0 + eV, u1 - eU, v1 - eV, tint, translucent);
+                    u0 + eU, v0 + eV, u1 - eU, v1 - eV, tint, translucent, state.getLightEmission());
         }
         return result;
     }

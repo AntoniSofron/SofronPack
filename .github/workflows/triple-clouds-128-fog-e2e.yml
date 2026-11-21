@@ -1,7 +1,7 @@
 name: Triple clouds and 128-chunk fog — in-world smoke
 on:
   push:
-    branches: ['fix/extended-128-clouds-triple', 'fix/lod-fog-clouds-night-20261121', 'fix/lod-progressive-fog-cloud-gradient', 'fix/shared-four-stage-fog-v0138']
+    branches: ['fix/extended-128-clouds-triple', 'fix/lod-fog-clouds-night-20261121', 'fix/lod-progressive-fog-cloud-gradient', 'fix/shared-four-stage-fog-v0138', 'fix/streamed-lod-v0139']
     paths:
       - 'src/**'
       - '.github/workflows/triple-clouds-128-fog-e2e.yml'
@@ -35,18 +35,12 @@ jobs:
           mkdir -p run/saves run/config
           cp -a run/sofronpack-wild-rice-smoke run/saves/SofronLodE2E
           printf '{"enabled":true}\n' > run/config/sofronpack-extended-world.json
-          printf 'renderDistance:6\nsimulationDistance:4\n' >> run/options.txt
+          printf 'renderDistance:32\nsimulationDistance:5\n' >> run/options.txt
           test -f run/saves/SofronLodE2E/level.dat
       - name: Boot directly into the world with textured LOD enabled
         run: |
-          set +e
-          timeout -s TERM 180s xvfb-run -a -s "-screen 0 1280x960x24 +extension GLX" \
-            env LIBGL_ALWAYS_SOFTWARE=1 MESA_GL_VERSION_OVERRIDE=4.6 \
-            gradle --no-daemon --console=plain runClient \
-            --args='--quickPlaySingleplayer SofronLodE2E' > triple-clouds-128-fog.log 2>&1
-          code=$?
-          set -e
-          echo "Exit code: $code"
+          timeout 260s xvfb-run -a -s "-screen 0 1280x960x24 +extension GLX" \
+            env LIBGL_ALWAYS_SOFTWARE=1 MESA_GL_VERSION_OVERRIDE=4.6 python3 tools/lod_flight_smoke.py
           grep -E 'SofronPack|Voxel LOD|Extended World|Joining|Loading|graphics backend|Exception|ERROR' triple-clouds-128-fog.log | tail -n 95 || true
           if grep -E 'Mixin apply failed|InvalidMixinException|Native Extended World renderer disabled|Extended World GPU preparation failed|Extended World draw disabled|Crash Report' triple-clouds-128-fog.log; then
             echo 'LOADING OR GPU RENDER FAILURE'
@@ -60,6 +54,7 @@ jobs:
             echo 'The 128-chunk, fogged GPU render hook was not reached while in the world'
             exit 1
           fi
+          grep -Fq 'Sodium terrain fog range confirmed at 2048 blocks' triple-clouds-128-fog.log
           if ! grep -q 'Unified Extended World fog active' triple-clouds-128-fog.log; then
             echo 'The shared normal-chunk + LOD fog mixin was not activated'
             exit 1
@@ -81,4 +76,5 @@ jobs:
           path: |
             triple-clouds-128-fog.log
             wild-rice-smoke.log
+            lod-*.png
           if-no-files-found: ignore
