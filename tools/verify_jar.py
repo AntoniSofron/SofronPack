@@ -61,7 +61,7 @@ with zipfile.ZipFile(jar) as z:
     assert "sofron-atmosphere.mixins.json" in mod["mixins"]
     atmosphere_mixins = json.loads(z.read("sofron-atmosphere.mixins.json"))
     assert atmosphere_mixins["package"] == "pl.sofron.atmosphere.mixin"
-    assert atmosphere_mixins["client"] == ["AtmosphereBuilderMixin", "AtmosphericFogMixin"]
+    assert atmosphere_mixins["client"] == ["AtmosphereBuilderMixin", "AtmosphericFogMixin", "CloudLayersMixin"]
     for mixin in atmosphere_mixins["client"]:
         path = "pl/sofron/atmosphere/mixin/" + mixin + ".class"
         assert path in files, path
