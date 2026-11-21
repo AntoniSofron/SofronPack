@@ -176,7 +176,7 @@ public final class ExtendedVoxelMesher {
                         // Unknown neighbours are NOT air. Otherwise missing
                         // distant snapshots paint huge vertical stone walls
                         // around every partial tile during streaming.
-                        if (face >= 2 && unknownHorizontalNeighbour(
+                        if (detail >= 4 && face >= 2 && unknownHorizontalNeighbour(
                                 chunks, x, z, detail, face, side)) continue;
                         var dir = switch (face) {
                             case 0 -> Direction.UP;

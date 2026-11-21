@@ -87,14 +87,18 @@ class ExtendedVoxelLodTest {
     @Test void aMissingNeighbourDoesNotCreateAFalseStoneWall() {
         int grid = ExtendedVoxelStore.GRID;
         short[] cells = new short[grid * grid * 16];
-        // A full column at the eastern edge of a source chunk; the chunk
-        // east of it is not generated yet, so there is no wall to invent.
-        for (int y = 0; y < 16; y++) cells[(y * grid + 8) * grid + 15] = 1;
+        // A coarse, four-block-wide column at the eastern boundary.
+        // The missing neighbour must not become a 16-block stone curtain.
+        for (int y = 0; y < 16; y++) {
+            for (int x = 12; x < 16; x++) {
+                cells[(y * grid + 8) * grid + x] = 1;
+            }
+        }
         var voxel = ExtendedVoxelStore.encode(3, 0, 0, 16,
                 new String[]{"minecraft:air", "minecraft:stone"}, cells);
         int[] eastFaces = {0};
         var material = new ExtendedVoxelMesher.MaterialUV(0, 0, 1, 1, 0xffffff, false);
-        var result = ExtendedVoxelMesher.build(0, 0, 20, 20, 12, 64, 1,
+        var result = ExtendedVoxelMesher.build(0, 0, 20, 20, 12, 64, 4,
                 (x, z) -> x == 3 && z == 0 ? voxel : null,
                 (name, face) -> {
                     if (face == Direction.EAST) eastFaces[0]++;
