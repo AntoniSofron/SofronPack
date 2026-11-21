@@ -36,6 +36,11 @@ public final class ExtendedVoxelMesher {
         ExtendedVoxelStore.VoxelChunk get(int x, int z);
     }
 
+    // Flags for each quad corner: x=1, y=2, z=4. No per-quad allocations.
+    private static final int[][] FACE_CORNERS = {
+            {2, 6, 7, 3}, {4, 0, 1, 5}, {1, 3, 2, 0},
+            {4, 6, 7, 5}, {0, 2, 6, 4}, {5, 7, 3, 1}
+    };
     private static final int DECODED_CACHE_LIMIT = 256;
     // One per client render thread, not one decompressed volume per quad.
     // 256 x 16*16*worldHeight*2bytes ~= 50 MB at Minecraft's 384-block height.
@@ -122,6 +127,18 @@ public final class ExtendedVoxelMesher {
         }
 
         int side = TILE_CHUNKS * ExtendedVoxelStore.GRID;
+        // The client chunk lookup is comparatively expensive. Do it once
+        // per source chunk, NOT once per voxel (formerly up to 1.5M calls).
+        boolean[] skip = new boolean[TILE_CHUNKS * TILE_CHUNKS];
+        for (int z = 0; z < TILE_CHUNKS; z++) {
+            for (int x = 0; x < TILE_CHUNKS; x++) {
+                int chunkX = tileX * TILE_CHUNKS + x;
+                int chunkZ = tileZ * TILE_CHUNKS + z;
+                int radius = Math.max(Math.abs(chunkX - cx), Math.abs(chunkZ - cz));
+                skip[z * TILE_CHUNKS + x] =
+                        radius > far || (radius <= near && normalChunkReady.test(chunkX, chunkZ));
+            }
+        }
         ByteBuffer data = VERTEX_STAGING.get();
         data.clear();
         int rendered = 0;
@@ -132,14 +149,10 @@ public final class ExtendedVoxelMesher {
         for (int y = 0; y < yCount; y += detail) {
             for (int z = 0; z < side; z += detail) {
                 for (int x = 0; x < side; x += detail) {
-                    int chunkX = tileX * TILE_CHUNKS + x / ExtendedVoxelStore.GRID;
-                    int chunkZ = tileZ * TILE_CHUNKS + z / ExtendedVoxelStore.GRID;
-                    int radius = Math.max(Math.abs(chunkX - cx), Math.abs(chunkZ - cz));
-                    // Retain cached LOD if a normal chunk has not arrived at
-                    // the client yet. This prevents the empty hard-edged gap
-                    // when vanilla chunks are still streaming in.
-                    if (radius > far || (radius <= near &&
-                            normalChunkReady.test(chunkX, chunkZ))) continue;
+                    // Retain cached LOD until the corresponding normal chunk
+                    // is ready. Dynamic near/far transitions must not reveal gaps.
+                    if (skip[(z / ExtendedVoxelStore.GRID) * TILE_CHUNKS
+                            + x / ExtendedVoxelStore.GRID]) continue;
 
                     String id = block(chunks, x, y, z, yCount, side);
                     if (id == null || id.equals("minecraft:air")) continue;
@@ -225,14 +238,6 @@ public final class ExtendedVoxelMesher {
 
     private static void emit(ByteBuffer out, float x, float y, float z, float n,
                              int face, MaterialUV uv, int tint) {
-        float[][] p = switch (face) {
-            case 0 -> new float[][] {{x,y+n,z},{x,y+n,z+n},{x+n,y+n,z+n},{x+n,y+n,z}};
-            case 1 -> new float[][] {{x,y,z+n},{x,y,z},{x+n,y,z},{x+n,y,z+n}};
-            case 2 -> new float[][] {{x+n,y,z},{x+n,y+n,z},{x,y+n,z},{x,y,z}};
-            case 3 -> new float[][] {{x,y,z+n},{x,y+n,z+n},{x+n,y+n,z+n},{x+n,y,z+n}};
-            case 4 -> new float[][] {{x,y,z},{x,y+n,z},{x,y+n,z+n},{x,y,z+n}};
-            default -> new float[][] {{x+n,y,z+n},{x+n,y+n,z+n},{x+n,y+n,z},{x+n,y,z}};
-        };
         float shade = switch (face) {
             case 0 -> 1.0f;
             case 1 -> 0.55f;
@@ -242,12 +247,15 @@ public final class ExtendedVoxelMesher {
         int r = Math.clamp(Math.round((tint >> 16 & 255) * shade), 0, 255);
         int g = Math.clamp(Math.round((tint >> 8 & 255) * shade), 0, 255);
         int b = Math.clamp(Math.round((tint & 255) * shade), 0, 255);
-        float[] uu = {uv.u0(),uv.u0(),uv.u1(),uv.u1()};
-        float[] vv = {uv.v0(),uv.v1(),uv.v1(),uv.v0()};
+        int[] corners = FACE_CORNERS[face];
         for (int i = 0; i < 4; i++) {
-            out.putFloat(p[i][0]).putFloat(p[i][1]).putFloat(p[i][2]);
-            out.putFloat(uu[i]).putFloat(vv[i]);
-            out.put((byte) r).put((byte) g).put((byte) b).put((byte) 255);
+            int bits = corners[i];
+            out.putFloat(x + ((bits & 1) != 0 ? n : 0f));
+            out.putFloat(y + ((bits & 2) != 0 ? n : 0f));
+            out.putFloat(z + ((bits & 4) != 0 ? n : 0f));
+            out.putFloat(i < 2 ? uv.u0() : uv.u1());
+            out.putFloat((i == 0 || i == 3) ? uv.v0() : uv.v1());
+            out.put((byte)r).put((byte)g).put((byte)b).put((byte)255);
         }
     }
 }
