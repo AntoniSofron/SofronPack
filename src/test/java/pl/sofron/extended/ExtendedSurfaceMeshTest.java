@@ -4,6 +4,32 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ExtendedSurfaceMeshTest {
+    @Test void serializedWaterloggedPropertiesKeepTheirBlockTint() {
+        assertEquals(2, ExtendedSurfaceMesh.color(1, 2, 3, "minecraft:oak_leaves[waterlogged=false]", -1));
+        assertEquals(2, ExtendedSurfaceMesh.color(1, 2, 3, "minecraft:spruce_leaves[waterlogged=true]", -1));
+        assertEquals(3, ExtendedSurfaceMesh.color(1, 2, 3, "minecraft:water[level=0]", -1));
+    }
+
+    @Test void aCutoutSurfaceKeepsTheSolidGroundUnderneath() {
+        short[] cells = new short[4096];
+        cells[5 * 16 + 5] = 1;
+        cells[256 + 5 * 16 + 5] = 2;
+        var chunks = new ExtendedVoxelStore.VoxelChunk[36];
+        chunks[7] = ExtendedVoxelStore.encode(0, 0, 0, 16, 0, 0, 0,
+                new String[]{"minecraft:air", "minecraft:dirt", "minecraft:short_grass"}, cells);
+        boolean[] dirtTop = {false};
+        var mesh = new ExtendedSurfaceMesh().build(0, chunks, (name, face) -> {
+            return new ExtendedVoxelMesher.MaterialUV(0, 0, 1, 1, 0xffffff, name.endsWith("grass"));
+        });
+        for (int i = 0; i < mesh.vertices().remaining(); i += 4 * ExtendedVoxelMesher.VERTEX_BYTES) {
+            boolean ground = true;
+            for (int vertex = 0; vertex < 4; vertex++)
+                ground &= mesh.vertices().getFloat(i + vertex * ExtendedVoxelMesher.VERTEX_BYTES + 4) == 1f;
+            if (ground) dirtTop[0] = true;
+        }
+        assertTrue(dirtTop[0]);
+    }
+
     @Test void topOffSamplingGridSurvivesAtEveryResolution() {
         short[] cells = new short[16 * 16 * 16];
         cells[15 * 256 + 7 * 16 + 11] = 1;

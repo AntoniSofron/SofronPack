@@ -32,13 +32,8 @@ void main() {
     if (normalReady && FogRenderDistanceEnd >= 2047.5 &&
             horizontalChunks < FogRenderDistanceStart / 16.0) discard;
 
-    if (normalReady && FogRenderDistanceEnd >= 2047.5) {
-        float start = FogRenderDistanceStart / 16.0;
-        float coverage = smoothstep(start, start * (8.0 / 7.0), horizontalChunks);
-        ivec2 pixel = ivec2(gl_FragCoord.xy);
-        int rank = ((pixel.x & 1) * 2 + (pixel.y & 1) * 3) & 3;
-        if (coverage < (float(rank) + 0.5) * 0.25) discard;
-    }
+    // Keep continuous backing geometry across the overlap. The ordinary
+    // chunk wins the depth test wherever it actually covers the pixel.
 
     // Same four-zone function as the native Sodium terrain shader.
     float fog = FogRenderDistanceEnd >= 2047.5
@@ -46,9 +41,9 @@ void main() {
             : max(linear_fog_value(sphericalBlocks, FogEnvironmentalStart, FogEnvironmentalEnd),
                   linear_fog_value(cylindricalBlocks, FogRenderDistanceStart, FogRenderDistanceEnd));
     // FogColor comes from the live blended biome/environment, not a fixed hue.
-    sampled.rgb = mix(sampled.rgb, FogColor.rgb, fog);
+    sampled.rgb = mix(sampled.rgb, FogColor.rgb, fog * FogColor.a);
     // At 128 chunks even semi-transparent water must disappear completely
     // into the surrounding fog, rather than retaining a distant silhouette.
-    sampled.a = mix(sampled.a, 1.0, fog * fog);
+    sampled.a = 1.0;
     fragColor = sampled;
 }

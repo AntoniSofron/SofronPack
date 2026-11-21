@@ -123,7 +123,7 @@ public final class ExtendedVoxelAtlas implements ExtendedVoxelMesher.MaterialRes
                         int tint = baseName.equals("minecraft:water") ? -1 : 0xffffff;
                         result[i] = new ExtendedVoxelMesher.MaterialUV(
                                 sprite.getU0(), sprite.getV0(), sprite.getU1(), sprite.getV1(),
-                                tint, true);
+                                tint, true, state.getLightEmission());
                     }
                 }
                 continue;
@@ -146,7 +146,7 @@ public final class ExtendedVoxelAtlas implements ExtendedVoxelMesher.MaterialRes
             int tint = quad.materialInfo().isTinted() ? -1 : 0xffffff;
             boolean translucent = quad.materialInfo().layer() != ChunkSectionLayer.SOLID;
             result[i] = new ExtendedVoxelMesher.MaterialUV(
-                    u0 + eU, v0 + eV, u1 - eU, v1 - eV, tint, translucent);
+                    u0 + eU, v0 + eV, u1 - eU, v1 - eV, tint, translucent, state.getLightEmission());
         }
         return result;
     }

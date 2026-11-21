@@ -51,7 +51,7 @@ def main():
                 if process.poll() is not None or time.monotonic() > deadline:
                     raise RuntimeError("Flight probe failed, see client log")
                 time.sleep(2)
-            for label in ("origin", "east", "return"):
+            for label in ("origin", "night", "rain", "east", "return"):
                 source = pathlib.Path(f"run/screenshots/lod-{label}.png")
                 assert source.stat().st_size > 4096, f"Empty {label} capture"
                 shutil.copyfile(source, source.name)

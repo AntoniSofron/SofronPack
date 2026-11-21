@@ -8,8 +8,8 @@ import pl.sofron.extended.ExtendedVoxelStore;
 
 /** Only added to runClient in the disposable smoke-test checkout. */
 public final class FlightProbe implements ClientModInitializer {
-    private final int[] x = {40, 360, 40};
-    private final String[] labels = {"origin", "east", "return"};
+    private final int[] x = {40, 40, 40, 360, 40};
+    private final String[] labels = {"origin", "night", "rain", "east", "return"};
     private int stage;
     private long since;
     private boolean moved;
@@ -19,6 +19,8 @@ public final class FlightProbe implements ClientModInitializer {
             if (mc.player == null || mc.getConnection() == null || stage >= x.length) return;
             if (!moved) {
                 if (stage == 0) mc.getConnection().sendCommand("gamemode spectator");
+                mc.getConnection().sendCommand(stage == 1 ? "time set midnight" : "time set noon");
+                mc.getConnection().sendCommand(stage == 2 ? "weather thunder" : "weather clear");
                 mc.getConnection().sendCommand("tp @s " + x[stage] + " 180 42 150 16");
                 since = System.nanoTime();
                 moved = true;

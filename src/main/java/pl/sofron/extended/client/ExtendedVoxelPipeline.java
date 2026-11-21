@@ -17,6 +17,8 @@ public final class ExtendedVoxelPipeline {
                     .withVertexShader(Identifier.parse("minecraft:core/sofronpack/extended_voxel"))
                     .withFragmentShader(Identifier.parse("minecraft:core/sofronpack/extended_voxel"))
                     .withBindGroupLayout(BindGroupLayouts.FOG)
+                    .withBindGroupLayout(BindGroupLayouts.SAMPLER2)
+                    .withColorTargetState(com.mojang.renderpearl.api.pipeline.ColorTargetState.DEFAULT)
                     .withDepthStencilState(DepthStencilState.DEFAULT)
                     .withCull(false)
                     .build();

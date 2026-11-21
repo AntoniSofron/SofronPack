@@ -17,7 +17,7 @@ public final class ExtendedSurfaceMesh {
             Direction.UP, Direction.DOWN, Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST
     };
     private final LinkedHashMap<Long, Columns> cache = new LinkedHashMap<>(512, .75f, true);
-    private final ByteBuffer staging = ByteBuffer.allocate(SIDE * SIDE * 5 * 4 * ExtendedVoxelMesher.VERTEX_BYTES)
+    private final ByteBuffer staging = ByteBuffer.allocate(SIDE * SIDE * 6 * 4 * ExtendedVoxelMesher.VERTEX_BYTES)
             .order(ByteOrder.nativeOrder());
 
     private static final class Columns {
@@ -29,10 +29,18 @@ public final class ExtendedSurfaceMesh {
         final int[] height = new int[256];
         final short[] top = new short[256], side = new short[256];
 
-        Columns(VoxelChunk source) {
+        final short[] backing = new short[256];
+        final int[] backingHeight = new int[256];
+
+        Columns(VoxelChunk source, MaterialResolver materials) {
             this.source = source;
             palette = source.palette();
             minimum = source.minY(); grass = source.grassTint(); foliage = source.foliageTint(); water = source.waterTint();
+            boolean[] solid = new boolean[palette.length];
+            for (int i = 1; i < palette.length; i++) {
+                var topFace = materials.face(palette[i], Direction.UP);
+                solid[i] = topFace != null && (!topFace.translucent() || water(palette[i]));
+            }
             short[] cells = source.unpack();
             for (int column = 0; column < 256; column++) {
                 winner[0][column] = (short) column;
@@ -43,6 +51,15 @@ public final class ExtendedSurfaceMesh {
                     height[column] = source.minY() + y + 1;
                     top[column] = cells[at];
                     side[column] = y > 0 && cells[at - 256] != 0 ? cells[at - 256] : cells[at];
+                    if (!solid[cells[at]]) {
+                        for (int by = y - 1; by >= 0; by--) {
+                            short id = cells[by * 256 + column];
+                            if (!solid[id]) continue;
+                            backing[column] = id;
+                            backingHeight[column] = minimum + by + 1;
+                            break;
+                        }
+                    }
                     break;
                 }
             }
@@ -106,7 +123,7 @@ public final class ExtendedSurfaceMesh {
             long key = ExtendedVoxelStore.pack(chunk.chunkX(), chunk.chunkZ());
             Columns columns = cache.get(key);
             if (columns == null || columns.source != chunk) {
-                columns = new Columns(chunk);
+                columns = new Columns(chunk, materials);
                 cache.put(key, columns);
                 if (cache.size() > 2048) cache.pollFirstEntry();
             }
@@ -132,7 +149,7 @@ public final class ExtendedSurfaceMesh {
                         staging.putFloat(corner < 2 ? x0 : x1).putFloat(own.height[column])
                                 .putFloat(corner == 0 || corner == 3 ? z0 : z1)
                                 .putFloat(u).putFloat(v).put((byte)(tint >> 16))
-                                .put((byte)(tint >> 8)).put((byte)tint).put((byte)254);
+                                .put((byte)(tint >> 8)).put((byte)tint).put((byte)(254 - 3 * uv.emission()));
                     }
                 }
             };
@@ -142,6 +159,9 @@ public final class ExtendedSurfaceMesh {
                     int h = own.height[column];
                     tops.putNext(h == Integer.MIN_VALUE ? 0 : ((long)h << 16) | own.top[column]);
                     if (h == Integer.MIN_VALUE) continue;
+                    if (own.backing[column] != 0)
+                        face(own, own.backing[column], x, own.backingHeight[column] - detail,
+                                z, detail, detail, 0, materials);
                     for (int f = 2; f < 6; f++) {
                         int xx = x + (f == 4 ? -detail : f == 5 ? detail : 0);
                         int zz = z + (f == 2 ? -detail : f == 3 ? detail : 0);
@@ -184,9 +204,14 @@ public final class ExtendedSurfaceMesh {
         int tint = color(own.grass, own.foliage, own.water, name, uv.tint());
         ExtendedVoxelMesher.emit(staging, x, y, z, width, height, face, uv, tint);
     }
+    private static boolean water(String state) {
+        return state.equals("minecraft:water") || state.startsWith("minecraft:water[")
+                || state.equals("minecraft:bubble_column") || state.startsWith("minecraft:bubble_column[");
+    }
+
     static int color(int grass, int foliage, int water, String name, int tint) {
         if (tint != -1) return tint;
-        if (name.contains("water")) return water;
+        if (water(name)) return water;
         if (name.contains("leaves") || name.contains("vine")) return foliage;
         return grass;
     }

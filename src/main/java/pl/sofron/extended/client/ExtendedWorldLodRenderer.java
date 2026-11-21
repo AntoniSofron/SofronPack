@@ -236,6 +236,8 @@ public final class ExtendedWorldLodRenderer {
                     Identifier.parse("minecraft:textures/atlas/blocks.png")).getTextureView();
             pass.setUniform("Sampler0", blockAtlas,
                     RenderSystem.getSamplerCache().getClampToEdge(FilterMode.LINEAR));
+            pass.setUniform("Sampler2", Minecraft.getInstance().gameRenderer.levelLightmap(),
+                    RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
             pass.setIndexBuffer(quadIndices, IndexType.INT);
             var mc = Minecraft.getInstance();
             int cameraCX = ((int)Math.floor(camera.x)) >> 4, cameraCZ = ((int)Math.floor(camera.z)) >> 4;

@@ -18,7 +18,11 @@ public final class ExtendedVoxelMesher {
     public static final int MAX_QUADS = 32_768;
 
     public record MaterialUV(float u0, float v0, float u1, float v1,
-                             int tint, boolean translucent) {}
+                             int tint, boolean translucent, int emission) {
+        public MaterialUV(float u0, float v0, float u1, float v1, int tint, boolean translucent) {
+            this(u0, v0, u1, v1, tint, translucent, 0);
+        }
+    }
     public record Mesh(ByteBuffer vertices, int quads) {
         public Mesh {
             if (vertices.remaining() != quads * 4 * VERTEX_BYTES)

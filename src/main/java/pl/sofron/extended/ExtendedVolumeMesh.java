@@ -184,7 +184,7 @@ public final class ExtendedVolumeMesh {
                         .put((byte)((tint >> 16 & 255) * shade / 255))
                         .put((byte)((tint >> 8 & 255) * shade / 255))
                         .put((byte)((tint & 255) * shade / 255))
-                        .put((byte)(254 - face / 2));
+                        .put((byte)(254 - face / 2 - 3 * uv.emission()));
             }
         }
     }

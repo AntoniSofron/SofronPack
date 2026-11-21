@@ -31,6 +31,7 @@ public abstract class ExtendedWorldFogMixin {
             DeltaTracker deltaTracker, float darkenWorldAmount, ClientLevel level,
             CallbackInfoReturnable<FogData> cir) {
         if (!ExtendedWorldConfig.get().enabled || level == null
+                || net.minecraft.client.Minecraft.getInstance().getSingleplayerServer() == null
                 || !level.dimension().equals(Level.OVERWORLD)
                 || camera.getFluidInCamera() != FogType.NONE) return;
 
