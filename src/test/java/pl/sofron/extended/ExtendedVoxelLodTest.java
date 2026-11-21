@@ -1,0 +1,61 @@
+package pl.sofron.extended;
+
+import net.minecraft.core.Direction;
+import org.junit.jupiter.api.Test;
+import java.util.Arrays;
+import static org.junit.jupiter.api.Assertions.*;
+
+class ExtendedVoxelLodTest {
+    @Test void compressedVoxelPaletteRoundTripsWithoutChangingMaterials() throws Exception {
+        short[] blocks = new short[ExtendedVoxelStore.GRID * ExtendedVoxelStore.GRID * 20];
+        Arrays.fill(blocks, (short) 1);
+        blocks[5] = 2;
+        blocks[71] = 0;
+        var original = ExtendedVoxelStore.encode(-40, 12, -64, 20,
+                new String[] {"minecraft:air", "minecraft:stone", "minecraft:oak_leaves"}, blocks);
+        byte[] record = ExtendedVoxelStore.payload(original);
+        var restored = ExtendedVoxelStore.readPayload(record);
+        assertEquals(-40, restored.chunkX());
+        assertEquals(12, restored.chunkZ());
+        assertEquals(-64, restored.minY());
+        assertArrayEquals(blocks, restored.unpack());
+        assertArrayEquals(original.palette(), restored.palette());
+    }
+
+    @Test void independentStoneVoxelHasSixSquareTexturedFaces() {
+        short[] cells = new short[ExtendedVoxelStore.GRID * ExtendedVoxelStore.GRID * 4];
+        cells[(2 * 8 + 3) * 8 + 4] = 1;
+        var chunk = ExtendedVoxelStore.encode(0, 0, 0, 4,
+                new String[] {"minecraft:air", "minecraft:stone"}, cells);
+        var material = new ExtendedVoxelMesher.MaterialUV(
+                0.1f, 0.2f, 0.125f, 0.225f, 0xffffff, false);
+        var mesh = ExtendedVoxelMesher.build(0, 0, 30, 30, 12, 64, 1,
+                (x, z) -> x == 0 && z == 0 ? chunk : null,
+                (id, direction) -> material);
+        assertEquals(6, mesh.quads());
+        assertEquals(6 * 4 * 24, mesh.vertices().remaining());
+    }
+
+    @Test void undergroundNeighboursAreCulledWithoutHidingTopFace() {
+        short[] cells = new short[ExtendedVoxelStore.GRID * ExtendedVoxelStore.GRID * 4];
+        cells[0] = 1;
+        cells[1] = 1; // two adjacent blocks share a face; it must not be drawn
+        var chunk = ExtendedVoxelStore.encode(0, 0, 0, 4,
+                new String[] {"minecraft:air", "minecraft:dirt"}, cells);
+        var material = new ExtendedVoxelMesher.MaterialUV(0, 0, 1, 1, 0xffffff, false);
+        var mesh = ExtendedVoxelMesher.build(0, 0, 20, 20, 12, 64, 1,
+                (x,z) -> x == 0 && z == 0 ? chunk : null, (id, dir) -> material);
+        assertEquals(10, mesh.quads());
+    }
+
+    @Test void normalRenderRangeKeepsPriority() {
+        short[] cells = new short[ExtendedVoxelStore.GRID * ExtendedVoxelStore.GRID];
+        Arrays.fill(cells, (short)1);
+        var chunk = ExtendedVoxelStore.encode(0,0,0,1,
+                new String[]{"minecraft:air","minecraft:dirt"}, cells);
+        var m = new ExtendedVoxelMesher.MaterialUV(0,0,1,1,0xffffff,false);
+        var mesh = ExtendedVoxelMesher.build(0,0,0,0,12,64,1,
+                (x,z) -> x==0&&z==0 ? chunk : null,(id,dir)->m);
+        assertEquals(0,mesh.quads());
+    }
+}
