@@ -249,12 +249,12 @@ public final class ExtendedVoxelStore {
                 for (int x = 0; x < GRID; x++) {
                     pos.set(chunkX * 16 + x * CELL + 1, y + 1, chunkZ * 16 + z * CELL + 1);
                     BlockState state = chunk.getBlockState(pos);
-                    if (state.isAir() || state.getRenderShape() == RenderShape.INVISIBLE) {
+                    if (state.isAir() || (state.getRenderShape() == RenderShape.INVISIBLE && state.getFluidState().isEmpty())) {
                         pos.set(chunkX * 16 + x * CELL, y, chunkZ * 16 + z * CELL);
                         state = chunk.getBlockState(pos);
                     }
                     int material = 0;
-                    if (!state.isAir() && state.getRenderShape() != RenderShape.INVISIBLE) {
+                    if (!state.isAir() && (state.getRenderShape() != RenderShape.INVISIBLE || !state.getFluidState().isEmpty())) {
                         String id = BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString();
                         Integer mapped = mapping.get(id);
                         if (mapped == null) {
