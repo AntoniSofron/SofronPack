@@ -42,8 +42,7 @@ public final class ExtendedWorldPrefetch {
         thread.setDaemon(true);
         return thread;
     });
-    private static final TicketType GENERATION_TICKET = Registry.register(BuiltInRegistries.TICKET_TYPE,
-            Identifier.parse("sofronpack:distant_generation"), new TicketType(0L, TicketType.FLAG_LOADING));
+    private static TicketType generationTicket;
     private static final LinkedHashSet<Long> recentlyLoaded = new LinkedHashSet<>();
     private static long epoch;
     private static int ticks, cursor, nearbyCursor, stageIndex;
@@ -60,6 +59,8 @@ public final class ExtendedWorldPrefetch {
     private ExtendedWorldPrefetch() {}
 
     public static void register() {
+        generationTicket = Registry.register(BuiltInRegistries.TICKET_TYPE,
+                Identifier.parse("sofronpack:distant_generation"), new TicketType(0L, TicketType.FLAG_LOADING));
         ServerChunkEvents.CHUNK_LOAD.register((level, chunk, generated) -> {
             if (level == lastLevel && ExtendedWorldConfig.get().enabled) {
                 if (recentlyLoaded.size() >= 2048) recentlyLoaded.removeFirst();
@@ -173,7 +174,7 @@ public final class ExtendedWorldPrefetch {
                 }
                 continue;
             }
-            storage.addTicket(new Ticket(GENERATION_TICKET, ticketLevel), new ChunkPos(x, z));
+            storage.addTicket(new Ticket(generationTicket, ticketLevel), new ChunkPos(x, z));
             requests[requestCount++] = key;
         }
         // Submit the batch after installing all tickets. Vanilla's temporary
@@ -194,12 +195,12 @@ public final class ExtendedWorldPrefetch {
                             queued[0] = true;
                         });
                     } finally {
-                        storage.removeTicket(new Ticket(GENERATION_TICKET, ticketLevel), pos);
+                        storage.removeTicket(new Ticket(generationTicket, ticketLevel), pos);
                         if (requestEpoch == epoch && !queued[0]) finishRequest(level, key);
                     }
                 }));
             } catch (RuntimeException failure) {
-                storage.removeTicket(new Ticket(GENERATION_TICKET, ticketLevel), pos);
+                storage.removeTicket(new Ticket(generationTicket, ticketLevel), pos);
                 finishRequest(level, key);
                 System.err.println("[SofronPack] Distant chunk generation: " + failure.getMessage());
             }
