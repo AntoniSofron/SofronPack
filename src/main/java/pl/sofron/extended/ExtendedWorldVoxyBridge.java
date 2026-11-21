@@ -19,6 +19,17 @@ public final class ExtendedWorldVoxyBridge {
         return FabricLoader.getInstance().isModLoaded("voxy");
     }
 
+    /** True only after Voxy's distant-world engine is initialized. */
+    public static boolean ready() {
+        if (!available()) return false;
+        try {
+            Class<?> common = Class.forName("me.cortex.voxy.commonImpl.VoxyCommon");
+            return common.getMethod("getInstance").invoke(null) != null;
+        } catch (ReflectiveOperationException | LinkageError ex) {
+            return false;
+        }
+    }
+
     public static void updateSettings(boolean enabled) {
         if (!available()) return;
         try {
