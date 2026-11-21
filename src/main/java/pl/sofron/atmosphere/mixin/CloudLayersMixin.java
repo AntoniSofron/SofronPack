@@ -28,10 +28,12 @@ abstract class CloudLayersMixin {
     @Shadow private int quadCount;
     @Shadow protected abstract void render(RenderPass pass, RenderPipeline pipeline);
 
-    @Unique private CloudRenderer sofron$upper;
-    @Unique private boolean sofron$isUpper;
+    @Unique private CloudRenderer[] sofron$extra;
+    @Unique private int sofron$farIndex;
+    @Unique private double sofron$cameraY;
+    @Unique private float sofron$baseHeight;
+    @Unique private boolean sofron$isExtra;
     @Unique private boolean sofron$layered;
-    @Unique private boolean sofron$upperFirst;
     @Unique private int sofron$range = -1;
     @Unique private final Vector4f sofron$sky = new Vector4f();
 
@@ -46,26 +48,31 @@ abstract class CloudLayersMixin {
             ((CloudRenderer)(Object)this).markForRebuild();
             sofron$range = range;
         }
-        if (sofron$isUpper) return;
+        if (sofron$isExtra) return;
         var client = Minecraft.getInstance();
         sofron$layered = texture != null && client.level != null && client.level.dimension().equals(Level.OVERWORLD);
         if (!sofron$layered) return;
-        if (sofron$upper == null) {
-            sofron$upper = new CloudRenderer();
-            sofron$state(sofron$upper).sofron$isUpper = true;
-        }
-        var upper = sofron$state(sofron$upper);
-        if (upper.texture != texture) {
-            upper.texture = texture;
-            sofron$upper.markForRebuild();
+        if (sofron$extra == null) {
+            sofron$extra = new CloudRenderer[]{new CloudRenderer(), new CloudRenderer()};
+            for (var renderer : sofron$extra) sofron$state(renderer).sofron$isExtra = true;
         }
         var sky = client.gameRenderer.mainCamera().attributeProbe().getValue(EnvironmentAttributes.SKY_COLOR, partial);
         sofron$sky.set(sky, -1f);
-        upper.sofron$sky.set(sofron$sky);
-        upper.sofron$layered = true;
-        sofron$upperFirst = Math.abs(camera.y - 512) > Math.abs(camera.y - height);
-        // A fixed phase offset positions the upper banks above different gaps.
-        sofron$upper.prepare(color, status, 512f, range, camera, ticks + 47L * 400L, partial);
+        sofron$baseHeight = height;
+        sofron$cameraY = camera.y;
+        sofron$farIndex = sofron$distance(1) > sofron$distance(0) ? 1 : 0;
+        for (int i = 0; i < sofron$extra.length; i++) {
+            CloudRenderer renderer = sofron$extra[i];
+            var layer = sofron$state(renderer);
+            if (layer.texture != texture) {
+                layer.texture = texture;
+                renderer.markForRebuild();
+            }
+            layer.sofron$sky.set(sofron$sky);
+            layer.sofron$layered = true;
+            renderer.prepare(color, status, sofron$height(i), range, camera,
+                    ticks + (i == 0 ? 23L : 47L) * 400L, partial);
+        }
     }
 
     // The pack doubles vertical cell size in the vertex shader. Match CPU face selection.
@@ -78,25 +85,41 @@ abstract class CloudLayersMixin {
     @Redirect(method = {"render(Lnet/minecraft/client/CloudStatus;Lcom/mojang/renderpearl/api/commands/RenderPass;)V", "renderOit"},
             at = @At(value = "FIELD", target = "Lnet/minecraft/client/renderer/CloudRenderer;quadCount:I"))
     private int sofron$visibleQuads(CloudRenderer renderer) {
-        return sofron$layered && sofron$upper != null ? Math.max(quadCount, sofron$state(sofron$upper).quadCount) : quadCount;
+        if (sofron$layered && sofron$extra != null && quadCount == 0) {
+            for (var layer : sofron$extra) if (sofron$state(layer).quadCount > 0) return 1;
+        }
+        return quadCount;
     }
 
-    @Unique private void sofron$drawUpper(RenderPass pass, RenderPipeline pipeline) {
-        var upper = sofron$state(sofron$upper);
-        if (upper.quadCount > 0) upper.render(pass, pipeline);
+    @Unique private static float sofron$height(int index) {
+        return index == 0 ? 384f : 512f;
+    }
+
+    @Unique private double sofron$distance(int index) {
+        return Math.abs(sofron$cameraY - (sofron$height(index) + 4));
+    }
+
+    @Unique private void sofron$drawExtras(RenderPass pass, RenderPipeline pipeline, boolean beforeBase) {
+        double baseDistance = Math.abs(sofron$cameraY - (sofron$baseHeight + 4));
+        for (int order = 0; order < 2; order++) {
+            int index = order == 0 ? sofron$farIndex : 1 - sofron$farIndex;
+            if ((quadCount == 0 || sofron$distance(index) >= baseDistance) != beforeBase) continue;
+            var layer = sofron$state(sofron$extra[index]);
+            if (layer.quadCount > 0) layer.render(pass, pipeline);
+        }
     }
 
     @Inject(method = "render(Lcom/mojang/renderpearl/api/commands/RenderPass;Lcom/mojang/renderpearl/api/pipeline/RenderPipeline;)V",
             at = @At("HEAD"), cancellable = true)
     private void sofron$farLayer(RenderPass pass, RenderPipeline pipeline, CallbackInfo ci) {
-        if (!sofron$layered || sofron$upper == null) return;
-        if (sofron$upperFirst || quadCount == 0) sofron$drawUpper(pass, pipeline);
+        if (!sofron$layered || sofron$extra == null) return;
+        sofron$drawExtras(pass, pipeline, true);
         if (quadCount == 0) ci.cancel();
     }
 
     @Inject(method = "render(Lcom/mojang/renderpearl/api/commands/RenderPass;Lcom/mojang/renderpearl/api/pipeline/RenderPipeline;)V", at = @At("RETURN"))
     private void sofron$nearLayer(RenderPass pass, RenderPipeline pipeline, CallbackInfo ci) {
-        if (sofron$layered && sofron$upper != null && !sofron$upperFirst && quadCount > 0) sofron$drawUpper(pass, pipeline);
+        if (sofron$layered && sofron$extra != null && quadCount > 0) sofron$drawExtras(pass, pipeline, false);
     }
 
     @Redirect(method = "render(Lcom/mojang/renderpearl/api/commands/RenderPass;Lcom/mojang/renderpearl/api/pipeline/RenderPipeline;)V",
@@ -107,14 +130,15 @@ abstract class CloudLayersMixin {
 
     @Inject(method = "endFrame", at = @At("TAIL"))
     private void sofron$rotate(CallbackInfo ci) {
-        if (sofron$upper != null && sofron$layered) sofron$upper.endFrame();
+        if (sofron$extra != null && sofron$layered)
+            for (var layer : sofron$extra) layer.endFrame();
     }
 
     @Inject(method = "close", at = @At("TAIL"))
     private void sofron$close(CallbackInfo ci) {
-        if (sofron$upper != null) {
-            sofron$upper.close();
-            sofron$upper = null;
+        if (sofron$extra != null) {
+            for (var layer : sofron$extra) layer.close();
+            sofron$extra = null;
         }
     }
 }
