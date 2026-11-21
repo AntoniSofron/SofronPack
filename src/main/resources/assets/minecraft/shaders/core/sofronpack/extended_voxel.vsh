@@ -31,7 +31,9 @@ void main() {
     if (Color.a < 0.999) {
         vec2 u = unpackRange(UV0.x), v = unpackRange(UV0.y);
         tileUv = vec4(u.x, v.x, u.y - u.x, v.y - v.x);
-        texCoord0 = Position.xz;
+        int axis = 254 - int(round(Color.a * 255.0));
+        texCoord0 = axis == 0 ? Position.xz : axis == 1
+                ? vec2(Position.x, -Position.y) : vec2(Position.z, -Position.y);
     }
     vertexColor = vec4(Color.rgb, 1.0);
 

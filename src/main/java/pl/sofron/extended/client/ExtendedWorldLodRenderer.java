@@ -17,6 +17,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import pl.sofron.extended.ExtendedSurfaceMesh;
+import pl.sofron.extended.ExtendedVolumeMesh;
 import java.util.Set;
 import net.caffeinemc.mods.sodium.client.render.chunk.ChunkRenderMatrices;
 import net.caffeinemc.mods.sodium.client.render.chunk.terrain.DefaultTerrainRenderPasses;
@@ -55,6 +56,7 @@ public final class ExtendedWorldLodRenderer {
         return thread;
     });
     private static ExtendedSurfaceMesh surfaces = new ExtendedSurfaceMesh();
+    private static ExtendedVolumeMesh volumes = new ExtendedVolumeMesh();
     private record Pending(long detail, CompletableFuture<ExtendedVoxelMesher.Mesh> result) {}
     private static final Map<Long, Pending> pending = new HashMap<>();
     private static final long FRAME_MESH_BUDGET_NS = 5_000_000L;
@@ -359,16 +361,27 @@ public final class ExtendedWorldLodRenderer {
     private static void scheduleTile(int tx, int tz, int cx, int cz) {
         long key = ExtendedVoxelStore.pack(tx, tz);
         long detail = detailAt(tx, tz, cx, cz);
-        if (!MESHES.containsKey(key)) detail = 0xaaaa_aaaaL;
+        boolean preview = !MESHES.containsKey(key);
+        if (preview) detail = 0x1_aaaa_aaaaL;
         var chunks = new ExtendedVoxelStore.VoxelChunk[(TILE + 2) * (TILE + 2)];
+        int[] levels = new int[chunks.length];
         int i = 0;
-        for (int z = -1; z <= TILE; z++) for (int x = -1; x <= TILE; x++)
-            chunks[i++] = ExtendedVoxelStore.get(tx * TILE + x, tz * TILE + z);
+        for (int z = -1; z <= TILE; z++) for (int x = -1; x <= TILE; x++) {
+            int chunkX = tx * TILE + x, chunkZ = tz * TILE + z;
+            chunks[i] = ExtendedVoxelStore.get(chunkX, chunkZ);
+            levels[i++] = ExtendedLodLevels.ringFor(Math.max(Math.abs(cx - chunkX), Math.abs(cz - chunkZ)));
+        }
         var materials = ATLAS.snapshot(chunks);
-        var builder = surfaces;
+        var surface = surfaces;
+        var volume = volumes;
         long resolution = detail;
-        var task = CompletableFuture.supplyAsync(
-                () -> builder.build(resolution, chunks, materials), WORKER);
+        var task = CompletableFuture.supplyAsync(() -> {
+            if (!preview) {
+                var mesh = volume.build(chunks, levels, materials);
+                if (mesh != null) return mesh;
+            }
+            return surface.build(resolution, chunks, materials);
+        }, WORKER);
         pending.put(key, new Pending(detail, task));
     }
 
@@ -462,6 +475,7 @@ public final class ExtendedWorldLodRenderer {
         pending.clear();
         readyColumns.clear();
         surfaces = new ExtendedSurfaceMesh();
+        volumes = new ExtendedVolumeMesh();
         for (GpuTile tile : MESHES.values()) tile.close();
         MESHES.clear();
         DIRTY.clear();

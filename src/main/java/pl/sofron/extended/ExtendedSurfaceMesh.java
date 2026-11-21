@@ -89,7 +89,7 @@ public final class ExtendedSurfaceMesh {
                     String name = own.source.palette()[own.top[column]];
                     var uv = materials.face(name, Direction.UP);
                     if (uv == null) return;
-                    int tint = color(own, name, uv.tint());
+                    int tint = color(own.source, name, uv.tint());
                     int x0 = ox + (x + 1 - length) * detail, x1 = ox + (x + 1) * detail;
                     int z0 = oz + (z + 1 - width) * detail, z1 = oz + (z + 1) * detail;
                     float u = packUv(uv.u0(), uv.u1()), v = packUv(uv.v0(), uv.v1());
@@ -146,18 +146,18 @@ public final class ExtendedSurfaceMesh {
         String name = own.source.palette()[id];
         var uv = materials.face(name, DIRECTIONS[face]);
         if (uv == null) return;
-        int tint = color(own, name, uv.tint());
+        int tint = color(own.source, name, uv.tint());
         ExtendedVoxelMesher.emit(staging, x, y, z, width, height, face, uv, tint);
     }
-    private static int color(Columns own, String name, int tint) {
+    static int color(VoxelChunk own, String name, int tint) {
         if (tint != -1) return tint;
-        if (name.contains("water")) return own.source.waterTint();
-        if (name.contains("leaves") || name.contains("vine")) return own.source.foliageTint();
-        return own.source.grassTint();
+        if (name.contains("water")) return own.waterTint();
+        if (name.contains("leaves") || name.contains("vine")) return own.foliageTint();
+        return own.grassTint();
     }
 
     // Two 15-bit atlas coordinates in a finite, normal float vertex attribute.
-    private static float packUv(float low, float high) {
+    static float packUv(float low, float high) {
         int bits = Math.round(low * 32767f) | (Math.round(high * 32767f) << 15);
         return Float.intBitsToFloat(bits + 0x00800000);
     }
