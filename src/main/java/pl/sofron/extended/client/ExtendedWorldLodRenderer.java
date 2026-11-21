@@ -113,6 +113,12 @@ public final class ExtendedWorldLodRenderer {
                     DIRTY.add(key);
                 }
             }
+            // Avoid retaining coordinates from worlds/areas the player has
+            // left. They were previously scanned again on every frame.
+            DIRTY.removeIf(key -> {
+                int tx = (int)(key >> 32), tz = (int)(long)key;
+                return tx < minTX || tx > maxTX || tz < minTZ || tz > maxTZ;
+            });
             Iterator<Map.Entry<Long, GpuTile>> it = MESHES.entrySet().iterator();
             while (it.hasNext()) {
                 Map.Entry<Long, GpuTile> entry = it.next();
@@ -347,7 +353,13 @@ public final class ExtendedWorldLodRenderer {
         }
         if (worst != null) {
             GpuTile evicted = MESHES.remove(worst);
-            if (evicted != null) evicted.close();
+            if (evicted != null) {
+                evicted.close();
+                // Do not permanently lose already generated chunks when the
+                // GPU cache reaches its bound. Schedule a fresh mesh if the
+                // camera later turns back toward this tile.
+                DIRTY.add(worst);
+            }
         }
     }
 
