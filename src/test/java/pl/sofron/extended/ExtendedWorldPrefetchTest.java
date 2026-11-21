@@ -22,6 +22,17 @@ class ExtendedWorldPrefetchTest {
         assertTrue(unique.contains(ExtendedWorldPrefetch.pack(128, -128)));
     }
 
+    @Test void continuousFlightEventuallyRestartsEightChunkPriority() {
+        assertTrue(ExtendedLodStages.shouldRecenter(0, 0,
+                Integer.MIN_VALUE, Integer.MIN_VALUE));
+        for (int step = 1; step < 8; step++)
+            assertFalse(ExtendedLodStages.shouldRecenter(step, 0, 0, 0));
+        assertTrue(ExtendedLodStages.shouldRecenter(8, 0, 0, 0));
+        assertTrue(ExtendedLodStages.shouldRecenter(0, -8, 0, 0));
+        assertFalse(ExtendedLodStages.shouldRecenter(12, 5, 8, 0));
+        assertTrue(ExtendedLodStages.shouldRecenter(16, 5, 8, 0));
+    }
+
     @Test void sevenStrictStagesCoverEntireSquareWithoutOverlap() {
         int[] expected = {8, 16, 32, 48, 64, 96, 128};
         long[] offsets = ExtendedWorldPrefetch.spiralOffsets(128);

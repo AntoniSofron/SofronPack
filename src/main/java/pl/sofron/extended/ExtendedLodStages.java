@@ -22,6 +22,14 @@ public final class ExtendedLodStages {
         return index == 0 ? 0 : endExclusive(index - 1);
     }
 
+    public static boolean shouldRecenter(int currentX, int currentZ,
+                                         int anchorX, int anchorZ) {
+        if (anchorX == Integer.MIN_VALUE || anchorZ == Integer.MIN_VALUE) return true;
+        long dx = Math.abs((long)currentX - anchorX);
+        long dz = Math.abs((long)currentZ - anchorZ);
+        return Math.max(dx, dz) >= 8L;
+    }
+
     public static int indexForRadius(int distanceChunks) {
         for (int i = 0; i < RADII.length - 1; i++) {
             if (distanceChunks <= RADII[i]) return i;

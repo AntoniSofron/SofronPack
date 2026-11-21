@@ -38,6 +38,9 @@ public final class ExtendedWorldPrefetch {
     // generated or compressed. All accesses occur on the server thread.
     private static final Set<Long> IN_FLIGHT = new HashSet<>();
     private static int centerX = Integer.MIN_VALUE, centerZ = Integer.MIN_VALUE;
+    // Anchor of the current staged scan, NOT the most recent player chunk.
+    // Continuous flight must eventually restart the local 8-chunk priority.
+    private static int scanAnchorX = Integer.MIN_VALUE, scanAnchorZ = Integer.MIN_VALUE;
     private static ServerLevel lastLevel;
 
     private ExtendedWorldPrefetch() {}
@@ -50,7 +53,7 @@ public final class ExtendedWorldPrefetch {
             lastLevel = null;
             cursor = nearbyCursor = ticks = stageIndex = 0;
             IN_FLIGHT.clear();
-            centerX = centerZ = Integer.MIN_VALUE;
+            centerX = centerZ = scanAnchorX = scanAnchorZ = Integer.MIN_VALUE;
         });
     }
 
@@ -64,7 +67,7 @@ public final class ExtendedWorldPrefetch {
 
         if (level != lastLevel) {
             lastLevel = level;
-            centerX = centerZ = Integer.MIN_VALUE;
+            centerX = centerZ = scanAnchorX = scanAnchorZ = Integer.MIN_VALUE;
             cursor = nearbyCursor = stageIndex = 0;
             pending = nearbyPending = 0;
             IN_FLIGHT.clear();
@@ -73,12 +76,14 @@ public final class ExtendedWorldPrefetch {
                 level.dimension().identifier().toString());
         int cx = player.chunkPosition().x(), cz = player.chunkPosition().z();
         if (cx != centerX || cz != centerZ) {
-            // Do not restart the expensive 128-chunk scan every time the
-            // player crosses a chunk boundary. Continuous flight otherwise
-            // prevents the cursor from ever reaching the distant rings.
-            if (centerX != Integer.MIN_VALUE &&
-                    Math.max(Math.abs(cx - centerX), Math.abs(cz - centerZ)) > 24) {
-                stageIndex = cursor = 0; // Refill nearest 8-chunk stage first.
+            // Recenter the ordered ring scheduler only after 8 chunks of
+            // accumulated travel, not after each adjacent-chunk movement.
+            // Otherwise sustained flight never generates distant bands.
+            if (ExtendedLodStages.shouldRecenter(
+                    cx, cz, scanAnchorX, scanAnchorZ)) {
+                stageIndex = cursor = 0;
+                scanAnchorX = cx;
+                scanAnchorZ = cz;
             }
             centerX = cx;
             centerZ = cz;
