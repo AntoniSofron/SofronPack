@@ -28,8 +28,6 @@ public final class ExtendedWorldConfig {
         if (enabled == value) return;
         enabled = value;
         save();
-        // Voxy is a compatible, optional LOD backend, not part of the worldgen logic.
-        ExtendedWorldVoxyBridge.updateSettings(value);
     }
 
     public synchronized void save() {

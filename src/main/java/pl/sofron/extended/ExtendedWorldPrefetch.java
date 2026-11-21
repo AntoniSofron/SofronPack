@@ -1,162 +1,133 @@
 package pl.sofron.extended;
 
-import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
-import pl.sofron.extended.mixin.ExtendedChunkFutureAccess;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.level.storage.LevelResource;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
-
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.EOFException;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
-import java.util.HashMap;
-import java.util.Map;
+import net.minecraft.world.level.storage.LevelResource;
+import pl.sofron.extended.mixin.ExtendedChunkFutureAccess;
 
 /**
- * Incremental single-player pregeneration. No additional simulation tickets
- * are held after a chunk is generated, and Minecraft's ordinary view/simulation
- * distances remain unchanged. Only one async request may be in flight.
+ * The only producer of previously unseen distant terrain. Minecraft generates
+ * real chunks once through its own asynchronous pipeline; SofronPack stores a
+ * small immutable LOD surface and relinquishes the chunk immediately.
  */
 public final class ExtendedWorldPrefetch {
     private static final int RADIUS = ExtendedWorldConfig.DISTANT_RADIUS_CHUNKS;
     private static final long[] OFFSETS = spiralOffsets(RADIUS);
-    private static final Map<String, Progress> PROGRESS = new HashMap<>();
-    private static int tick;
+    private static int ticks, cursor, nearbyCursor;
+    private static int centerX = Integer.MIN_VALUE, centerZ = Integer.MIN_VALUE;
     private static boolean pending;
-    private static int centerX = Integer.MIN_VALUE, centerZ = Integer.MIN_VALUE, cursor;
+    private static ServerLevel lastLevel;
 
     private ExtendedWorldPrefetch() {}
 
     public static void register() {
         ServerTickEvents.END_SERVER_TICK.register(ExtendedWorldPrefetch::tick);
         ServerLifecycleEvents.SERVER_STOPPING.register(server -> {
-            PROGRESS.clear();
+            ExtendedWorldStorage.close();
             pending = false;
-            cursor = tick = 0;
+            lastLevel = null;
+            cursor = nearbyCursor = ticks = 0;
             centerX = centerZ = Integer.MIN_VALUE;
         });
     }
 
     private static void tick(MinecraftServer server) {
-        // Do not schedule unauthorized generation on external multiplayer servers.
-        if (!server.isSingleplayer() || !ExtendedWorldConfig.get().enabled ||
-                !ExtendedWorldVoxyBridge.ready() || pending ||
-                (++tick % 4) != 0) return;
+        // The integrated server shares the database with its own client.
+        // Never generate chunks without authority on an external server.
+        if (!server.isSingleplayer() || !ExtendedWorldConfig.get().enabled) return;
         if (server.getPlayerList().getPlayers().isEmpty()) return;
         ServerPlayer player = server.getPlayerList().getPlayers().getFirst();
         ServerLevel level = player.level();
-        if (level == null) return;
 
+        if (level != lastLevel) {
+            lastLevel = level;
+            centerX = centerZ = Integer.MIN_VALUE;
+            cursor = nearbyCursor = 0;
+            pending = false;
+        }
+        ExtendedWorldStorage.open(server.getWorldPath(LevelResource.ROOT),
+                level.dimension().identifier().toString());
         int cx = player.chunkPosition().x(), cz = player.chunkPosition().z();
-        if (centerX != cx || centerZ != cz) {
-            centerX = cx;
-            centerZ = cz;
-            cursor = 0;
+        if (cx != centerX || cz != centerZ) {
+            centerX = cx; centerZ = cz; cursor = 0;
         }
 
-        String dimension = level.dimension().identifier().toString();
-        Progress progress = PROGRESS.computeIfAbsent(dimension,
-                key -> Progress.load(server, dimension));
-        // Only generate beyond the normal view distance; its chunks are
-        // simulated/rendered by vanilla, never by this prefetch worker.
-        int near = Math.max(2, server.getPlayerList().getViewDistance());
+        // Nearby live data can change through normal gameplay. Refresh only
+        // loaded chunks at a bounded rate; frozen far LOD is not resampled.
+        int normal = Math.max(2, server.getPlayerList().getViewDistance());
+        refreshNearby(level, cx, cz, normal);
 
+        if ((++ticks % 40) == 0) ExtendedWorldStorage.flush();
+        if (pending || ticks % 4 != 0) return;
         int inspected = 0;
-        while (inspected++ < 512) {
-            if (cursor >= OFFSETS.length) cursor = 0;
+        while (inspected++ < 1024) {
+            if (cursor == OFFSETS.length) cursor = 0;
             long offset = OFFSETS[cursor++];
             int dx = (int)(offset >> 32), dz = (int)offset;
-            if (Math.max(Math.abs(dx), Math.abs(dz)) <= near) continue;
+            if (Math.max(Math.abs(dx), Math.abs(dz)) <= normal) continue;
             int x = cx + dx, z = cz + dz;
-            long packed = pack(x, z);
-            if (progress.visited.contains(packed)) continue;
-
+            if (ExtendedWorldStorage.has(x, z)) continue;
             pending = true;
-            var request = ((ExtendedChunkFutureAccess)level.getChunkSource())
-                    .sofron$getChunkFuture(x, z, ChunkStatus.FULL, true);
-            request.whenComplete((result, error) -> server.execute(() -> {
-                try {
-                    if (error != null || result == null) return;
-                    result.ifSuccess(chunk -> {
-                        if (chunk instanceof LevelChunk full &&
-                                ExtendedWorldVoxyBridge.submitGeneratedChunk(full)) {
-                            progress.record(packed);
-                        }
-                    });
-                } finally {
-                    pending = false;
-                }
-            }));
+            final ServerLevel expectedLevel = level;
+            try {
+                var future = ((ExtendedChunkFutureAccess) level.getChunkSource())
+                        .sofron$getChunkFuture(x, z, ChunkStatus.FULL, true);
+                future.whenComplete((result, error) -> server.execute(() -> {
+                    try {
+                        if (expectedLevel != lastLevel || error != null || result == null) return;
+                        result.ifSuccess(chunk -> {
+                            if (chunk instanceof LevelChunk full) {
+                                ExtendedWorldStorage.put(ExtendedWorldStorage.sample(expectedLevel, full));
+                            }
+                        });
+                    } finally {
+                        pending = false;
+                    }
+                }));
+            } catch (RuntimeException failure) {
+                pending = false;
+                System.err.println("[SofronPack] Distant chunk generation: " + failure.getMessage());
+            }
             return;
         }
     }
 
-    static long pack(int x, int z) {
-        return ((long)x << 32) | (z & 0xFFFFFFFFL);
+    private static void refreshNearby(ServerLevel level, int cx, int cz, int normal) {
+        int size = normal * 2 + 1;
+        int total = size * size;
+        for (int i = 0; i < 2; i++) {
+            int slot = nearbyCursor++ % total;
+            int dx = slot % size - normal, dz = slot / size - normal;
+            LevelChunk chunk = level.getChunkSource().getChunkNow(cx + dx, cz + dz);
+            if (chunk != null) {
+                ExtendedWorldStorage.put(ExtendedWorldStorage.sample(level, chunk));
+            }
+        }
     }
 
-    /** Center-outwards Chebyshev rings, matching Minecraft's chunk distance. */
+    static long pack(int x, int z) { return ExtendedWorldStorage.pack(x, z); }
+
     static long[] spiralOffsets(int radius) {
         if (radius < 0 || radius > 256) throw new IllegalArgumentException("radius");
-        int side = 2 * radius + 1;
-        long[] offsets = new long[side * side];
+        int side = radius * 2 + 1;
+        long[] result = new long[side * side];
         int i = 0;
-        offsets[i++] = pack(0, 0);
-        for (int r = 1; r <= radius; r++) {
-            for (int z = -r; z <= r; z++) {
-                for (int x = -r; x <= r; x++) {
-                    if (Math.abs(x) == r || Math.abs(z) == r) offsets[i++] = pack(x, z);
+        result[i++] = pack(0, 0);
+        for (int ring = 1; ring <= radius; ring++) {
+            for (int dz = -ring; dz <= ring; dz++) {
+                for (int dx = -ring; dx <= ring; dx++) {
+                    if (Math.max(Math.abs(dx), Math.abs(dz)) == ring) {
+                        result[i++] = pack(dx, dz);
+                    }
                 }
             }
         }
-        if (i != offsets.length) throw new IllegalStateException("Incorrect ring traversal");
-        return offsets;
-    }
-
-    private static final class Progress {
-        private final Path file;
-        private final LongOpenHashSet visited = new LongOpenHashSet();
-
-        private Progress(Path file) { this.file = file; }
-
-        static Progress load(MinecraftServer server, String dimension) {
-            String safe = dimension.replaceAll("[^a-zA-Z0-9_.-]", "_");
-            Path file = server.getWorldPath(LevelResource.ROOT)
-                    .resolve("sofronpack-extended-world").resolve(safe + ".bin");
-            Progress progress = new Progress(file);
-            if (!Files.isRegularFile(file)) return progress;
-            try (DataInputStream in = new DataInputStream(Files.newInputStream(file))) {
-                while (true) {
-                    progress.visited.add(in.readLong());
-                }
-            } catch (EOFException end) {
-                // Expected end of append-only completed-chunk log.
-            } catch (IOException problem) {
-                System.err.println("[SofronPack] Distant chunk cache read error: " + problem.getMessage());
-            }
-            return progress;
-        }
-
-        void record(long location) {
-            if (!visited.add(location)) return;
-            try {
-                Files.createDirectories(file.getParent());
-                try (DataOutputStream out = new DataOutputStream(Files.newOutputStream(file,
-                        StandardOpenOption.CREATE, StandardOpenOption.APPEND))) {
-                    out.writeLong(location);
-                }
-            } catch (IOException problem) {
-                System.err.println("[SofronPack] Distant chunk cache write error: " + problem.getMessage());
-            }
-        }
+        if (i != result.length) throw new IllegalStateException("Invalid LOD ring traversal");
+        return result;
     }
 }

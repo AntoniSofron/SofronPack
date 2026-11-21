@@ -16,5 +16,6 @@ public abstract class MinecraftFramePrepareMixin {
         var camera = mc.gameRenderer.mainCamera();
         var pos = camera.position();
         SodiumRenderPassCoordinator.prepareFrame(pos.x, pos.y, pos.z);
+        pl.sofron.extended.client.ExtendedWorldLodRenderer.prepareFrame(pos.x, pos.z);
     }
 }

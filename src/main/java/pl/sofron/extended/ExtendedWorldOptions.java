@@ -11,12 +11,11 @@ public final class ExtendedWorldOptions {
 
     public static BooleanOptionBuilder build(ConfigBuilder builder) {
         var option = builder.createBooleanOption(Identifier.parse("sofronpack:extended_world"));
-        option.setName(Component.literal(ExtendedWorldVoxyBridge.available() ? "Większy świat (64 chunki)" : "Większy świat (wymaga Voxy)"));
-        option.setEnabled(ExtendedWorldVoxyBridge.available());
-        option.setTooltip(Component.literal("Zwykły zasięg renderowania i aktualizacji pozostaje " +
-                "bez zmian. Odległy teren generuje się stopniowo i trafia do trwałego LOD. " +
-                "Tryb wymaga Voxy jako silnika LOD; nowy teren generowany jest tylko w " +
-                "trybie jednoosobowym. Po zmianie opcji ponownie wejdź do świata."));
+        option.setName(Component.literal("Większy świat (LOD 64 chunki)"));
+        option.setTooltip(Component.literal("SofronPack samodzielnie wyświetla i zapisuje uproszczony " +
+                "teren do 64 chunków. Zwykły zasięg renderowania i symulacji " +
+                "pozostaje bez zmian. Generowanie nowego terenu działa stopniowo " +
+                "w trybie jednoosobowym. Nie potrzebujesz dodatkowego moda."));
         option.setBinding(value -> ExtendedWorldConfig.get().setEnabled(value),
                 () -> ExtendedWorldConfig.get().enabled);
         option.setDefaultValue(false);

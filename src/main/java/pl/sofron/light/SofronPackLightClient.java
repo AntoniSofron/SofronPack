@@ -33,7 +33,10 @@ public final class SofronPackLightClient implements ClientModInitializer {
             PROBE.tick(client, LIGHTS, CONFIG);
             diagnostics.tick(client, LIGHTS, CONFIG);
         });
-        ClientLifecycleEvents.CLIENT_STOPPING.register(client -> pl.sofron.light.render.gpu.SodiumRenderPassCoordinator.close());
+        ClientLifecycleEvents.CLIENT_STOPPING.register(client -> {
+            pl.sofron.extended.client.ExtendedWorldLodRenderer.close();
+            pl.sofron.light.render.gpu.SodiumRenderPassCoordinator.close();
+        });
         System.out.println("[Sofron Pack Light] Sodium terrain lighting initialized.");
     }
 }

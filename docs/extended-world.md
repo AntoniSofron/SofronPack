@@ -1,54 +1,52 @@
-# SofronPack Extended World (Minecraft 26.3)
+# SofronPack Extended World — native LOD, Minecraft 26.3
 
-This is an optional, conservative distant-world feature, implemented as a
-small integration layer rather than an in-tree copy of Voxy.
+The Extended World mode is fully part of **one SofronPack JAR**. It does not
+load or require Voxy, and no Voxy code is copied into this implementation.
+The architecture follows the same basic principle of separating far, frozen
+geometries from near, live Minecraft chunks.
 
-## In-game behavior
+## How it works
 
-* **Render distance** and **simulation distance** remain Minecraft settings.
-  SofronPack never changes them automatically.
-* An **Extended World / Większy świat** switch appears directly after the render
-  distance slider in Sodium's General settings. Rejoin the world to apply it.
-* In an integrated single-player server, a bounded background queue loads
-  existing chunks or generates missing chunks up to **64 chunks** from the
-  player's current chunk. Traversal uses successive Chebyshev rings.
-* At most **one Minecraft asynchronous chunk request** may be in flight.
-  A new request is scheduled at most once every four server ticks.
-* FULL chunks are delivered once to the optional Voxy LOD ingestion service.
-  The generator does not permanently force-load them or grant them simulation
-  tickets. The ordinary engine remains in charge of live updates nearby.
-* Completed LOD ingestions are tracked per dimension in the save's
-  `sofronpack-extended-world/` directory so the same distant columns are
-  not repeatedly pre-generated. The actual LOD appearance/storage is managed
-  by the rendering backend.
+* A **Większy świat (LOD 64 chunki)** toggle is inserted directly underneath
+  the normal render-distance control in Sodium's Video Settings.
+* Minecraft's normal render and simulation distances are untouched.
+* In single-player, the integrated server incrementally visits chunk
+  coordinates in near-to-far rings up to **64 chunks** from the player,
+  loading previously generated chunks and generating missing ones.
+* Only one FULL-chunk request is in flight, and attempts are paced to no more
+  than once every four ticks. These are Minecraft's normal chunk generation
+  requests and don't add permanent simulation tickets.
+* Finished chunks yield a compact 8-block-resolution surface representation
+  (3x3 heights and 2x2 colours per chunk), saved as a versioned binary database
+  under the world save. Far terrain uses this frozen snapshot.
+* Nearby, loaded chunks are resampled at a bounded pace to reflect gameplay
+  changes before they eventually become distant again. Distant snapshots are
+  not continuously simulated or re-rendered by vanilla.
+* The built-in RenderPearl client renderer groups the far data into GPU tiles,
+  reuses each tile until its sources change or the camera moves across a LOD
+  boundary, and performs at most 3 tile uploads per frame.
 
-## Compatibility and limits
+## Boundaries / safety
 
-**Voxy 26.3 must also be installed** to render the distant terrain. This
-release of SofronPack has its own scheduler and setting, but does **not** yet
-bundle or replace Voxy's GPU rendering and persistent LOD engine. The toggle
-is disabled when Voxy is missing. No upstream source code is copied into this
-module.
+* The native renderer is **surface-only LOD**: land, height variations and
+  large-scale shapes are approximated using 8-block quads. It is not a
+  block-perfect reproduction of caves, foliage, facades, overhangs or structures.
+  Developing full voxel LOD of Voxy's fidelity is a separate engineering step.
+* Gameplay, redstone, entities, block ticks and crop growth remain governed by
+  Minecraft's standard live chunk view and simulation distances.
+* Far pregeneration is **single-player only**. On external multiplayer servers
+  a client must not compel generation of chunks the server has not sent.
+* The system is intentionally off by default. Generating 64 chunk radii can
+  take substantial disk space and CPU time; the queue is paced for stability.
+* Minecraft 26.3's RenderPearl pipeline is used instead of raw OpenGL. The
+  renderer is intended to work with both OpenGL and Vulkan backends, subject
+  to in-game testing (automated client bootstrap alone is insufficient).
+* Existing worlds are not converted or modified outside their normal Minecraft
+  region data; the distant surface cache is stored separately.
 
-Only integrated single-player generation is supported. External multiplayer
-servers control which chunks exist and which chunks may be generated; the
-client must not bypass server view-distance permissions. Voxy may require
-an OpenGL backend and suitable GPU capabilities.
+## Implementation
 
-Generating a new 129 x 129 chunk area can take a long time and occupy disk
-space. The queue is intentionally gradual to avoid overwhelming the tick
-thread. Chunk generation is not the same as a GPU LOD mesh, and continuous
-movement may postpone work at the outer rings.
+`ExtendedWorldPrefetch` → `ExtendedWorldStorage` →
+`ExtendedWorldMeshBuilder` → `ExtendedWorldLodRenderer`
 
-## Files and entry points
-
-* `ExtendedWorldConfig`: independent opt-in configuration.
-* `ExtendedWorldOptions` and client mixin: UI below render distance.
-* `ExtendedWorldPrefetch`: bounded background generation and progress log.
-* `ExtendedChunkFutureAccess`: Minecraft's own chunk generation future.
-* `ExtendedWorldVoxyBridge`: optional runtime interface for LOD ingestion.
-
-A complete standalone renderer would require a dedicated GPU pipeline,
-frustum/occlusion selection, geometry generation, shader integration, storage
-versioning and end-to-end testing with Iris and Sodium; it is not part of
-this change.
+All four stages are compiled into the same SofronPack JAR.
