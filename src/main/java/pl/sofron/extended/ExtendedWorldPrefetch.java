@@ -10,6 +10,8 @@ import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.level.storage.LevelResource;
 import pl.sofron.extended.mixin.ExtendedChunkFutureAccess;
 
+import java.util.HashSet;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -30,9 +32,15 @@ public final class ExtendedWorldPrefetch {
         thread.setDaemon(true);
         return thread;
     });
-    private static int ticks, cursor, nearbyCursor;
+    private static int ticks, cursor, nearbyCursor, stageIndex;
     private static int pending, nearbyPending;
+    // Prevent duplicate FULL requests while an older snapshot is being
+    // generated or compressed. All accesses occur on the server thread.
+    private static final Set<Long> IN_FLIGHT = new HashSet<>();
     private static int centerX = Integer.MIN_VALUE, centerZ = Integer.MIN_VALUE;
+    // Anchor of the current staged scan, NOT the most recent player chunk.
+    // Continuous flight must eventually restart the local 8-chunk priority.
+    private static int scanAnchorX = Integer.MIN_VALUE, scanAnchorZ = Integer.MIN_VALUE;
     private static ServerLevel lastLevel;
 
     private ExtendedWorldPrefetch() {}
@@ -43,8 +51,9 @@ public final class ExtendedWorldPrefetch {
             ExtendedVoxelStore.close();
             pending = nearbyPending = 0;
             lastLevel = null;
-            cursor = nearbyCursor = ticks = 0;
-            centerX = centerZ = Integer.MIN_VALUE;
+            cursor = nearbyCursor = ticks = stageIndex = 0;
+            IN_FLIGHT.clear();
+            centerX = centerZ = scanAnchorX = scanAnchorZ = Integer.MIN_VALUE;
         });
     }
 
@@ -58,20 +67,23 @@ public final class ExtendedWorldPrefetch {
 
         if (level != lastLevel) {
             lastLevel = level;
-            centerX = centerZ = Integer.MIN_VALUE;
-            cursor = nearbyCursor = 0;
+            centerX = centerZ = scanAnchorX = scanAnchorZ = Integer.MIN_VALUE;
+            cursor = nearbyCursor = stageIndex = 0;
             pending = nearbyPending = 0;
+            IN_FLIGHT.clear();
         }
         ExtendedVoxelStore.open(server.getWorldPath(LevelResource.ROOT),
                 level.dimension().identifier().toString());
         int cx = player.chunkPosition().x(), cz = player.chunkPosition().z();
         if (cx != centerX || cz != centerZ) {
-            // Do not restart the expensive 128-chunk scan every time the
-            // player crosses a chunk boundary. Continuous flight otherwise
-            // prevents the cursor from ever reaching the distant rings.
-            if (centerX != Integer.MIN_VALUE &&
-                    Math.max(Math.abs(cx - centerX), Math.abs(cz - centerZ)) > 24) {
-                cursor = 0; // Actual teleport / dimension repositioning.
+            // Recenter the ordered ring scheduler only after 8 chunks of
+            // accumulated travel, not after each adjacent-chunk movement.
+            // Otherwise sustained flight never generates distant bands.
+            if (ExtendedLodStages.shouldRecenter(
+                    cx, cz, scanAnchorX, scanAnchorZ)) {
+                stageIndex = cursor = 0;
+                scanAnchorX = cx;
+                scanAnchorZ = cz;
             }
             centerX = cx;
             centerZ = cz;
@@ -93,66 +105,119 @@ public final class ExtendedWorldPrefetch {
         // This is a bounded throughput improvement, not a 100x worldgen claim.
         // Throttle hard as soon as server tick duration becomes critical.
         if (busyServer && ticks % 4 != 0) return;
-        int submitBudget = busyServer ? 1 : 4;
-        for (int submitted = 0; submitted < submitBudget && pending < MAX_PENDING; ) {
-            int inspected = 0;
-            boolean launched = false;
-            while (inspected++ < 2048) {
-                if (cursor == OFFSETS.length) cursor = 0;
-                long offset = OFFSETS[cursor++];
-                int dx = (int)(offset >> 32), dz = (int)offset;
-                if (Math.max(Math.abs(dx), Math.abs(dz)) <= normal) continue;
-                int x = cx + dx, z = cz + dz;
-                if (ExtendedVoxelStore.has(x, z)) continue;
-
-                final ServerLevel expectedLevel = level;
-                pending++;
-                submitted++;
-                launched = true;
-                try {
-                    var future = ((ExtendedChunkFutureAccess)level.getChunkSource())
-                            .sofron$getChunkFuture(x, z, ChunkStatus.FULL, true);
-                    future.whenComplete((result, error) -> server.execute(() -> {
-                        // Keep the pending slot until the *entire* snapshot is
-                        // compressed and published. This bounds memory and
-                        // worker queue depth even during rapid camera motion.
-                        final boolean[] encoding = {false};
-                        try {
-                            if (expectedLevel != lastLevel || error != null || result == null) return;
-                            result.ifSuccess(chunk -> {
-                                if (chunk instanceof LevelChunk full) {
-                                    var captured = ExtendedVoxelStore.capture(expectedLevel, full);
-                                    CompletableFuture.supplyAsync(captured::encode, ENCODERS)
-                                            .whenComplete((encoded, failure) -> server.execute(() -> {
-                                                try {
-                                                    if (expectedLevel != lastLevel) return;
-                                                    if (failure != null) {
-                                                        System.err.println("[SofronPack] Distant voxel encode: "
-                                                                + failure.getMessage());
-                                                    } else if (encoded != null) {
-                                                        ExtendedVoxelStore.put(encoded);
-                                                    }
-                                                } finally {
-                                                    if (expectedLevel == lastLevel)
-                                                        pending = Math.max(0, pending - 1);
-                                                }
-                                            }));
-                                    encoding[0] = true;
-                                }
-                            });
-                        } finally {
-                            if (!encoding[0] && expectedLevel == lastLevel)
-                                pending = Math.max(0, pending - 1);
-                        }
-                    }));
-                } catch (RuntimeException failure) {
-                    pending = Math.max(0, pending - 1);
-                    System.err.println("[SofronPack] Distant chunk generation: " + failure.getMessage());
-                }
-                break;
+        int submitBudget = busyServer ? 1 : stageIndex == 0 ? 8 : stageIndex == 1 ? 6 : 4;
+        int submitted = 0, inspected = 0;
+        // Strict near-first stage boundaries. A later band cannot be queued
+        // before the preceding band has finished persisting its snapshots.
+        while (submitted < submitBudget && pending < MAX_PENDING && inspected < 4096) {
+            if (stageIndex >= ExtendedLodStages.count()) {
+                // All seven bands have been processed. Do not spin through
+                // the 128-chunk world every tick once the cache is complete.
+                if (ticks % 20 != 0) break;
+                stageIndex = cursor = 0;
             }
-            if (!launched) break;
+
+            int first = ExtendedLodStages.startInclusive(stageIndex);
+            int last = ExtendedLodStages.endExclusive(stageIndex);
+            if (cursor < first) cursor = first;
+            if (cursor >= last) {
+                if (pending > 0) {
+                    // Wait for this band to finish rather than dispatching the
+                    // next one and starving the closest visible terrain.
+                    cursor = first;
+                    break;
+                }
+                int missing = firstMissing(level, cx, cz, first, last);
+                if (missing >= 0) {
+                    cursor = missing; // Retry failed/previously pending cells.
+                    break;
+                }
+                stageIndex++;
+                if (stageIndex < ExtendedLodStages.count())
+                    cursor = ExtendedLodStages.startInclusive(stageIndex);
+                continue;
+            }
+
+            long offset = OFFSETS[cursor++];
+            inspected++;
+            int dx = (int)(offset >> 32), dz = (int)offset;
+            int x = cx + dx, z = cz + dz;
+            long key = pack(x, z);
+            if (ExtendedVoxelStore.has(x, z) || IN_FLIGHT.contains(key)) continue;
+            IN_FLIGHT.add(key);
+            pending++;
+            submitted++;
+            final ServerLevel expectedLevel = level;
+            try {
+                // Capture already-live terrain immediately, without asking
+                // worldgen to build the same chunk twice.
+                LevelChunk loaded = level.getChunkSource().getChunkNow(x, z);
+                if (loaded != null) {
+                    encodeAndPublish(server, expectedLevel, loaded, key);
+                    continue;
+                }
+                var future = ((ExtendedChunkFutureAccess)level.getChunkSource())
+                        .sofron$getChunkFuture(x, z, ChunkStatus.FULL, true);
+                future.whenComplete((result, error) -> server.execute(() -> {
+                    boolean queued = false;
+                    try {
+                        if (expectedLevel != lastLevel || error != null || result == null) return;
+                        // Minecraft may return success or failure; queue only
+                        // fully generated source chunks for async compression.
+                        final boolean[] scheduled = {false};
+                        result.ifSuccess(chunk -> {
+                            if (chunk instanceof LevelChunk full) {
+                                encodeAndPublish(server, expectedLevel, full, key);
+                                scheduled[0] = true;
+                            }
+                        });
+                        queued = scheduled[0];
+                    } catch (RuntimeException failure) {
+                        System.err.println("[SofronPack] Distant chunk capture: " + failure.getMessage());
+                    } finally {
+                        if (!queued) finishRequest(expectedLevel, key);
+                    }
+                }));
+            } catch (RuntimeException failure) {
+                finishRequest(expectedLevel, key);
+                System.err.println("[SofronPack] Distant chunk generation: " + failure.getMessage());
+            }
         }
+    }
+
+    private static int firstMissing(ServerLevel level, int cx, int cz, int begin, int end) {
+        for (int i = begin; i < end; i++) {
+            long offset = OFFSETS[i];
+            int x = cx + (int)(offset >> 32);
+            int z = cz + (int)offset;
+            if (!ExtendedVoxelStore.has(x, z) && !IN_FLIGHT.contains(pack(x, z)))
+                return i;
+        }
+        return -1;
+    }
+
+    private static void finishRequest(ServerLevel expected, long key) {
+        if (expected != lastLevel) return;
+        IN_FLIGHT.remove(key);
+        pending = Math.max(0, pending - 1);
+    }
+
+    private static void encodeAndPublish(MinecraftServer server, ServerLevel level,
+                                         LevelChunk chunk, long key) {
+        var captured = ExtendedVoxelStore.capture(level, chunk);
+        CompletableFuture.supplyAsync(captured::encode, ENCODERS)
+                .whenComplete((encoded, error) -> server.execute(() -> {
+                    try {
+                        if (level != lastLevel) return;
+                        if (error != null) {
+                            System.err.println("[SofronPack] Distant voxel encode: " + error.getMessage());
+                        } else if (encoded != null) {
+                            ExtendedVoxelStore.put(encoded);
+                        }
+                    } finally {
+                        finishRequest(level, key);
+                    }
+                }));
     }
 
     private static void refreshNearby(MinecraftServer server, ServerLevel level,

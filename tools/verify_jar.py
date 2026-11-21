@@ -110,7 +110,19 @@ with zipfile.ZipFile(jar) as z:
     assert b"cylindricalBlocks" in extended_shader
     assert b"FogRenderDistanceStart" in extended_shader
     assert b"linear_fog_value" in extended_shader
-    assert b"max(baseFog, nativeFog)" in extended_shader
+    assert b"sofronExtendedFog" in extended_shader
+    assert b"horizontalChunks < FogRenderDistanceStart / 16.0" in extended_shader
+    shared_shader = z.read("assets/sofronpack/shaders/include/extended_fog.glsl")
+    assert b"sofronExtendedFog" in shared_shader
+    assert b"16.0,  8.0" in shared_shader
+    native_shader = z.read("assets/sofronpack/shaders/blocks/block_layer_opaque.fsh")
+    assert b"sofronExtendedFog" in native_shader
+    assert b"2047.5" in native_shader
+    assert "pl/sofron/extended/ExtendedLodHandoff.class" in files
+    assert "pl/sofron/extended/ExtendedLodStages.class" in files
+    assert "int pass = band * 2" in pathlib.Path(
+        "src/main/java/pl/sofron/extended/client/ExtendedWorldLodRenderer.java").read_text()
+    assert b"sofronFogStrength(FogEnvironmentalEnd)" in extended_shader
     cloud_vertex = z.read("assets/minecraft/shaders/core/sofronpack/clouds.vsh")
     assert b"0.60 * underside" in cloud_vertex
     assert b"ColorModulator.rgb" in cloud_vertex
@@ -129,6 +141,7 @@ with zipfile.ZipFile(jar) as z:
     fog_mixin_source = pathlib.Path(
         "src/main/java/pl/sofron/extended/mixin/ExtendedWorldFogMixin.java").read_text()
     assert "fog.renderDistanceStart = start" in fog_mixin_source
+    assert "ExtendedLodHandoff.nearStartChunks(renderDistanceInChunks)" in fog_mixin_source
     assert "AtmospherePresets.distantFogBlend()" in fog_mixin_source
     assert "Unified Extended World fog active" in fog_mixin_source
     assert "fog.renderDistanceEnd = end" in fog_mixin_source

@@ -2,6 +2,7 @@
 
 #include <sodium:globals.glsl>
 #include <sodium:fog.glsl>
+#include <sofronpack:extended_fog.glsl>
 #include <sodium:chunk_material.glsl>
 #include <minecraft:oit.glsl>
 
@@ -107,6 +108,16 @@ vec4 calculateFinalColor(vec4 color) {
     float factor = fadeFactor;
     #endif
 
+    // 2048-block far end is the opt-in Extended World fog signature.
+    // This replaces Sodium's aggressive linear distance fade ONLY for
+    // normal terrain when Extended World is enabled. LODs call this exact
+    // same function, so both renderers use the same 16/32/64/96/128 stages.
+    if (u_RenderFog.y >= 2047.5) {
+        float horizontalChunks = length(spl_SurfaceCameraPos.xz) / 16.0;
+        float strength = sofronFogStrength(u_EnvironmentFog.y);
+        float fog = max(1.0 - factor, sofronExtendedFog(horizontalChunks, strength));
+        return vec4(mix(color.rgb, fogColor.rgb, fog * fogColor.a), color.a);
+    }
     return _linearFog(color, v_FragDistance, fogColor, u_EnvironmentFog, u_RenderFog, factor);
 }
 vec4 sampleNearest(sampler2D source, vec2 uv, vec2 pixelSize, vec2 du, vec2 dv, vec2 texelScreenSize) {

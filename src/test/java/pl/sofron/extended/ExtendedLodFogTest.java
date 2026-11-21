@@ -14,6 +14,24 @@ class ExtendedLodFogTest {
         assertEquals(1f, ExtendedLodFog.opacity(150), 0.00001);
     }
 
+    @Test void badWeatherMovesAllBandsCloserButPreservesSmoothness() {
+        assertEquals(0f, ExtendedLodFog.opacity(8, 1f), .0001f);
+        assertEquals(.13f, ExtendedLodFog.opacity(16, 1f), .0001f);
+        assertEquals(.55f, ExtendedLodFog.opacity(32, 1f), .0001f);
+        assertEquals(.85f, ExtendedLodFog.opacity(56, 1f), .0001f);
+        assertEquals(1f, ExtendedLodFog.opacity(64, 1f), .0001f);
+        assertEquals(0f, ExtendedLodFog.strengthFromEnvironmentalEnd(2048), .0001f);
+        assertEquals(1f, ExtendedLodFog.strengthFromEnvironmentalEnd(256), .0001f);
+        for (float strength : new float[] {0f, .25f, .5f, 1f}) {
+            float previous = -1f;
+            for (int i = 0; i <= 1300; i++) {
+                float now = ExtendedLodFog.opacity(i / 10d, strength);
+                assertTrue(now >= previous - 1e-5f);
+                previous = now;
+            }
+        }
+    }
+
     @Test void fogNeverDecreasesOrJumpsAcrossLodBorders() {
         float previous = -1;
         for (int i = 0; i <= 12800; i++) {

@@ -122,6 +122,39 @@ class ExtendedVoxelLodTest {
         assertEquals(0, eastFaces[0], "Unloaded east neighbour must not become a vertical wall");
     }
 
+    @Test void sevenEighthsBoundaryIsAbsoluteButRetainsNormalChunkOverlap() {
+        short[] cells = new short[ExtendedVoxelStore.GRID * ExtendedVoxelStore.GRID];
+        cells[0] = 1;
+        var chunk = ExtendedVoxelStore.encode(13, 0, 0, 1,
+                new String[]{"minecraft:air", "minecraft:stone"}, cells);
+        var material = new ExtendedVoxelMesher.MaterialUV(0, 0, 1, 1, 0xffffff, false);
+        // Camera at (0,0); radius 13 is strictly closer than 16*7/8.
+        var hidden = ExtendedVoxelMesher.build(3, 0, 0, 0, 16, 64, 1,
+                (x,z) -> x==13 && z==0 ? chunk : null, (id,dir)->material,
+                (x,z) -> false);
+        assertEquals(0, hidden.quads());
+        var boundary = ExtendedVoxelStore.encode(14, 0, 0, 1,
+                new String[]{"minecraft:air", "minecraft:stone"}, cells);
+        var visible = ExtendedVoxelMesher.build(3, 0, 0, 0, 16, 64, 1,
+                (x,z) -> x==14 && z==0 ? boundary : null, (id,dir)->material,
+                (x,z) -> false);
+        assertTrue(visible.quads() > 0);
+    }
+
+    @Test void diagonalHandoffUsesHorizontalRadiusNotSquareDistance() {
+        short[] cells = new short[ExtendedVoxelStore.GRID * ExtendedVoxelStore.GRID];
+        cells[0] = 1;
+        var one = ExtendedVoxelStore.encode(10, 10, 0, 1,
+                new String[]{"minecraft:air", "minecraft:stone"}, cells);
+        var uv = new ExtendedVoxelMesher.MaterialUV(0, 0, 1, 1, 0xffffff, false);
+        // sqrt(10^2+10^2) > 14: LOD must be allowed even
+        // though Chebyshev chunk distance is only 10.
+        var mesh = ExtendedVoxelMesher.build(2, 2, 0, 0, 16, 64, 1,
+                (x,z) -> x == 10 && z == 10 ? one : null,
+                (id,face) -> uv, (x,z) -> false);
+        assertTrue(mesh.quads() > 0, "Diagonal LOD must not have a radial handoff hole");
+    }
+
     @Test void normalRenderRangeKeepsPriority() {
         short[] cells = new short[ExtendedVoxelStore.GRID * ExtendedVoxelStore.GRID];
         Arrays.fill(cells, (short)1);
