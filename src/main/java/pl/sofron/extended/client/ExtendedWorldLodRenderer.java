@@ -173,6 +173,7 @@ public final class ExtendedWorldLodRenderer {
                 // near-resolution rebuilds stalling the render thread.
                 if (rebuilt > 0 && System.nanoTime() >= meshDeadline) break;
                 Long best = null;
+                int bestPass = Integer.MAX_VALUE;
                 double nearest = Double.POSITIVE_INFINITY;
                 for (long key : DIRTY) {
                     int tx = (int)(key >> 32), tz = (int)key;
@@ -181,7 +182,21 @@ public final class ExtendedWorldLodRenderer {
                     double dx = (long)tx * TILE * 16 + TILE * 8 - px;
                     double dz = (long)tz * TILE * 16 + TILE * 8 - pz;
                     double distanceSq = dx * dx + dz * dz;
-                    if (distanceSq < nearest) { nearest = distanceSq; best = key; }
+                    // Prioritise close previews, then refine close terrain,
+                    // then fill farther regions and refine those. Without
+                    // spatially bounded passes, *any* missing distant tile
+                    // could starve near-field resolution upgrades indefinitely.
+                    int radiusChunks = Math.max(
+                            Math.abs(tx * TILE + TILE / 2 - cx),
+                            Math.abs(tz * TILE + TILE / 2 - cz));
+                    int pass = MESHES.containsKey(key)
+                            ? (radiusChunks <= 64 ? 1 : 3)
+                            : (radiusChunks <= 64 ? 0 : 2);
+                    if (pass < bestPass || (pass == bestPass && distanceSq < nearest)) {
+                        bestPass = pass;
+                        nearest = distanceSq;
+                        best = key;
+                    }
                 }
                 if (best == null) break;
                 DIRTY.remove(best);
@@ -225,8 +240,9 @@ public final class ExtendedWorldLodRenderer {
                         (float)-camera.y,
                         (float)((long)tz * TILE * 16 - camera.z));
                 var transform = RenderSystem.getDynamicUniforms().writeTransform(
-                        relative, new Vector4f(1f, 1f, 1f,
-                                pl.sofron.atmosphere.AtmospherePresets.distantFogBlend()),
+                        // Full material alpha: fog is now calculated
+                        // exclusively from the shared Minecraft Fog uniforms.
+                        relative, new Vector4f(1f, 1f, 1f, 1f),
                         new Vector3f(
                                 (float)((long)tx * TILE * 16 - camera.x),
                                 (float)-camera.y,
@@ -296,20 +312,38 @@ public final class ExtendedWorldLodRenderer {
         int dx = Math.abs(tx * TILE + TILE / 2 - cx);
         int dz = Math.abs(tz * TILE + TILE / 2 - cz);
         int range = Math.max(dx, dz);
-        int detail = ExtendedLodLevels.voxelSize(range);
+        int wantedDetail = ExtendedLodLevels.voxelSize(range);
+        long key = ExtendedVoxelStore.pack(tx, tz);
+        boolean firstPaint = !MESHES.containsKey(key);
+        int detail = firstPaint ? ExtendedLodLevels.firstPaintVoxelSize(range) : wantedDetail;
         var client = Minecraft.getInstance().level;
         var mesh = ExtendedVoxelMesher.build(tx, tz, cx, cz, near, FAR, detail,
                 ExtendedVoxelStore::get, ATLAS,
                 (chunkX, chunkZ) -> client != null &&
                         client.getChunkSource().getChunk(chunkX, chunkZ, ChunkStatus.FULL, false) != null);
+        // A very sparse or extremely high-altitude scene can have no block
+        // exactly on the 4-block sampling grid. Fall back to full resolution
+        // rather than leaving that tile permanently invisible.
+        if (mesh.quads() == 0 && detail != wantedDetail) {
+            detail = wantedDetail;
+            mesh = ExtendedVoxelMesher.build(tx, tz, cx, cz, near, FAR, detail,
+                    ExtendedVoxelStore::get, ATLAS,
+                    (chunkX, chunkZ) -> client != null &&
+                            client.getChunkSource().getChunk(chunkX, chunkZ,
+                                    ChunkStatus.FULL, false) != null);
+        }
         // Never retire the visible mesh before the replacement is ready.
         // If source data is temporarily missing, preserve the prior buffer.
         if (mesh.quads() == 0) return;
         GpuBuffer buffer = device.createBuffer(() -> "SofronPack Extended World tile",
                 GpuBuffer.USAGE_VERTEX | GpuBuffer.USAGE_COPY_DST, mesh.vertices());
-        GpuTile previous = MESHES.put(ExtendedVoxelStore.pack(tx, tz),
-                new GpuTile(buffer, mesh.quads(), detail));
+        GpuTile previous = MESHES.put(key, new GpuTile(buffer, mesh.quads(), detail));
         if (previous != null) previous.close();
+        if (detail != wantedDetail) {
+            // The cheap preview is visible now; refine when there are no
+            // missing visible tiles left to fill. No camera movement needed.
+            DIRTY.add(key);
+        }
         if (!loggedFirstUpload) {
             loggedFirstUpload = true;
             System.out.println("[SofronPack] Textured Extended World LOD GPU tile uploaded: "

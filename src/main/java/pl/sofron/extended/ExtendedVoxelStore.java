@@ -239,7 +239,25 @@ public final class ExtendedVoxelStore {
         }
     }
 
+    /**
+     * Immutable-by-ownership capture of a live chunk. Block states and biome
+     * tints are read ONLY on the server thread; pure zlib compression of the
+     * copied primitive volume can safely run on a bounded worker pool.
+     */
+    public record CapturedVoxel(int chunkX, int chunkZ, int minY, int yCount,
+                                int grassTint, int foliageTint, int waterTint,
+                                String[] palette, short[] cells) {
+        public VoxelChunk encode() {
+            return ExtendedVoxelStore.encode(chunkX, chunkZ, minY, yCount,
+                    grassTint, foliageTint, waterTint, palette, cells);
+        }
+    }
+
     public static VoxelChunk sample(ServerLevel level, LevelChunk chunk) {
+        return capture(level, chunk).encode();
+    }
+
+    public static CapturedVoxel capture(ServerLevel level, LevelChunk chunk) {
         int chunkX = chunk.getPos().x(), chunkZ = chunk.getPos().z();
         int minimum = level.getMinY();
         int count = chunk.getSections().length * 16 / CELL;
@@ -288,7 +306,7 @@ public final class ExtendedVoxelStore {
                 net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, 8, 8),
                 chunkZ * 16 + 8);
         var biome = level.getBiome(pos).value();
-        return encode(chunkX, chunkZ, minimum, count,
+        return new CapturedVoxel(chunkX, chunkZ, minimum, count,
                 biome.getGrassColor(pos.getX(), pos.getZ()),
                 biome.getFoliageColor(), biome.getWaterColor(),
                 palette.toArray(String[]::new), cells);

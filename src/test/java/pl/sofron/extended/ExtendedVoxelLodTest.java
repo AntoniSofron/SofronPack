@@ -26,6 +26,20 @@ class ExtendedVoxelLodTest {
         assertEquals(0x256db1, restored.waterTint());
     }
 
+    @Test void offThreadCapturedSnapshotProducesTheSamePersistentFormat() {
+        short[] cells = new short[ExtendedVoxelStore.GRID * ExtendedVoxelStore.GRID * 2];
+        cells[3] = 1;
+        cells[50] = 2;
+        var raw = new ExtendedVoxelStore.CapturedVoxel(15, -8, -64, 2,
+                0x45a457, 0x66a951, 0x3777e4,
+                new String[]{"minecraft:air", "minecraft:stone", "minecraft:oak_leaves"}, cells);
+        var encoded = java.util.concurrent.CompletableFuture.supplyAsync(raw::encode).join();
+        assertArrayEquals(cells, encoded.unpack());
+        assertEquals(15, encoded.chunkX());
+        assertEquals(-8, encoded.chunkZ());
+        assertArrayEquals(raw.palette(), encoded.palette());
+    }
+
     @Test void blockStatePaletteKeepsDistinctLogOrientationsAfterReload() throws Exception {
         short[] cells = new short[ExtendedVoxelStore.GRID * ExtendedVoxelStore.GRID];
         cells[0] = 1;
@@ -82,6 +96,30 @@ class ExtendedVoxelLodTest {
                         : cx == 4 && cz == 0 ? east : null,
                 (block, face) -> texture);
         assertEquals(5, mesh.quads(), "Face shared with a neighbouring LOD tile must be culled");
+    }
+
+    @Test void aMissingNeighbourDoesNotCreateAFalseStoneWall() {
+        int grid = ExtendedVoxelStore.GRID;
+        short[] cells = new short[grid * grid * 16];
+        // A coarse, four-block-wide column at the eastern boundary.
+        // The missing neighbour must not become a 16-block stone curtain.
+        for (int y = 0; y < 16; y++) {
+            for (int x = 12; x < 16; x++) {
+                cells[(y * grid + 8) * grid + x] = 1;
+            }
+        }
+        var voxel = ExtendedVoxelStore.encode(3, 0, 0, 16,
+                new String[]{"minecraft:air", "minecraft:stone"}, cells);
+        int[] eastFaces = {0};
+        var material = new ExtendedVoxelMesher.MaterialUV(0, 0, 1, 1, 0xffffff, false);
+        var result = ExtendedVoxelMesher.build(0, 0, 20, 20, 12, 64, 4,
+                (x, z) -> x == 3 && z == 0 ? voxel : null,
+                (name, face) -> {
+                    if (face == Direction.EAST) eastFaces[0]++;
+                    return material;
+                });
+        assertTrue(result.quads() > 0);
+        assertEquals(0, eastFaces[0], "Unloaded east neighbour must not become a vertical wall");
     }
 
     @Test void normalRenderRangeKeepsPriority() {

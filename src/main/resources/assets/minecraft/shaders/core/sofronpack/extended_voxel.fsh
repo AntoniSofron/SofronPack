@@ -9,7 +9,7 @@ layout(location = 0) in vec2 texCoord0;
 layout(location = 1) in vec4 vertexColor;
 layout(location = 2) in float horizontalChunks;
 layout(location = 3) in float sphericalBlocks;
-layout(location = 4) in float atmosphereBlend;
+layout(location = 4) in float cylindricalBlocks;
 
 layout(location = 0) out vec4 fragColor;
 
@@ -37,24 +37,17 @@ void main() {
 
     float baseFog = sofronLodFog(horizontalChunks);
 
-    // Use the SAME environmental start/end distances as normal Minecraft
-    // terrain. In thick biome/weather/cave fog, a 100% fogged normal chunk
-    // must not be followed by a fully visible distant LOD tile.
-    //
-    // Render-distance clipping is NOT carried into the distant world: only
-    // the custom environment is shared. This preserves 128-chunk visibility
-    // in clear weather. The atmosphereBlend signal comes from the CPU's
-    // actual biome/cave/weather fog selection, never distance heuristics.
-    float environmentFog = clamp(
-        (sphericalBlocks - FogEnvironmentalStart)
-            / max(FogEnvironmentalEnd - FogEnvironmentalStart, 0.001),
-        0.0, 1.0
+    // Both the normal chunk renderer and the LOD shader now evaluate the
+    // SAME live environmental and render-distance fog uniforms. No weather
+    // switch or second biome-opacity multiplier: if normal terrain is fully
+    // fogged at a position, the corresponding LOD cannot show through it.
+    float nativeFog = max(
+        linear_fog_value(sphericalBlocks,
+            FogEnvironmentalStart, FogEnvironmentalEnd),
+        linear_fog_value(cylindricalBlocks,
+            FogRenderDistanceStart, FogRenderDistanceEnd)
     );
-    // Camera biome weights were ALREADY blended into FogEnvironmentalEnd.
-    // Multiplying that fog by the biome weight a second time would make the
-    // LOD half-transparent when the normal chunk is completely fogged.
-    float unifiedEnvironment = environmentFog * step(0.001, atmosphereBlend);
-    float fog = max(baseFog, unifiedEnvironment);
+    float fog = max(baseFog, nativeFog);
     // FogColor comes from the live blended biome/environment, not a fixed hue.
     sampled.rgb = mix(sampled.rgb, FogColor.rgb, fog);
     // At 128 chunks even semi-transparent water must disappear completely

@@ -17,6 +17,11 @@ public final class ExtendedLodLevels {
         return 16;
     }
 
+    /** First visible mesh: at most 4-block voxels before a later full-detail rebuild. */
+    public static int firstPaintVoxelSize(int distanceChunks) {
+        return Math.max(4, voxelSize(distanceChunks));
+    }
+
     public static int ringFor(int distanceChunks) {
         if (distanceChunks <= 32) return 0;
         if (distanceChunks <= 48) return 1;

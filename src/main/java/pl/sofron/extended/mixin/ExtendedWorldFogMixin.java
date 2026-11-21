@@ -13,6 +13,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import pl.sofron.extended.ExtendedWorldConfig;
+import pl.sofron.atmosphere.AtmospherePresets;
 
 /**
  * Normal chunks and far LODs share one atmospheric depth range. Only the
@@ -40,8 +41,19 @@ public abstract class ExtendedWorldFogMixin {
         // Keep normal chunk loading/simulation untouched while shifting only
         // this artificial distance fade to the *same* distant-world range.
         // Real environmental fog end/start still wins in severe conditions.
-        fog.renderDistanceStart = 16f * 16f;
-        fog.renderDistanceEnd = ExtendedWorldConfig.DISTANT_RADIUS_CHUNKS * 16f;
+        float start = 16f * 16f;
+        float end = ExtendedWorldConfig.DISTANT_RADIUS_CHUNKS * 16f;
+        fog.renderDistanceStart = start;
+        fog.renderDistanceEnd = end;
+
+        // Ordinary, clear-sky environmental fog was tuned for vanilla's
+        // much shorter view distance. Stretch only that benign haze to the
+        // extended horizon, while preserving the genuine biome, cave and
+        // weather fog computed earlier by AtmospherePresets.
+        float influence = Math.clamp(AtmospherePresets.distantFogBlend(), 0f, 1f);
+        fog.environmentalStart = start + (fog.environmentalStart - start) * influence;
+        fog.environmentalEnd = Math.max(fog.environmentalStart + 2f,
+                end + (fog.environmentalEnd - end) * influence);
         if (!sofron$logged) {
             sofron$logged = true;
             System.out.println("[SofronPack] Unified Extended World fog active: normal + LOD terrain, 128 chunks");
