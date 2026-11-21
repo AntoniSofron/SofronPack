@@ -122,11 +122,13 @@ void main() {
     // Use the same camera sky sample as the sky disc, including biome transitions.
     float underside = (useTopColor && CloudOffset.y < 0.0) ? 0.0 : 1.0 - faceVertex.y;
     vec3 sky = clamp(ColorModulator.rgb, 0.0, 1.0);
-    float peak = max(max(sky.r, sky.g), sky.b);
-    float chroma = peak - min(min(sky.r, sky.g), sky.b);
-    // Scale HSV saturation without clipping individual channels and shifting hue.
-    float gain = min(1.15, peak / max(chroma, 1e-6));
-    vec3 shadedSky = 0.92 * (vec3(peak) + (sky - vec3(peak)) * gain);
+    // Lift the weaker sky channels towards the cloud highlight. This keeps the
+    // biome hue visible and lets weather and night dim the highlight naturally.
+    float skyPeak = max(sky.r, max(sky.g, sky.b));
+    float cloudPeak = max(CloudColor.r, max(CloudColor.g, CloudColor.b));
+    float highlight = max(skyPeak, cloudPeak);
+    vec3 headroom = max(vec3(highlight) - sky, vec3(0.0));
+    vec3 shadedSky = sky + 0.62 * headroom * sqrt(headroom / max(highlight, 0.001));
     undersideTint = vec4(shadedSky, ColorModulator.a < 0.0 ? underside : 0.0);
     PlayerPos = pos;
 
