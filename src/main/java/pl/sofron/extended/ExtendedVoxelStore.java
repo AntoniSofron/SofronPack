@@ -18,17 +18,17 @@ import java.util.zip.*;
  * A sampled block is an axis-aligned cube, never a triangulated height field.
  */
 public final class ExtendedVoxelStore {
-    public static final int CELL = 2;
+    public static final int CELL = 1;
     public static final int GRID = 16 / CELL;
-    private static final int MAGIC = 0x53465633; // SFV3
-    private static final int VERSION = 3;
+    private static final int MAGIC = 0x53465634; // SFV4
+    private static final int VERSION = 4;
     private static final int MAX_RECORD = 1_048_576;
     private static volatile Session current;
     private static volatile long generation;
 
     private ExtendedVoxelStore() {}
 
-    /** A compressed immutable 8 x (height/2) x 8 material-palette grid. */
+    /** A compressed immutable 16 x full-height x 16 material-palette grid. */
     public record VoxelChunk(int chunkX, int chunkZ, int minY, int yCount,
                              int grassTint, int foliageTint, int waterTint,
                              String[] palette, byte[] deflated) {
@@ -175,7 +175,7 @@ public final class ExtendedVoxelStore {
     public static synchronized void open(Path save, String dimension) {
         String name = dimension.replaceAll("[^a-zA-Z0-9_.-]", "_");
         Path path = save.resolve("sofronpack-extended-world")
-                .resolve(name + ".voxel.v3.bin").toAbsolutePath().normalize();
+                .resolve(name + ".voxel.v4.bin").toAbsolutePath().normalize();
         Session old = current;
         if (old != null && old.file.equals(path)) return;
         close();
@@ -260,12 +260,11 @@ public final class ExtendedVoxelStore {
             int y = minimum + yi * CELL;
             for (int z = 0; z < GRID; z++) {
                 for (int x = 0; x < GRID; x++) {
-                    pos.set(chunkX * 16 + x * CELL + 1, y + 1, chunkZ * 16 + z * CELL + 1);
+                    // Store the actual Minecraft block at exact integer
+                    // coordinates: no 2-block averaging, synthetic colours
+                    // or diagonally interpolated heightfield.
+                    pos.set(chunkX * 16 + x, y, chunkZ * 16 + z);
                     BlockState state = chunk.getBlockState(pos);
-                    if (state.isAir() || (state.getRenderShape() == RenderShape.INVISIBLE && state.getFluidState().isEmpty())) {
-                        pos.set(chunkX * 16 + x * CELL, y, chunkZ * 16 + z * CELL);
-                        state = chunk.getBlockState(pos);
-                    }
                     int material = 0;
                     if (!state.isAir() && (state.getRenderShape() != RenderShape.INVISIBLE || !state.getFluidState().isEmpty())) {
                         String id = BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString();
