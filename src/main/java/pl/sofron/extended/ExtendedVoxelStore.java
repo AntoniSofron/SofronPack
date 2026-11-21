@@ -6,7 +6,6 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.block.RenderShape;
-import net.minecraft.world.level.block.state.properties.Property;
 import java.io.*;
 import java.nio.file.*;
 import java.util.*;
@@ -301,23 +300,23 @@ public final class ExtendedVoxelStore {
      * properties so the distant texture lookup selects the correct baked
      * model instead of rendering every block with its default texture.
      */
-    @SuppressWarnings({"rawtypes", "unchecked"})
     static String serializeState(BlockState state) {
         StringBuilder key = new StringBuilder(
                 BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString());
-        boolean first = true;
-        for (var entry : state.getValues().entrySet()) {
-            if (first) {
-                key.append('[');
-                first = false;
-            } else {
-                key.append(',');
+        // Minecraft 26.3 exposes properties as a Stream<Property.Value<?>>.
+        // valueName() uses the game's canonical encoding, including modded
+        // enum values, so these survive reloads correctly.
+        var values = state.getValues().toList();
+        if (!values.isEmpty()) {
+            key.append('[');
+            for (int i = 0; i < values.size(); i++) {
+                var value = values.get(i);
+                if (i != 0) key.append(',');
+                key.append(value.property().getName()).append('=')
+                        .append(value.valueName());
             }
-            Property property = entry.getKey();
-            key.append(property.getName()).append('=')
-                    .append(property.getName((Comparable) entry.getValue()));
+            key.append(']');
         }
-        if (!first) key.append(']');
         return key.toString();
     }
 
