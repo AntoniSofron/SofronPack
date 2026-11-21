@@ -1,0 +1,8 @@
+{
+  "required": false,
+  "minVersion": "0.8",
+  "package": "pl.sofron.extended",
+  "compatibilityLevel": "JAVA_25",
+  "client": ["ExtendedWorldSodiumOptionsMixin"],
+  "injectors": { "defaultRequire": 0 }
+}
