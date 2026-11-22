@@ -510,12 +510,15 @@ public final class ExtendedWorldLodRenderer {
             if (geometryArena == null) geometryArena = new ExtendedGpuGeometryArena(device);
             GpuTile previous = MESHES.get(key);
             ExtendedGpuGeometryArena.Region region;
-            if (previous != null && previous.region.size() >= packed.remaining()) {
-                // In-place upload into the same shared GPU allocation.
+            if (previous != null && previous.region.size() >= packed.remaining()
+                    && previous.region.size() <= (long)packed.remaining() * 2) {
+                // Reuse similarly sized regions to avoid needless GPU churn.
                 region = previous.region;
             } else {
-                // Retire an undersized old allocation BEFORE asking the
-                // driver for a replacement, so no double-VRAM spike.
+                // Also retire OVERSIZED regions when moving to a coarser mip:
+                // otherwise the geometry shrinks visually but stays at 1x1
+                // allocation size forever. Release BEFORE allocating again
+                // to prevent a temporary double-VRAM spike.
                 if (previous != null) {
                     MESHES.remove(key);
                     previous.close();
