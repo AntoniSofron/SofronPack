@@ -8,7 +8,7 @@ package pl.sofron.optimization.mixin;
 
 import com.mojang.blaze3d.platform.Window;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.FramerateLimiter;
+import com.mojang.blaze3d.platform.FramerateLimitTracker;
 import org.lwjgl.sdl.SDLVideo;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -19,7 +19,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  * Does not change gameplay or FPS when Minecraft is focused. Saves GPU time
  * when tabbed out, without interrupting vanilla world simulation or audio.
  */
-@Mixin(FramerateLimiter.class)
+@Mixin(FramerateLimitTracker.class)
 public abstract class SofronBackgroundFramerateMixin {
     private static final int INACTIVE_FPS = 15;
 
