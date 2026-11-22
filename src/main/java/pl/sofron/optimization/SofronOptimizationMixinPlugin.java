@@ -23,7 +23,9 @@ public final class SofronOptimizationMixinPlugin implements IMixinConfigPlugin {
                 || mixinClassName.contains("SofronGlSurface")) {
             return !loader.isModLoaded("immediatelyfast");
         }
-        if (mixinClassName.contains("SofronFastElytra")) return !loader.isModLoaded("lithium");
+        if (mixinClassName.contains("SofronFastElytra")
+                || mixinClassName.contains("SofronLithium"))
+            return !loader.isModLoaded("lithium");
         if (mixinClassName.contains("SofronBackgroundFramerate"))
             return !loader.isModLoaded("dynamic_fps");
         return true;
