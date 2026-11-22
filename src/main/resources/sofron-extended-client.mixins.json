@@ -8,7 +8,8 @@
     "ExtendedWorldSodiumRenderMixin",
     "ExtendedVoxelPipelineMixin",
     "ExtendedWorldFogMixin",
-    "ExtendedFogCullingMixin"
+    "ExtendedFogCullingMixin",
+    "SofronMinimalDebugOverlayMixin"
   ],
   "injectors": {
     "defaultRequire": 0
