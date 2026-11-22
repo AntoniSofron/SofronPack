@@ -13,6 +13,8 @@ import java.nio.file.Path;
 import pl.sofron.extended.ExtendedLodMeshCache;
 import pl.sofron.extended.ExtendedLodMeshFingerprint;
 import java.util.HashMap;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
@@ -115,6 +117,18 @@ public final class ExtendedWorldLodRenderer {
     private static long lastMeshIndexGeneration = Long.MIN_VALUE;
     private static int centerX = Integer.MIN_VALUE, centerZ = Integer.MIN_VALUE;
     private static int lastRenderDistance;
+
+    // Never traverse all 4,000+ distant tiles in a single render frame.
+    // A full horizon scan is spread over many frames. New camera positions
+    // request another pass without aborting an already-progressing scan.
+    private static final int HORIZON_TILES_PER_FRAME = 128;
+    private static final long HORIZON_SCAN_TIME_NS = 1_500_000L;
+    private static boolean horizonScanning, horizonAgain, horizonForce;
+    private static int horizonCursor, horizonMinTX, horizonMinTZ, horizonWidth, horizonDepth;
+    private static final ArrayDeque<Long> expiredMeshes = new ArrayDeque<>();
+    private static final ArrayDeque<Long> expiredDirty = new ArrayDeque<>();
+    private static final ArrayList<Long> reprioritize = new ArrayList<>();
+    private static int reprioritizeCursor;
     private static final Map<Long, Integer> readyColumns = new HashMap<>();
     private static int readyCursor;
     private static boolean failed;
@@ -178,40 +192,24 @@ public final class ExtendedWorldLodRenderer {
         int minTX = Math.floorDiv(cx - FAR, TILE), maxTX = Math.floorDiv(cx + FAR, TILE);
         int minTZ = Math.floorDiv(cz - FAR, TILE), maxTZ = Math.floorDiv(cz + FAR, TILE);
         updateNormalCoverage(mc, cx, cz, distance);
-        if (centerX != cx || centerZ != cz || lastRenderDistance != distance || indexReady) {
-            boolean first = centerX == Integer.MIN_VALUE || lastRenderDistance != distance;
+        boolean moved = centerX != cx || centerZ != cz;
+        boolean changedDistance = lastRenderDistance != distance;
+        if (moved || changedDistance || indexReady) {
+            boolean force = centerX == Integer.MIN_VALUE || changedDistance;
             centerX = cx; centerZ = cz; lastRenderDistance = distance;
-            for (int tx = minTX; tx <= maxTX; tx++) for (int tz = minTZ; tz <= maxTZ; tz++) {
-                long key = ExtendedVoxelStore.pack(tx, tz);
-                if (outsideHorizon(tx, tz, cx, cz) || tileEntirelyInsideHandoff(tx, tz, cx, cz, distance)) continue;
-                GpuTile current = MESHES.get(key);
-                long wantedDetail = detailAt(tx, tz, cx, cz);
-                // Fully generated chunks are NOT exempt from LOD changes.
-                // Even an all-real tile must be re-meshed when the camera
-                // crosses any 40/64/96-chunk resolution boundary.
-                boolean detailChanged = current != null && current.detail() != wantedDetail;
-                if ((current == null || first || detailChanged)
-                        && (hasChunkData(tx, tz)
-                            || ExtendedLodMeshCache.hasSaved(meshCache, tx, tz, wantedDetail))) {
-                    markDirty(key);
-                }
+            if (!horizonScanning) {
+                beginHorizonScan(minTX, maxTX, minTZ, maxTZ, force);
+            } else {
+                horizonAgain = true;
             }
-            // Avoid retaining coordinates from worlds/areas the player has
-            // left. They were previously scanned again on every frame.
-            DIRTY.removeIf(key -> {
-                int tx = (int)(key >> 32), tz = (int)(long)key;
-                return tx < minTX || tx > maxTX || tz < minTZ || tz > maxTZ;
-            });
-            Iterator<Map.Entry<Long, GpuTile>> it = MESHES.entrySet().iterator();
-            while (it.hasNext()) {
-                Map.Entry<Long, GpuTile> entry = it.next();
-                int tx = (int)(entry.getKey() >> 32), tz = (int)(long)entry.getKey();
-                if (tx < minTX || tx > maxTX || tz < minTZ || tz > maxTZ) {
-                    entry.getValue().close();
-                    it.remove();
-                }
+            if (moved || changedDistance) {
+                // Copy keys only; individual GPU buffers are retired gradually.
+                if (expiredMeshes.isEmpty()) expiredMeshes.addAll(MESHES.keySet());
+                if (expiredDirty.isEmpty()) expiredDirty.addAll(DIRTY);
             }
         }
+        scanHorizon(meshCache, minTX, maxTX, minTZ, maxTZ, cx, cz, distance);
+        retireOutOfRange(minTX, maxTX, minTZ, maxTZ);
 
         // Publish surface changes to the GPU gradually; do not iterate every
         // saved chunk or upload the whole LOD mesh when one surface changes.
@@ -240,14 +238,33 @@ public final class ExtendedWorldLodRenderer {
             // Pick the nearest visible dirty tile. Random HashSet iteration
             // caused important close LOD chunks to appear after far-off ones.
             var view = mc.gameRenderer.mainCamera().forwardVector();
-            if (queueX != cx || queueZ != cz || Math.abs(queueLookX - view.x()) > .05f
-                    || Math.abs(queueLookZ - view.z()) > .05f) {
+            // Do not re-sort thousands of dirty tiles for every one-chunk
+            // movement or tiny mouse turn. Rebuild in bounded slices.
+            boolean reorient = queueX == Integer.MIN_VALUE
+                    || Math.abs(queueX - cx) >= 4 || Math.abs(queueZ - cz) >= 4
+                    || Math.abs(queueLookX - view.x()) > .30f
+                    || Math.abs(queueLookZ - view.z()) > .30f;
+            if (reorient && reprioritizeCursor >= reprioritize.size()) {
                 queueX = cx; queueZ = cz;
                 queueLookX = view.x(); queueLookZ = view.z();
                 queued.clear();
                 candidates.clear();
                 reductions.clear();
-                for (long key : DIRTY) enqueue(key);
+                reprioritize.clear();
+                reprioritize.addAll(DIRTY);
+                reprioritizeCursor = 0;
+            }
+            long priorityStart = System.nanoTime();
+            for (int scanned = 0;
+                    reprioritizeCursor < reprioritize.size() && scanned < 128;
+                    scanned++) {
+                if (scanned > 0 && System.nanoTime() - priorityStart >= 1_500_000L)
+                    break;
+                enqueue(reprioritize.get(reprioritizeCursor++));
+            }
+            if (reprioritizeCursor >= reprioritize.size()) {
+                reprioritize.clear();
+                reprioritizeCursor = 0;
             }
             long meshDeadline = System.nanoTime() + FRAME_MESH_BUDGET_NS;
             int freshJobs = 0;
@@ -278,6 +295,70 @@ public final class ExtendedWorldLodRenderer {
                     + problem.getMessage());
             close();
             failed = true;
+        }
+    }
+
+    private static void beginHorizonScan(int minTX, int maxTX, int minTZ, int maxTZ,
+                                         boolean force) {
+        horizonScanning = true;
+        horizonAgain = false;
+        horizonForce = force;
+        horizonCursor = 0;
+        horizonMinTX = minTX;
+        horizonMinTZ = minTZ;
+        horizonWidth = maxTX - minTX + 1;
+        horizonDepth = maxTZ - minTZ + 1;
+    }
+
+    private static void scanHorizon(Path meshCache, int minTX, int maxTX,
+                                    int minTZ, int maxTZ, int cx, int cz, int distance) {
+        if (!horizonScanning) return;
+        long start = System.nanoTime();
+        int total = horizonWidth * horizonDepth;
+        for (int scanned = 0; horizonCursor < total
+                && scanned < HORIZON_TILES_PER_FRAME; scanned++) {
+            if (scanned > 0 && System.nanoTime() - start >= HORIZON_SCAN_TIME_NS)
+                break;
+            int tx = horizonMinTX + horizonCursor / horizonDepth;
+            int tz = horizonMinTZ + horizonCursor % horizonDepth;
+            horizonCursor++;
+            if (outsideHorizon(tx, tz, cx, cz)
+                    || tileEntirelyInsideHandoff(tx, tz, cx, cz, distance)) continue;
+            long key = ExtendedVoxelStore.pack(tx, tz);
+            GpuTile current = MESHES.get(key);
+            long detail = detailAt(tx, tz, cx, cz);
+            if ((current == null || horizonForce || current.detail() != detail)
+                    && (hasChunkData(tx, tz)
+                        || ExtendedLodMeshCache.hasSaved(meshCache, tx, tz, detail))) {
+                markDirty(key);
+            }
+        }
+        if (horizonCursor >= total) {
+            horizonScanning = false;
+            if (horizonAgain)
+                beginHorizonScan(minTX, maxTX, minTZ, maxTZ, false);
+        }
+    }
+
+    private static void retireOutOfRange(int minTX, int maxTX, int minTZ, int maxTZ) {
+        long start = System.nanoTime();
+        for (int retired = 0; retired < 128; retired++) {
+            if (retired > 0 && System.nanoTime() - start >= 1_500_000L) break;
+            if (!expiredMeshes.isEmpty()) {
+                long key = expiredMeshes.removeFirst();
+                int tx = (int)(key >> 32), tz = (int)key;
+                if (tx < minTX || tx > maxTX || tz < minTZ || tz > maxTZ) {
+                    GpuTile tile = MESHES.remove(key);
+                    if (tile != null) tile.close();
+                }
+            } else if (!expiredDirty.isEmpty()) {
+                long key = expiredDirty.removeFirst();
+                int tx = (int)(key >> 32), tz = (int)key;
+                if (tx < minTX || tx > maxTX || tz < minTZ || tz > maxTZ)
+                    DIRTY.remove(key);
+            } else {
+                break;
+            }
         }
     }
 
@@ -700,6 +781,12 @@ public final class ExtendedWorldLodRenderer {
         reductions.clear();
         scheduleReductionNext = false;
         queued.clear();
+        reprioritize.clear();
+        reprioritizeCursor = 0;
+        expiredMeshes.clear();
+        expiredDirty.clear();
+        horizonScanning = horizonAgain = horizonForce = false;
+        horizonCursor = 0;
         queueX = Integer.MIN_VALUE;
     }
 
