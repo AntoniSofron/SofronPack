@@ -224,25 +224,30 @@ public final class ExtendedLodMeshCache {
                 CRC32 checksum = new CRC32();
                 Deflater deflater = new Deflater(Deflater.BEST_SPEED);
                 byte[] input = new byte[65536];
-                byte[] compressed = new byte[65536];
                 try {
-                    ByteBuffer vertices = packed.vertices().duplicate();
-                    while (vertices.hasRemaining()) {
-                        int count = Math.min(input.length, vertices.remaining());
-                        vertices.get(input, 0, count);
-                        checksum.update(input, 0, count);
-                        deflater.setInput(input, 0, count);
-                        while (!deflater.needsInput()) {
-                            int length = deflater.deflate(compressed);
-                            if (length <= 0) throw new IOException("LOD compressor stalled");
-                            output.write(compressed, 0, length);
+                    // Deflater may correctly consume input without producing
+                    // bytes yet; let DeflaterOutputStream handle that state
+                    // instead of treating a zero-length deflate as failure.
+                    java.io.OutputStream sink = new java.io.OutputStream() {
+                        @Override public void write(int b) throws IOException {
+                            output.write(b);
                         }
-                    }
-                    deflater.finish();
-                    while (!deflater.finished()) {
-                        int length = deflater.deflate(compressed);
-                        if (length <= 0) throw new IOException("LOD compressor did not finish");
-                        output.write(compressed, 0, length);
+                        @Override public void write(byte[] bytes, int off, int len) throws IOException {
+                            output.write(bytes, off, len);
+                        }
+                        @Override public void close() {
+                            // Keep RandomAccessFile open to patch CRC and size.
+                        }
+                    };
+                    try (java.util.zip.DeflaterOutputStream compressor =
+                                 new java.util.zip.DeflaterOutputStream(sink, deflater, 65536)) {
+                        ByteBuffer vertices = packed.vertices().duplicate();
+                        while (vertices.hasRemaining()) {
+                            int count = Math.min(input.length, vertices.remaining());
+                            vertices.get(input, 0, count);
+                            checksum.update(input, 0, count);
+                            compressor.write(input, 0, count);
+                        }
                     }
                 } finally {
                     deflater.end();
