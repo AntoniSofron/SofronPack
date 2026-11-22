@@ -89,7 +89,7 @@ public final class AtmospherePresets {
         Map<String, FogRule> fogs = new LinkedHashMap<>();
 
         var entries = new ArrayList<>(manager.listResources(
-                "polytone/biome_modifiers", id -> id.getPath().endsWith(".json")).entrySet());
+                "sofronpack/biome_modifiers", id -> id.getPath().endsWith(".json")).entrySet());
         entries.sort(Comparator
                 .comparingInt((Map.Entry<Identifier, Resource> entry) ->
                         entry.getKey().getPath().endsWith("/default.json") ? 0 : 1)
