@@ -84,13 +84,17 @@ public final class ExtendedWorldLodRenderer {
     // preview mesh that had the same captured voxel neighbours.
     private static final Set<Long> REFRESHED_PREVIEWS = new HashSet<>();
 
-    private record Candidate(long key, int priority, long distance) {}
+    private record Candidate(long key, int priority, long distance, boolean cached) {}
+    // On re-entry show *already rendered* areas before building new terrain.
+    // With cache misses, preserve the original distance/stage ordering.
     private static final PriorityQueue<Candidate> candidates = new PriorityQueue<>(
-            Comparator.comparingInt(Candidate::priority).thenComparingLong(Candidate::distance));
+            Comparator.comparing((Candidate c) -> !c.cached())
+                    .thenComparingInt(Candidate::priority).thenComparingLong(Candidate::distance));
     // Cached meshes need to shrink as the player travels AWAY from them, even
     // when those chunks are behind the camera and are no longer in the view cone.
     private static final PriorityQueue<Candidate> reductions = new PriorityQueue<>(
-            Comparator.comparingLong(Candidate::distance).thenComparingInt(Candidate::priority));
+            Comparator.comparing((Candidate c) -> !c.cached())
+                    .thenComparingLong(Candidate::distance).thenComparingInt(Candidate::priority));
     private static boolean scheduleReductionNext;
     private static final Set<Long> queued = new HashSet<>();
     private static float queueLookX, queueLookZ;
@@ -237,8 +241,7 @@ public final class ExtendedWorldLodRenderer {
                 if (outsideHorizon(tx, tz, cx, cz) || tileEntirelyInsideHandoff(tx, tz, cx, cz, distance)) continue;
                 // Preserve the old two-new-mesh-per-frame budget while allowing
                 // up to twelve already-saved LOD tiles to be restored promptly.
-                boolean cached = ExtendedLodMeshCache.hasSaved(meshCache, tx, tz,
-                        detailAt(tx, tz, cx, cz));
+                boolean cached = candidate.cached();
                 if (!cached && freshJobs >= 2) {
                     enqueue(key);
                     break;
@@ -421,8 +424,10 @@ public final class ExtendedWorldLodRenderer {
         int dx = tx * TILE + TILE / 2 - queueX, dz = tz * TILE + TILE / 2 - queueZ;
         int band = pl.sofron.extended.ExtendedLodStages.indexForRadius(Math.max(Math.abs(dx), Math.abs(dz)));
         int pass = band * 2 + (current != null ? 1 : 0);
+        boolean cached = ExtendedLodMeshCache.hasSaved(
+                ExtendedVoxelStore.meshCacheDirectory(), tx, tz, detailAt(tx, tz, queueX, queueZ));
         queued.add(key);
-        Candidate candidate = new Candidate(key, pass, (long)dx * dx + (long)dz * dz);
+        Candidate candidate = new Candidate(key, pass, (long)dx * dx + (long)dz * dz, cached);
         if (reduction) reductions.add(candidate);
         else candidates.add(candidate);
     }
