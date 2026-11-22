@@ -5,7 +5,16 @@
   "compatibilityLevel": "JAVA_25",
   "plugin": "pl.sofron.optimization.SofronOptimizationMixinPlugin",
   "mixins": [
-    "SofronFastElytraMixin"
+    "SofronFastElytraMixin",
+    "SofronLithiumShufflingListMixin",
+    "SofronLithiumGateBehaviorMixin",
+    "SofronLithiumGateRunOneMixin",
+    "SofronLithiumGateTryAllMixin",
+    "SofronLithiumDirectionMixin",
+    "SofronLithiumAabbMixin",
+    "SofronLithiumPistonDirectionMixin",
+    "SofronLithiumPistonResolverMixin",
+    "SofronLithiumRedstoneDirectionMixin"
   ],
   "client": [
     "SofronRenderTypeFeatureRendererInvoker",
