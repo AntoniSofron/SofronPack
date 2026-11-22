@@ -109,12 +109,12 @@ vec4 calculateFinalColor(vec4 color) {
     #endif
 
     // 2048-block far end is the opt-in Extended World fog signature.
-    // This replaces Sodium's aggressive linear distance fade ONLY for
-    // normal terrain when Extended World is enabled. LODs call this exact
-    // same function, so both renderers use the 0/8/16/32/64/96/128 stages.
+    // Keep the existing seven-stop volumetric fog, plus a separate ordinary
+    // horizontal-distance fade from 8 to 128 chunks. Sodium and distant LODs
+    // call the same compositor so their overlap does not reveal a fog seam.
     if (u_RenderFog.y >= 2047.5) {
-
-        float fog = max(1.0 - factor, sofronVolumeFog(spl_SurfaceCameraPos, u_EnvironmentFog.x, u_EnvironmentFog.y));
+        float fog = max(1.0 - factor, sofronCombinedFog(
+                spl_SurfaceCameraPos, u_EnvironmentFog.x, u_EnvironmentFog.y));
         return vec4(mix(color.rgb, fogColor.rgb, fog), color.a);
     }
     return _linearFog(color, v_FragDistance, fogColor, u_EnvironmentFog, u_RenderFog, factor);

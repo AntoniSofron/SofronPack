@@ -56,6 +56,43 @@ class ExtendedLodFogTest {
         assertEquals(.24f, ExtendedLodFog.opacity(0, 0f, 512), 1e-5f);
     }
 
+    @Test void regularDistanceFogBeginsAtEightAndEndsAt128() {
+        assertEquals(0f, ExtendedLodFog.regularOpacity(-5), 1e-5f);
+        assertEquals(0f, ExtendedLodFog.regularOpacity(0), 1e-5f);
+        assertEquals(0f, ExtendedLodFog.regularOpacity(8), 1e-5f);
+        assertEquals(.5f, ExtendedLodFog.regularOpacity(68), 1e-5f);
+        assertEquals(1f, ExtendedLodFog.regularOpacity(128), 1e-5f);
+        assertEquals(1f, ExtendedLodFog.regularOpacity(160), 1e-5f);
+        assertEquals(1f, ExtendedLodFog.regularOpacity(Double.POSITIVE_INFINITY), 1e-5f);
+        assertEquals(0f, ExtendedLodFog.regularOpacity(Double.NaN), 1e-5f);
+    }
+
+    @Test void ordinaryFogGrowsGraduallyWithoutBoundaryJumps() {
+        assertTrue(ExtendedLodFog.regularOpacity(9) > 0f);
+        assertTrue(ExtendedLodFog.regularOpacity(9) < .001f);
+        assertTrue(ExtendedLodFog.regularOpacity(16) < .02f);
+        float previous = 0f;
+        for (int i = 0; i <= 14000; i++) {
+            float current = ExtendedLodFog.regularOpacity(i / 100.0);
+            assertTrue(current >= previous - 1e-6f);
+            previous = current;
+        }
+        for (double cut : new double[]{8, 128})
+            assertEquals(ExtendedLodFog.regularOpacity(cut - .0001),
+                         ExtendedLodFog.regularOpacity(cut), 1e-5f);
+    }
+
+    @Test void combiningFogLayersPreservesBothAndClampsAtOne() {
+        float volume = ExtendedLodFog.opacity(32, 0f, 70);
+        float regular = ExtendedLodFog.regularOpacity(32);
+        float expected = 1f - (1f - volume) * (1f - regular);
+        assertEquals(expected, ExtendedLodFog.combinedOpacity(32, 0f, 70), 1e-5f);
+        assertTrue(ExtendedLodFog.combinedOpacity(32, 0f, 70) > volume);
+        assertEquals(0f, ExtendedLodFog.combinedOpacity(8, 0f, 70), 1e-5f);
+        assertEquals(1f, ExtendedLodFog.combinedOpacity(128, 0f, 70), 1e-5f);
+        assertEquals(1f, ExtendedLodFog.combinedOpacity(128, 1f, 512), 1e-5f);
+    }
+
     @Test void sharedShaderUniformsEncodeAndDecodeAltitudeAndWeather() {
         for (double y : new double[]{-64, -20, 20, 59, 60, 255, 256, 384, 512, 900})
             assertEquals(ExtendedLodFog.altitudeBonus(y),

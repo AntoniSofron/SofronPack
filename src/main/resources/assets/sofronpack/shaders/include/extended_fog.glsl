@@ -44,14 +44,38 @@ float sofronExtendedFog(float distanceChunks, float strength) {
     return 1.0;
 }
 
-// Existing vertical exponential density remains unchanged. Altitude opacity
-// adds to the horizontal curve before the camera-ray density integration.
-float sofronVolumeFog(vec3 relative, float environmentalStart, float environmentalEnd) {
-    float base = sofronExtendedFog(length(relative.xz) / 16.0, sofronFogStrength(environmentalEnd));
+// Ordinary, altitude-independent distance haze. Smoothstep grows very slowly
+// immediately beyond 8 chunks and reaches 100% exactly at 128 chunks.
+float sofronRegularDistanceFog(float distanceChunks) {
+    float t = clamp((distanceChunks - 8.0) / 120.0, 0.0, 1.0);
+    return t * t * (3.0 - 2.0 * t);
+}
+
+// Keep the established volumetric effect unchanged, including its existing
+// cloud/low-Y opacity bonus and exponential vertical ray density profile.
+float sofronVolumeFogAtDistance(vec3 relative, float distanceChunks,
+                                float environmentalStart, float environmentalEnd) {
+    float base = sofronExtendedFog(distanceChunks, sofronFogStrength(environmentalEnd));
     base = clamp(base + sofronAltitudeFogBonus(environmentalStart), 0.0, 1.0);
     if (base <= 0.0 || base >= 1.0) return base;
     float h = clamp(relative.y / 384.0, -1.0, 1.0);
     float density = abs(h) < 0.01 ? 1.0 - 0.5 * h : (1.0 - exp(-h)) / h;
     return 1.0 - pow(1.0 - base, density);
+}
+
+float sofronVolumeFog(vec3 relative, float environmentalStart, float environmentalEnd) {
+    return sofronVolumeFogAtDistance(relative, length(relative.xz) / 16.0,
+                                     environmentalStart, environmentalEnd);
+}
+
+// Layer the ordinary fog over the volumetric fog rather than replacing it.
+// Compositing via transmittance avoids a hard max() boundary and preserves
+// smooth changes as either layer's opacity varies. Compute distance only once.
+float sofronCombinedFog(vec3 relative, float environmentalStart, float environmentalEnd) {
+    float chunks = length(relative.xz) / 16.0;
+    float ordinary = sofronRegularDistanceFog(chunks);
+    float volumetric = sofronVolumeFogAtDistance(relative, chunks,
+                                                  environmentalStart, environmentalEnd);
+    return 1.0 - (1.0 - ordinary) * (1.0 - volumetric);
 }
 #endif

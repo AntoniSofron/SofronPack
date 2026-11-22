@@ -33,3 +33,26 @@ The opt-in Extended World mixin communicates the weather/cave factor with
 `environmentalStart = 256 + 1024 * altitudeBonus`. Both chunk shaders decode
 these shared fog uniforms. No new GPU buffers, uniform uploads or sampling
 loops are required. Non-Extended-World and non-Overworld fog is unaffected.
+
+## Ordinary (non-volumetric) distance fog
+
+The opt-in Extended World terrain also adds an independent, ordinary distance
+fog layer. It begins at **8 horizontal chunks (128 blocks)** and reaches
+**100% opacity at 128 horizontal chunks (2048 blocks)**. It is independent of
+weather, camera Y and cloud bands.
+
+The gradual fade uses one smoothstep across the complete distance interval:
+
+```text
+t = clamp((distanceChunks - 8) / 120, 0, 1)
+ordinaryFog = t * t * (3 - 2*t)
+```
+
+Both normal Sodium chunks and distant LOD geometry blend this ordinary layer
+with the unchanged volumetric layer using transmittance composition:
+`combined = 1 - (1 - ordinary) * (1 - volumetric)`.
+
+The transition is deliberately gentle near eight chunks, and opacity reaches
+100% at exactly 128 chunks. No new vertex data, GPU buffers, uniforms or
+per-frame CPU biome sampling are needed. Outside Extended World, vanilla fog
+behaviour remains unchanged.

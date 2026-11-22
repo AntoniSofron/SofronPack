@@ -32,6 +32,27 @@ public final class ExtendedLodFog {
     }
 
     /**
+     * Ordinary, non-volumetric distance fog begins gently at 8 chunks and
+     * reaches full opacity at 128 chunks, irrespective of the camera altitude.
+     * It uses horizontal distance, so looking up/down does not shift the horizon.
+     */
+    public static float regularOpacity(double chunks) {
+        if (!Double.isFinite(chunks)) return chunks > 0 ? 1f : 0f;
+        double t = Math.clamp((chunks - 8.0) / 120.0, 0.0, 1.0);
+        return (float) (t * t * (3.0 - 2.0 * t));
+    }
+
+    /**
+     * Reference opacity of the two independent fog layers combined; the shader
+     * additionally integrates the existing volumetric vertical-ray profile.
+     */
+    public static float combinedOpacity(double chunks, float strength, double cameraY) {
+        float volume = opacity(chunks, strength, cameraY);
+        float regular = regularOpacity(chunks);
+        return 1f - (1f - volume) * (1f - regular);
+    }
+
+    /**
      * Cloud decks are at Y=256, 384, 512: +8%, +16%, +24%, respectively.
      * Below Y=60 add 8% for each commenced 40-block band:
      * Y=59..20 -> +8%, 19..-20 -> +16%, -21..-60 -> +24%, etc.

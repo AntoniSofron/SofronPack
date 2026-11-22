@@ -36,9 +36,9 @@ void main() {
     // Keep continuous backing geometry across the overlap. The ordinary
     // chunk wins the depth test wherever it actually covers the pixel.
 
-    // Same seven-stop function as the native Sodium terrain shader.
+    // Same ordinary + volumetric fog compositor as native Sodium terrain.
     float fog = FogRenderDistanceEnd >= 2047.5
-            ? sofronVolumeFog(fogRelative, FogEnvironmentalStart, FogEnvironmentalEnd)
+            ? sofronCombinedFog(fogRelative, FogEnvironmentalStart, FogEnvironmentalEnd)
             : max(linear_fog_value(sphericalBlocks, FogEnvironmentalStart, FogEnvironmentalEnd),
                   linear_fog_value(cylindricalBlocks, FogRenderDistanceStart, FogRenderDistanceEnd));
     // FogColor comes from the live blended biome/environment, not a fixed hue.
