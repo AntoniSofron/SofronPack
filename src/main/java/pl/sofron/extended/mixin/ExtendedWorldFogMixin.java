@@ -13,13 +13,13 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import pl.sofron.extended.ExtendedWorldConfig;
+import pl.sofron.extended.ExtendedLodFog;
 import pl.sofron.atmosphere.AtmospherePresets;
 
 /**
- * Normal chunks and far LODs share one atmospheric depth range. Only the
- * automatic vanilla render-distance fade is extended; environmental fog
- * remains untouched, so biome, weather, blindness and cave density continue
- * to affect *both* renderers through the same uniforms.
+ * Shared 128-chunk profile for native Sodium chunks and distant LOD.
+ * The fog uniforms encode the same weather/cave and altitude inputs for both
+ * shaders, without extra per-draw GPU allocations.
  */
 @Mixin(FogRenderer.class)
 public abstract class ExtendedWorldFogMixin {
@@ -48,12 +48,12 @@ public abstract class ExtendedWorldFogMixin {
         fog.renderDistanceStart = start;
         fog.renderDistanceEnd = end;
 
-        // Ordinary, clear-sky environmental fog was tuned for vanilla's
-        // much shorter view distance. Stretch only that benign haze to the
-        // extended horizon, while preserving the genuine biome, cave and
-        // weather fog computed earlier by AtmospherePresets.
+        // Environmental end encodes weather/cave influence (0..1). Start
+        // encodes the 8%-per-band altitude bonus, for both terrain pipelines.
+        // The original environmental fog remains active outside this opt-in
+        // singleplayer Overworld path, including underwater and lava.
         float influence = Math.clamp(AtmospherePresets.distantFogBlend(), 0f, 1f);
-        fog.environmentalStart = 16f * 16f;
+        fog.environmentalStart = ExtendedLodFog.environmentalStartForAltitude(camera.position().y);
         fog.environmentalEnd = end - 1024f * influence;
         if (!sofron$logged) {
             sofron$logged = true;
