@@ -137,6 +137,7 @@ with zipfile.ZipFile(jar) as z:
     assert "normalRenderCap" not in pathlib.Path(
         "src/main/java/pl/sofron/extended/ExtendedWorldConfig.java").read_text()
     assert renderer_gpu_source.count("writeTransform(") == 1
+    assert "Shared LOD GPU transform active" in renderer_gpu_source
     assert "ExtendedLodVertexSpace.rebase(mesh.vertices()" in renderer_gpu_source
     assert "encoder.writeToBuffer(previous.buffer.slice" in renderer_gpu_source
     assert "reclaimOffscreen()" in renderer_gpu_source

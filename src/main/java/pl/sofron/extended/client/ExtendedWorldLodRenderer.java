@@ -99,6 +99,7 @@ public final class ExtendedWorldLodRenderer {
     private static boolean failed;
     private static boolean loggedFirstUpload;
     private static boolean loggedFirstDraw;
+    private static boolean loggedSharedTransform;
 
     private record GpuTile(GpuBuffer buffer, int quads, long detail, long bytes)
             implements AutoCloseable {
@@ -273,6 +274,11 @@ public final class ExtendedWorldLodRenderer {
                     new Vector3f(originDx, (float)-camera.y, originDz),
                     identityTexture);
             pass.setUniform("DynamicTransforms", sharedTransform);
+            if (!loggedSharedTransform) {
+                loggedSharedTransform = true;
+                System.out.println("[SofronPack] Shared LOD GPU transform active; normal render "
+                        + distance + " chunks, distant render " + FAR + " chunks");
+            }
             // Frustum/filter first to avoid hidden tiles consuming draw calls.
             var ordered = new ArrayList<Map.Entry<Long, GpuTile>>();
             for (var entry : MESHES.entrySet()) {
@@ -636,6 +642,6 @@ public final class ExtendedWorldLodRenderer {
         centerX = centerZ = Integer.MIN_VALUE;
         lastRenderDistance = 0;
         renderOriginX = renderOriginZ = Long.MIN_VALUE;
-        loggedFirstUpload = loggedFirstDraw = false;
+        loggedFirstUpload = loggedFirstDraw = loggedSharedTransform = false;
     }
 }
