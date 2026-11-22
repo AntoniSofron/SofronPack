@@ -175,7 +175,11 @@ public final class SofronCloudAirflow {
         if (!active && !falling) return delta;
         AABB bounds = entity.getBoundingBox();
         double y = (bounds.minY + bounds.maxY) / 2.0;
-        boolean cloud = inCloud(bounds, entity.level().getGameTime());
+        // A fast glider or falling player may cross all eight cloud blocks
+        // within a single tick. Check the swept body as well as the starting
+        // position, otherwise very high-speed falling would bypass the brake.
+        AABB traversed = bounds.expandTowards(delta);
+        boolean cloud = inCloud(traversed, entity.level().getGameTime());
         return transform(delta, y, active, falling, cloud);
     }
 }
