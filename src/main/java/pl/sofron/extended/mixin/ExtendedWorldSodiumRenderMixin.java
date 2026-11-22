@@ -33,6 +33,6 @@ public abstract class ExtendedWorldSodiumRenderMixin {
             sofron$loggedSodiumFog = true;
             System.out.println("[SofronPack] Sodium terrain fog range confirmed at 2048 blocks");
         }
-        ExtendedWorldLodRenderer.render(renderPass, matrices, terrainPass, camera);
+        ExtendedWorldLodRenderer.render(renderPass, matrices, terrainPass, camera, sampler);
     }
 }

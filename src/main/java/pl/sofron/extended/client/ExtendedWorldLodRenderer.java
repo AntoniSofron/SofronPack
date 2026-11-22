@@ -38,7 +38,7 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 import pl.sofron.extended.ExtendedVoxelMesher;
 import pl.sofron.extended.ExtendedVoxelStore;
-import net.minecraft.resources.Identifier;
+import com.mojang.renderpearl.api.textures.GpuSampler;
 import com.mojang.renderpearl.api.textures.FilterMode;
 
 /**
@@ -227,17 +227,14 @@ public final class ExtendedWorldLodRenderer {
      * generation, buffer allocation or command submission occurs here.
      */
     public static void render(RenderPass pass, ChunkRenderMatrices matrices,
-                              TerrainRenderPass terrainPass, CameraTransform camera) {
+                              TerrainRenderPass terrainPass, CameraTransform camera, GpuSampler terrainSampler) {
         if (terrainPass != DefaultTerrainRenderPasses.CUTOUT || pass == null
                 || failed || MESHES.isEmpty() || quadIndices == null || longProjection == null) return;
         try {
             pass.setPipeline(RenderSystem.getCompiledPipeline(ExtendedVoxelPipeline.TERRAIN));
             RenderSystem.bindDefaultUniforms(pass);
             pass.setUniform("Projection", longProjection.slice());
-            var blockAtlas = Minecraft.getInstance().getTextureManager().getTexture(
-                    Identifier.parse("minecraft:textures/atlas/blocks.png")).getTextureView();
-            pass.setUniform("Sampler0", blockAtlas,
-                    RenderSystem.getSamplerCache().getClampToEdge(FilterMode.LINEAR));
+            pass.setUniform("Sampler0", terrainPass.getAtlas(), terrainSampler);
             pass.setUniform("Sampler2", Minecraft.getInstance().gameRenderer.levelLightmap(),
                     RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
             pass.setIndexBuffer(quadIndices, IndexType.INT);
