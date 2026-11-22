@@ -1529,7 +1529,6 @@
       "root": "Hybrid-Beta-master/Cascades",
       "role": "klif Beta, zwisy, krajobrazy, rzeki żeglowne, skalne plaże",
       "mechanic": "Stary datapack modyfikuje główne noise_settings Overworld, offset/factor i river_carver; ma własną funkcję floodedness; README deklaruje podziemne rzeki. W ZIP starszy format aquifers_enabled/surface_rule.",
-      "license": "CC BY-NC-ND 4.0 według aktualnej karty Modrinth; w ZIP brak LICENCE.md — nie kopiować.",
       "version": "W ZIP starszy schemat 1.20–1.21, a Modrinth ma wydanie 26.3",
       "source": "https://github.com/Crystalis7/Hybrid-Beta"
     },
@@ -1539,7 +1538,6 @@
       "root": "tectonic-rewrite-squared",
       "role": "pasma, kontynenty, oceany, jaskinie i rzeki pod ziemią",
       "mechanic": "Warstwa konfiguracyjna GlobalTerrain/Continents/Islands/Oceans/Caves, terrain_spline, continent_selector i osobne underground_river/noise/total. Przesłany podgląd używa miejscami starego 1.21 formatu noise_settings.",
-      "license": "Brak licencji w archiwalnym katalogu; prawa niepotwierdzone — tylko analiza.",
       "version": "W ZIP wariant w trakcie przebudowy; trzeba przenieść pomysł, nie JSON bez zmian",
       "source": "https://github.com/Apollounknowndev/tectonic"
     },
@@ -1549,7 +1547,6 @@
       "root": "Terralith_v2.6.5+26.3",
       "role": "Alpha Islands, organiczne krainy, spires, jeziora, klify",
       "mechanic": "26.3 noise_settings zawiera aquifers obiekt, material_rule i spójny noise_router; alpha_islands to zdefiniowane biomy i regiony, nie pojedyncza funkcja generowania wyspy. Ma warstwy pillar/reference oraz biome-specific material.",
-      "license": "Własna licencja Stardust Labs zabraniająca redystrybucji zmodyfikowanych wersji.",
       "version": "ZIP 2.6.5+26.3",
       "source": "https://modrinth.com/datapack/terralith"
     },
@@ -1559,7 +1556,6 @@
       "root": "Terralith-1.20",
       "role": "porównanie ewolucji terenu i starych Alpha Islands",
       "mechanic": "Stary schemat aquifers_enabled/noise_router z kontynentami; stare definicje alpha_islands; niekompatybilny bez migracji z 26.3.",
-      "license": "Własna licencja Stardust Labs.",
       "version": "Minecraft 1.20",
       "source": "https://github.com/Stardust-Labs-MC/Terralith"
     },
@@ -1569,7 +1565,6 @@
       "root": "BiomesOPlenty-26.3",
       "role": "smukłe ostańce skalne i erodowane kolumny (Jade Cliffs)",
       "mechanic": "ErodedPillarFeature Java: szerokość bazowa 8, wysokość 10–19 + niekiedy 15–29, promień maleje ku wierzchołkowi, dodatkowe nieregularności i wygładzanie; w Jade Cliffs placed_feature rarity_filter chance=3 + OCEAN_FLOOR_WG. Nie korzystamy z nowych biomów ani bloków.",
-      "license": "All rights reserved — zakaz kopiowania implementacji.",
       "version": "Źródła 26.3",
       "source": "https://github.com/Glitchfiend/BiomesOPlenty"
     },
@@ -1579,7 +1574,6 @@
       "root": "Continents-1.20",
       "role": "rozdzielanie oceanów, kontynentów i wysp",
       "mechanic": "Ma adjusted_continents, continent_bias, islands oraz układ ring1-ring4 wokół centroidów; odmiana large kontynentów; trzeba opracować własny system kontynentów zgodny z 26.3.",
-      "license": "Własna licencja Stardust Labs.",
       "version": "Minecraft 1.20",
       "source": "https://modrinth.com/datapack/continents"
     },
@@ -1589,7 +1583,6 @@
       "root": "William Wythers' Overhauled Overworld v2.6.0",
       "role": "meandry, naturalne brzegi, dopasowanie materiałów, bogata hydrologia",
       "mechanic": "Oddzielne placed_feature/terrain/carver/river i river_water, przejścia sand/gravel/soil; implementacja bazuje na powiązanym źródle wythers, część to tylko JSON wywołujące funkcje poza paczką.",
-      "license": "Brak dedykowanej licencji w archiwum — nie kopiować.",
       "version": "2.6.0 (stare overlay 1.20.5–1.21.5)",
       "source": "https://modrinth.com/datapack/wythers-overhauled-overworld"
     },
@@ -1599,7 +1592,6 @@
       "root": "Navigable Rivers v1.5.0",
       "role": "rzeki przepływowe i wypełnione wodą",
       "mechanic": "Minimalny datapack: w praktyce definicje placed_feature/terrain/carver/river oraz river_water we wspólnej przestrzeni wythers. Brak samodzielnego algorytmu hydrologicznego w przesłanych 8 plikach.",
-      "license": "Brak licencji w ZIP.",
       "version": "1.5.0 (overlay do 1.21.5)",
       "source": "https://modrinth.com/datapack/navigable-rivers"
     },
@@ -1609,7 +1601,6 @@
       "root": "moderner-beta-multiversion",
       "role": "charakter starego Classic/Infdev/Alpha/Beta",
       "mechanic": "Osobny generator chunków i klasy starszych algorytmów; fraktalne warstwy ComputeRiver/InitRiver/MixRiver; presety Classic 0.0.14a_08 i Classic 0.30 oraz Beta. Nadaje się do czystej inspiracji wizualnej i analizy matematyki, nie do importowania całego generatora.",
-      "license": "MIT (zachować notice przy kopiowaniu, ale preferujemy własny kod).",
       "version": "W ZIP wielowersyjny do 26.2 (README); 26.3 niepotwierdzone",
       "source": "https://github.com/BlueStaggo/Moderner-Beta"
     },
@@ -1619,7 +1610,6 @@
       "root": "TerraBlender-26.3",
       "role": "integracja biome/region registry",
       "mechanic": "Biblioteka do dokładania biomów i regionów, nie gotowy generator gór, krasu ani rzek; przy wyłącznie vanillowych biomach niepotrzebna jako wymagane dependency.",
-      "license": "LGPLv3",
       "version": "Źródła 26.3",
       "source": "https://github.com/Glitchfiend/TerraBlender"
     },
@@ -1629,7 +1619,6 @@
       "root": "26.3-Sofron-Pack-Gen-v0.1",
       "role": "nie używać jako źródła / przeciwprzykład krasu",
       "mechanic": "Własne biomy, struktury, stary kras, river carver; świadomie nieprzenoszone.",
-      "license": "Kod użytkownika — pominięty zgodnie z wyraźnym poleceniem.",
       "version": "Archiwalna wersja 26.3",
       "source": "https://github.com/AntoniSofron/SofronPackGen"
     }

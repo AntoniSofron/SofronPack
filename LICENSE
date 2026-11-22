@@ -162,6 +162,24 @@ The in-game performance improvement of each module is not yet quantified.
 Any unstable or ineffective module should be removed rather than silently
 changing worldgen outcomes, block behavior or render quality.
 
+## Archived licensing review of world-generation references
+
+The following entries preserve the licensing assessment formerly stored in
+`design/catalog.json`. These are research references, **not** a declaration
+that those external implementations have been incorporated.
+
+- **Cascades / Hybrid Beta** (`cascades`): CC BY-NC-ND 4.0 według aktualnej karty Modrinth; w ZIP brak LICENCE.md — nie kopiować. Source: https://github.com/Crystalis7/Hybrid-Beta
+- **Tectonic** (`tectonic`): Brak licencji w archiwalnym katalogu; prawa niepotwierdzone — tylko analiza. Source: https://github.com/Apollounknowndev/tectonic
+- **Terralith 2.6.5 (26.3)** (`terralith`): Własna licencja Stardust Labs zabraniająca redystrybucji zmodyfikowanych wersji. Source: https://modrinth.com/datapack/terralith
+- **Terralith 1.20** (`terralith120`): Własna licencja Stardust Labs. Source: https://github.com/Stardust-Labs-MC/Terralith
+- **Biomes O’ Plenty 26.3** (`bop`): All rights reserved — zakaz kopiowania implementacji. Source: https://github.com/Glitchfiend/BiomesOPlenty
+- **Continents** (`continents`): Własna licencja Stardust Labs. Source: https://modrinth.com/datapack/continents
+- **William Wythers Overhauled Overworld** (`wythers`): Brak dedykowanej licencji w archiwum — nie kopiować. Source: https://modrinth.com/datapack/wythers-overhauled-overworld
+- **Navigable Rivers 1.5.0** (`navigable`): Brak licencji w ZIP. Source: https://modrinth.com/datapack/navigable-rivers
+- **Moderner Beta** (`modernbeta`): MIT (zachować notice przy kopiowaniu, ale preferujemy własny kod). Source: https://github.com/BlueStaggo/Moderner-Beta
+- **TerraBlender 26.3** (`terrablender`): LGPLv3 Source: https://github.com/Glitchfiend/TerraBlender
+- **SofronPackGen v0.1 (wyłączony)** (`legacy`): Kod użytkownika — pominięty zgodnie z wyraźnym poleceniem. Source: https://github.com/AntoniSofron/SofronPackGen
+
 ## Full third-party license text
 
 The following is the unmodified combined GNU Lesser General Public License
