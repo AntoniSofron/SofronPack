@@ -1,4 +1,3 @@
-// SofronPack: compact scanline meshing. Legal notices in LEGAL_NOTICE.md.
 package pl.sofron.extended.mesh;
 
 

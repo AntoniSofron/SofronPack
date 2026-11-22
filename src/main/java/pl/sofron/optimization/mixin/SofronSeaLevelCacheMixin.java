@@ -1,6 +1,3 @@
-/* SofronPack optimization component. Licensing and contributor notices:
- * LEGAL_NOTICE.md (distributed with this source).
- */
 package pl.sofron.optimization.mixin;
 
 import net.minecraft.core.Holder;
@@ -22,10 +19,7 @@ public abstract class SofronSeaLevelCacheMixin {
     @Shadow @Final private Holder<NoiseGeneratorSettings> settings;
     @Unique private int sofron$cachedSeaLevel = Integer.MIN_VALUE;
 
-    /**
-     * @author SofronPack integration (see LEGAL_NOTICE.md)
-     * @reason Remove repeated registry indirection in the chunk generation hot path.
-     */
+    /** Optimized equivalent operation. */
     @Overwrite
     public int getSeaLevel() {
         if (sofron$cachedSeaLevel == Integer.MIN_VALUE)
