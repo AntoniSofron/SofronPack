@@ -5,7 +5,7 @@ package pl.sofron.extended;
  * Source snapshots retain their full 1x1 block palette and exact height;
  * only the generated GPU meshes are reduced horizontally at long distances.
  *
- *   0..48 chunks: 1x1, 49..96: 2x2, 97..128: 4x4
+ *   0..40 chunks: 1x1, 41..64: 2x2, 65..96: 4x4, 97..128: 8x8
  *
  * Fog and source-world generation are independent of these display rings.
  */
@@ -20,7 +20,7 @@ public final class ExtendedLodLevels {
 
     /**
      * Opaque vertical SIDE faces use this coarse slab size. All near
-     * geometry (0–48 chunks) stays at EXACT 1-block Y; all top/bottom
+     * geometry (0–40 chunks) stays at EXACT 1-block Y; all top/bottom
      * faces, fluids, foliage and cutouts retain exact Y even at distance.
      * Source voxel snapshots are always full-height, 1-block precision.
      */
@@ -28,15 +28,16 @@ public final class ExtendedLodLevels {
         return 1 << ringFor(distanceChunks);
     }
 
-    /** First visible mesh: at most 4-block voxels before a later full-detail rebuild. */
+    /** Preview-first world sampling: coarse nearby, never finer than the final ring. */
     public static int firstPaintVoxelSize(int distanceChunks) {
         return Math.max(4, voxelSize(distanceChunks));
     }
 
     public static int ringFor(int distanceChunks) {
-        if (distanceChunks <= 48) return 0;
-        if (distanceChunks <= 96) return 1;
-        return 2;
+        if (distanceChunks <= 40) return 0;
+        if (distanceChunks <= 64) return 1;
+        if (distanceChunks <= 96) return 2;
+        return 3;
     }
 
     /**

@@ -255,3 +255,36 @@ Voxy's 8-byte quad encoder, hierarchical GPU Hi-Z occlusion traversal,
 multi-draw indirect rendering or lazy RAM snapshot storage. Any claim
 about eliminating GPU OOM still requires sustained VRAM measurements
 on the user's own hardware.
+
+## v0.1.50 — four distance-dependent LOD bands
+
+Change the render-only distance thresholds, with no modification to stored
+world voxels, the 128-chunk horizon or the player's normal chunk setting:
+
+| Camera-to-chunk horizontal Chebyshev distance | Displayed voxel footprint | Opaque-side Y slab |
+| --- | --- | --- |
+| 0–40 chunks | 1×1 XZ | **Exact 1-block Y** |
+| 41–64 chunks | 2×2 XZ | 2 blocks |
+| 65–96 chunks | 4×4 XZ | 4 blocks |
+| 97–128 chunks | 8×8 XZ | 8 blocks |
+
+Only opaque vertical walls are coarsened in Y; all top/bottom faces,
+water, foliage, vegetation and transparent geometry stay at exact
+native Y heights regardless of distance. Incomplete terrain may retain
+a temporary surface-only preview at ≥4×4 (and ≥8×8 in the farthest ring)
+until its accurate real-chunk geometry is ready.
+
+Previous volume and surface meshers had only THREE cached XZ mip levels:
+they must grow to FOUR to support the eighth-block ring without array
+out-of-bounds. Both the per-chunk 2-bit packed resolution fingerprint
+and the 4×4-chunk halo already support ring value 3 and continue to
+trigger on-camera-movement rebuilds. Unit tests now cover every boundary,
+8×8 occupied-child preservation, 1-block water surfaces, vertical
+precision close to the player, and complete source voxel retention.
+
+The packed 48-byte GPU quad instances, paginated reusable buffer arena,
+fog, clouds, foliage, seven-stage generation, resource packs, simulation
+distance and all other SofronPack functions are unchanged. The farthest
+ring samples up to 64 times fewer horizontal cell locations per Y layer
+than the exact 1×1 representation, prior to greedy surface meshing;
+actual VRAM/FPS savings depend on terrain and graphics hardware.
