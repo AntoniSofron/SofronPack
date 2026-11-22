@@ -226,7 +226,10 @@ with zipfile.ZipFile(jar) as z:
     assert "levels[i] = ExtendedLodLevels.ringForChunk(chunkX, chunkZ, cx, cz)" in renderer_source
     assert "new Pending(detail, task)" in renderer_source
     assert "new Pending(captured == TILE * TILE ? -2 : detail, task)" not in renderer_source
-    assert "current.detail() != wantedDetail" in renderer_source
+    assert "current.detail() != detail" in renderer_source
+    assert "scanHorizon(meshCache" in renderer_source
+    assert "HORIZON_TILES_PER_FRAME = 128" in renderer_source
+    assert "reprioritizeCursor < reprioritize.size()" in renderer_source
     assert "if (job.detail != detailAt(tx, tz, cx, cz)) markDirty(key)" in renderer_source
 
     assert b"sofronVolumeFog(fogRelative, FogEnvironmentalEnd)" in extended_shader
