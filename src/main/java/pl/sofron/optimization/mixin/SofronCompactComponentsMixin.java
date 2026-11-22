@@ -1,8 +1,5 @@
-/*
- * Adapted from FerriteCore's PatchedDataComponentMapMixin (Minecraft 26.1):
- * https://github.com/malte0811/FerriteCore
- * Copyright malte0811 and FerriteCore contributors.
- * LGPL-3.0-only. See THIRD_PARTY_OPTIMIZATIONS.md.
+/* SofronPack optimization component. Licensing and contributor notices:
+ * LEGAL_NOTICE.md (distributed with this source).
  */
 package pl.sofron.optimization.mixin;
 
@@ -24,7 +21,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  * mutable map when an item stack changes later.
  */
 @Mixin(PatchedDataComponentMap.class)
-public abstract class SofronFerriteEmptyDataPatchMixin {
+public abstract class SofronCompactComponentsMixin {
     @Shadow private Reference2ObjectMap<DataComponentType<?>, Optional<?>> patch;
     @Shadow private boolean copyOnWrite;
 

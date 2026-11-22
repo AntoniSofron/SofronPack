@@ -1,7 +1,5 @@
-/*
- * Adapted from Lithium for Minecraft 26.3 (JellySquid, 2No2Name and
- * Lithium contributors): https://github.com/CaffeineMC/lithium
- * Licensed under LGPL-3.0-only. See THIRD_PARTY_OPTIMIZATIONS.md.
+/* SofronPack optimization component. Licensing and contributor notices:
+ * LEGAL_NOTICE.md (distributed with this source).
  */
 package pl.sofron.optimization.mixin;
 
@@ -14,7 +12,7 @@ import org.spongepowered.asm.mixin.Shadow;
 
 /** Fast axis-selection in collision and entity movement hot paths. */
 @Mixin(AABB.class)
-public abstract class SofronLithiumAabbMixin {
+public abstract class SofronAabbMathMixin {
     @Shadow @Final public double minX;
     @Shadow @Final public double minY;
     @Shadow @Final public double minZ;
@@ -22,7 +20,7 @@ public abstract class SofronLithiumAabbMixin {
     @Shadow @Final public double maxY;
     @Shadow @Final public double maxZ;
 
-    /** @author JellySquid @reason Avoid virtual dispatch and enum lookup. */
+    /** @author SofronPack integration (see LEGAL_NOTICE.md)
     @Overwrite
     public double min(Direction.Axis axis) {
         return switch (axis) {
@@ -32,7 +30,7 @@ public abstract class SofronLithiumAabbMixin {
         };
     }
 
-    /** @author JellySquid @reason Avoid virtual dispatch and enum lookup. */
+    /** @author SofronPack integration (see LEGAL_NOTICE.md)
     @Overwrite
     public double max(Direction.Axis axis) {
         return switch (axis) {

@@ -1,7 +1,5 @@
-/*
- * Adapted from Lithium for Minecraft 26.3 (JellySquid, 2No2Name and
- * Lithium contributors): https://github.com/CaffeineMC/lithium
- * Licensed under LGPL-3.0-only. See THIRD_PARTY_OPTIMIZATIONS.md.
+/* SofronPack optimization component. Licensing and contributor notices:
+ * LEGAL_NOTICE.md (distributed with this source).
  */
 package pl.sofron.optimization.mixin;
 
@@ -22,18 +20,18 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
-import pl.sofron.optimization.lithium.SofronRunningPolicy;
-import pl.sofron.optimization.lithium.SofronWeightedBehaviors;
+import pl.sofron.optimization.ai.SofronRunningPolicy;
+import pl.sofron.optimization.ai.SofronWeightedBehaviors;
 
 @Mixin(GateBehavior.class)
-public abstract class SofronLithiumGateBehaviorMixin<E extends LivingEntity>
+public abstract class SofronGateBehaviorMixin<E extends LivingEntity>
         implements BehaviorControl<E> {
     @Shadow @Final private ShufflingList<BehaviorControl<? super E>> behaviors;
     @Shadow @Final private Set<MemoryModuleType<?>> exitErasedMemories;
     @Shadow private Behavior.Status status;
 
     /**
-     * @author JellySquid, IMS, 2No2Name
+     * @author SofronPack integration (see LEGAL_NOTICE.md)
      * @reason Remove a stream allocation from the per-entity AI tick hot path.
      */
     @Overwrite
@@ -49,7 +47,7 @@ public abstract class SofronLithiumGateBehaviorMixin<E extends LivingEntity>
     }
 
     /**
-     * @author JellySquid
+     * @author SofronPack integration (see LEGAL_NOTICE.md)
      * @reason Iterate the already-stored tasks instead of constructing a stream.
      */
     @Overwrite

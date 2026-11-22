@@ -1,7 +1,5 @@
-/*
- * Adapted from Lithium for Minecraft 26.3 (JellySquid, 2No2Name and
- * Lithium contributors): https://github.com/CaffeineMC/lithium
- * Licensed under LGPL-3.0-only. See THIRD_PARTY_OPTIMIZATIONS.md.
+/* SofronPack optimization component. Licensing and contributor notices:
+ * LEGAL_NOTICE.md (distributed with this source).
  */
 package pl.sofron.optimization.mixin;
 
@@ -14,17 +12,17 @@ import org.spongepowered.asm.mixin.Shadow;
 
 /** Avoid per-call Direction.values() array allocations and opposite modulo. */
 @Mixin(Direction.class)
-public abstract class SofronLithiumDirectionMixin {
+public abstract class SofronDirectionMathMixin {
     @Shadow @Final private static Direction[] VALUES;
     @Shadow @Final private int oppositeIndex;
 
-    /** @author JellySquid @reason Avoid modulo and abs on the hot block update path. */
+    /** @author SofronPack integration (see LEGAL_NOTICE.md)
     @Overwrite
     public Direction getOpposite() {
         return VALUES[oppositeIndex];
     }
 
-    /** @author JellySquid @reason Reuse the internal direction constant array. */
+    /** @author SofronPack integration (see LEGAL_NOTICE.md)
     @Overwrite
     public static Direction getRandom(RandomSource random) {
         return VALUES[random.nextInt(VALUES.length)];

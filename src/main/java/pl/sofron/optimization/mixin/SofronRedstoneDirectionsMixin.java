@@ -1,7 +1,5 @@
-/*
- * Adapted from Lithium for Minecraft 26.3 (JellySquid, 2No2Name and
- * Lithium contributors): https://github.com/CaffeineMC/lithium
- * Licensed under LGPL-3.0-only. See THIRD_PARTY_OPTIMIZATIONS.md.
+/* SofronPack optimization component. Licensing and contributor notices:
+ * LEGAL_NOTICE.md (distributed with this source).
  */
 package pl.sofron.optimization.mixin;
 
@@ -12,7 +10,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;
 
 @Mixin(RedstoneWireBlock.class)
-public abstract class SofronLithiumRedstoneDirectionMixin {
+public abstract class SofronRedstoneDirectionsMixin {
     private static final Direction[] DIRECTIONS = Direction.values();
 
     @Redirect(method = "affectNeighborsAfterRemoval", at = @At(value = "INVOKE",

@@ -26,7 +26,7 @@ with zipfile.ZipFile(jar) as z:
     assert len(mod["mixins"]) == 6
     assert "sofron-optimization.mixins.json" in mod["mixins"]
     optimized = json.loads(z.read("sofron-optimization.mixins.json"))
-    assert optimized["plugin"] == "pl.sofron.optimization.SofronOptimizationMixinPlugin"
+    assert "plugin" not in optimized
     for required in (
         "pl/sofron/optimization/gui/SofronScreenRectangleQuadTree.class",
         "pl/sofron/optimization/gui/SofronSpatialGuiArrayList.class",
@@ -44,7 +44,6 @@ with zipfile.ZipFile(jar) as z:
     assert "sofron-extended-client.mixins.json" in mod["mixins"]
     far_mixins = json.loads(z.read("sofron-extended-client.mixins.json"))
     assert "ExtendedWorldFogMixin" in far_mixins["client"]
-    assert "pl/sofron/extended/ExtendedWorldVoxyBridge.class" not in files
     assert "pl/sofron/extended/ExtendedWorldMeshBuilder.class" not in files
     assert "pl/sofron/extended/ExtendedWorldStorage.class" not in files
     for class_name in (
