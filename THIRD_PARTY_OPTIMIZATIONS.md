@@ -38,12 +38,15 @@ removed merely to unify code style.
 
 - **ModernFix 5.28 / Minecraft 1.20.1 Forge** — embeddedt and other
   ModernFix contributors. Source provided as `ModernFix-1.20.zip`.
-  Only the two small world-generation hot-loop algorithms were adapted to
-  Minecraft **26.3**: `SurfaceRules.SequenceRule` first-match iteration
-  and `MaterialRuleList` first-match iteration. Both preserve original
-  ordering and short-circuiting; they do not change terrain rules or seed.
-  This does NOT include ModernFix's Forge-specific classloader, registry,
-  texture, resource-pack or memory-layout replacements.
+  The old 1.20.1 surface-rule classes no longer exist in Minecraft 26.3,
+  so the direct 1.20.1 mixins were **discarded after failing compilation**.
+  Instead, ModernFix's immutable-value interning technique was adapted to
+  SofronPack's persistent voxel-palette strings. Thousands of snapshots
+  share weakly interned immutable block-state names, reducing potential
+  heap duplication without modifying the original terrain or data format.
+  Distinct mutable palette arrays are deliberately never shared. This does
+  NOT include ModernFix's Forge-specific classloader, registry, texture,
+  resource-pack or memory-layout replacements.
 
 - **Async 0.2.6+alpha-26.3** — AxalotL, Alchemy, Bliss, FurryMileon,
   Grider and jediminer543. Source provided as `Async-26.3.zip`.
