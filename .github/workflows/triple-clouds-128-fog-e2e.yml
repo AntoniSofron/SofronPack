@@ -1,7 +1,7 @@
 name: Triple clouds and 128-chunk fog — in-world smoke
 on:
   push:
-    branches: ['fix/extended-128-clouds-triple', 'fix/lod-fog-clouds-night-20261121', 'fix/lod-progressive-fog-cloud-gradient', 'fix/shared-four-stage-fog-v0138', 'fix/streamed-lod-v0139', 'fix/distance-dependent-volume-lod-1-2-4', 'feature/near-leaf-models-vanilla-far-lod-20261121']
+    branches: ['fix/extended-128-clouds-triple', 'fix/lod-fog-clouds-night-20261121', 'fix/lod-progressive-fog-cloud-gradient', 'fix/shared-four-stage-fog-v0138', 'fix/streamed-lod-v0139', 'fix/distance-dependent-volume-lod-1-2-4', 'fix/gpu-memory-oom-v0147', 'feature/near-leaf-models-vanilla-far-lod-20261121']
     paths:
       - 'src/**'
       - '.github/workflows/triple-clouds-128-fog-e2e.yml'

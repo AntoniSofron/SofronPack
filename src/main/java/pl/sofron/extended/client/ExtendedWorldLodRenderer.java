@@ -10,6 +10,7 @@ import com.mojang.renderpearl.api.pipeline.CompareOp;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.HashMap;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
@@ -33,6 +34,7 @@ import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
 import pl.sofron.extended.ExtendedWorldConfig;
+import pl.sofron.extended.ExtendedLodGpuBudget;
 import pl.sofron.extended.ExtendedLodLevels;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
@@ -64,9 +66,12 @@ public final class ExtendedWorldLodRenderer {
     private record Pending(long detail, CompletableFuture<ExtendedVoxelMesher.Mesh> result) {}
     private static final Map<Long, Pending> pending = new HashMap<>();
     private static final long FRAME_MESH_BUDGET_NS = 5_000_000L;
-    // A 128-chunk radius can require many more visible tiles than 64.
-    // Evicting after only 384 tiles caused distant regions to vanish.
-    private static final int MAX_GPU_TILES = 3_600;
+    // Safety first: this is a GPU BYTE budget, not a nominal tile count.
+    // The old 3,600-tile cap allowed multiple GiB of LOD vertex buffers,
+    // starving Sodium's ordinary terrain arena until it crashed with OOM.
+    private static final int MAX_GPU_TILES = ExtendedLodGpuBudget.MAX_RESIDENT_TILES;
+    private static long gpuVertexBytes;
+    private static int budgetDenials;
     private static final ExtendedVoxelAtlas ATLAS = new ExtendedVoxelAtlas();
     private static final int MAX_QUADS = ExtendedVoxelMesher.MAX_QUADS;
     private static final Map<Long, GpuTile> MESHES = new HashMap<>();
@@ -95,7 +100,8 @@ public final class ExtendedWorldLodRenderer {
     private static boolean loggedFirstUpload;
     private static boolean loggedFirstDraw;
 
-    private record GpuTile(GpuBuffer buffer, int quads, long detail) implements AutoCloseable {
+    private record GpuTile(GpuBuffer buffer, int quads, long detail, long bytes)
+            implements AutoCloseable {
         @Override public void close() { buffer.close(); }
     }
 
@@ -161,7 +167,7 @@ public final class ExtendedWorldLodRenderer {
                 Map.Entry<Long, GpuTile> entry = it.next();
                 int tx = (int)(entry.getKey() >> 32), tz = (int)(long)entry.getKey();
                 if (tx < minTX || tx > maxTX || tz < minTZ || tz > maxTZ) {
-                    entry.getValue().close();
+                    accountAndClose(entry.getValue());
                     it.remove();
                 }
             }
@@ -244,7 +250,14 @@ public final class ExtendedWorldLodRenderer {
             float low = (float)(mc.level.getMinY() - camera.y);
             float high = low + mc.level.getHeight();
             frustum.set(new Matrix4f(farProjection).mul(matrices.modelView()), false);
-            for (Map.Entry<Long, GpuTile> entry : MESHES.entrySet()) {
+            // Near-first ordering ensures that the bounded transform budget
+            // never spends the entire frame on far tiles behind the player.
+            var ordered = new ArrayList<>(MESHES.entrySet());
+            ordered.sort(Comparator.comparingLong(entry ->
+                    distanceSquared(entry.getKey(), cameraCX, cameraCZ)));
+            int drawnTiles = 0;
+            for (Map.Entry<Long, GpuTile> entry : ordered) {
+                if (drawnTiles >= ExtendedLodGpuBudget.MAX_DRAWN_TILES) break;
                 long key = entry.getKey();
                 int tx = (int)(key >> 32), tz = (int)(long)key;
                 float x = (float)((long)tx * TILE * 16 - camera.x), z = (float)((long)tz * TILE * 16 - camera.z);
@@ -252,6 +265,7 @@ public final class ExtendedWorldLodRenderer {
                         || tileEntirelyInsideHandoff(tx, tz, cameraCX, cameraCZ, distance)) continue;
                 GpuTile tile = entry.getValue();
                 if (tile.quads == 0) continue;
+                drawnTiles++;
                 Matrix4f relative = new Matrix4f(matrices.modelView()).translate(
                         (float)((long)tx * TILE * 16 - camera.x),
                         (float)-camera.y,
@@ -454,13 +468,29 @@ public final class ExtendedWorldLodRenderer {
             var mesh = job.result.join();
             if (mesh.quads() == 0) {
                 GpuTile previous = MESHES.remove(key);
-                if (previous != null) previous.close();
+                if (previous != null) accountAndClose(previous);
+                continue;
+            }
+            long requestedBytes = mesh.vertices().remaining();
+            // Reserve room BEFORE driver allocation, including a potential
+            // temporary overlap with the previous version of the tile.
+            if (!ExtendedLodGpuBudget.acceptableTile(requestedBytes)
+                    || !makeGpuRoom(key, requestedBytes, cx, cz)) {
+                if (++budgetDenials % 64 == 1) {
+                    System.err.println("[SofronPack] Skipping expensive distant GPU tile: "
+                            + (requestedBytes / 1048576L) + " MiB; "
+                            + "resident=" + (gpuVertexBytes / 1048576L) + " MiB, "
+                            + MESHES.size() + " tiles (hard cap "
+                            + (ExtendedLodGpuBudget.MAX_VERTEX_BYTES / 1048576L) + " MiB)");
+                }
                 continue;
             }
             var buffer = device.createBuffer(() -> "SofronPack Extended World tile",
                     GpuBuffer.USAGE_VERTEX | GpuBuffer.USAGE_COPY_DST, mesh.vertices());
-            GpuTile previous = MESHES.put(key, new GpuTile(buffer, mesh.quads(), job.detail));
-            if (previous != null) previous.close();
+            GpuTile previous = MESHES.put(key, new GpuTile(buffer, mesh.quads(),
+                    job.detail, requestedBytes));
+            gpuVertexBytes += requestedBytes;
+            if (previous != null) accountAndClose(previous);
             if (job.detail != detailAt(tx, tz, cx, cz)) markDirty(key);
             if (!loggedFirstUpload) {
                 loggedFirstUpload = true;
@@ -510,26 +540,76 @@ public final class ExtendedWorldLodRenderer {
         return length < 128 || (dx * lookX + dz * lookZ) >= -length * .2;
     }
 
-    private static void trimGpuCache(int cx, int cz) {
-        if (MESHES.size() <= MAX_GPU_TILES) return;
-        Long worst = null;
-        long worstDistance = -1;
-        for (long key : MESHES.keySet()) {
-            long tx = (int)(key >> 32), tz = (int)(long)key;
-            long dx = tx * TILE + TILE / 2 - cx;
-            long dz = tz * TILE + TILE / 2 - cz;
-            long distance = dx * dx + dz * dz;
-            if (distance > worstDistance) { worstDistance = distance; worst = key; }
-        }
-        if (worst != null) {
-            GpuTile evicted = MESHES.remove(worst);
-            if (evicted != null) {
-                evicted.close();
-                // Do not permanently lose already generated chunks when the
-                // GPU cache reaches its bound. Schedule a fresh mesh if the
-                // camera later turns back toward this tile.
-                markDirty(worst);
+    private static long distanceSquared(long key, int cx, int cz) {
+        long tx = (int)(key >> 32), tz = (int)key;
+        long dx = tx * TILE + TILE / 2 - cx;
+        long dz = tz * TILE + TILE / 2 - cz;
+        return dx * dx + dz * dz;
+    }
+
+    private static void accountAndClose(GpuTile tile) {
+        gpuVertexBytes -= tile.bytes;
+        tile.close();
+    }
+
+    /**
+     * Admission is transactional: don't evict anything if even removing all
+     * farther tiles would not allow this mesh to fit. A farther, expensive
+     * mesh may not evict a nearer tile (that would cause infinite reuploads).
+     *
+     * Keep the old buffer until the replacement uploads successfully, so
+     * distance-detail transitions never create a one-frame geometry hole.
+     */
+    private static boolean makeGpuRoom(long key, long bytes, int cx, int cz) {
+        int projectedTiles = MESHES.size() + (MESHES.containsKey(key) ? 0 : 1);
+        long projectedBytes = gpuVertexBytes;
+        var victims = new ArrayList<Long>();
+        long requestedDistance = distanceSquared(key, cx, cz);
+
+        while (ExtendedLodGpuBudget.needsEviction(projectedBytes, bytes, projectedTiles)) {
+            Long worst = null;
+            long worstDistance = Long.MIN_VALUE;
+            for (var entry : MESHES.entrySet()) {
+                long candidate = entry.getKey();
+                if (candidate == key || victims.contains(candidate)) continue;
+                long d = distanceSquared(candidate, cx, cz);
+                if (d > worstDistance) {
+                    worstDistance = d;
+                    worst = candidate;
+                }
             }
+            // Do not churn the cache by replacing nearer, useful tiles
+            // with more distant geometry that the player barely sees.
+            if (worst == null || worstDistance < requestedDistance) return false;
+            victims.add(worst);
+            projectedBytes -= MESHES.get(worst).bytes;
+            projectedTiles--;
+        }
+        for (long victim : victims) {
+            var old = MESHES.remove(victim);
+            if (old != null) accountAndClose(old);
+            // Not DIRTY on eviction. When the camera moves toward it,
+            // prepareFrame will rediscover the newly missing tile.
+            DIRTY.remove(victim);
+            queued.remove(victim);
+        }
+        return true;
+    }
+
+    private static void trimGpuCache(int cx, int cz) {
+        while (gpuVertexBytes > ExtendedLodGpuBudget.MAX_VERTEX_BYTES
+                || MESHES.size() > MAX_GPU_TILES) {
+            Long worst = null;
+            long worstDistance = -1;
+            for (long key : MESHES.keySet()) {
+                long d = distanceSquared(key, cx, cz);
+                if (d > worstDistance) { worstDistance = d; worst = key; }
+            }
+            if (worst == null) break;
+            GpuTile removed = MESHES.remove(worst);
+            if (removed != null) accountAndClose(removed);
+            DIRTY.remove(worst);
+            queued.remove(worst);
         }
     }
 
@@ -541,6 +621,8 @@ public final class ExtendedWorldLodRenderer {
         volumes = new ExtendedVolumeMesh();
         for (GpuTile tile : MESHES.values()) tile.close();
         MESHES.clear();
+        gpuVertexBytes = 0;
+        budgetDenials = 0;
         DIRTY.clear();
         candidates.clear();
         queued.clear();
