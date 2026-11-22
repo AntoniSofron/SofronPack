@@ -41,6 +41,18 @@ public final class ExtendedLodLevels {
     }
 
     /**
+     * Each 4x4-chunk tile stores sixteen two-bit display levels in a long.
+     * A tile needs a background reduction if ANY chunk has moved into a
+     * coarser ring; finer chunks can be upgraded on demand in the view cone.
+     */
+    public static boolean requiresCoarsening(long displayed, long wanted) {
+        for (int shift = 0; shift < 32; shift += 2)
+            if (((wanted >>> shift) & 3L) > ((displayed >>> shift) & 3L))
+                return true;
+        return false;
+    }
+
+    /**
      * Normal chunk-like (Chebyshev) XZ distance, matching the per-chunk
      * packed detail map used by both the preview and the volume mesher.
      */
