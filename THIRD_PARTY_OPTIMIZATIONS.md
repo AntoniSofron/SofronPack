@@ -34,6 +34,34 @@ removed merely to unify code style.
   to reduce RAM used by unchanged item stacks. Blockstate and shape structure
   replacements still need compatibility validation against Minecraft 26.3.
 
+## Integrations from the newly supplied source archives (v0.1.55)
+
+- **ModernFix 5.28 / Minecraft 1.20.1 Forge** — embeddedt and other
+  ModernFix contributors. Source provided as `ModernFix-1.20.zip`.
+  Only the two small world-generation hot-loop algorithms were adapted to
+  Minecraft **26.3**: `SurfaceRules.SequenceRule` first-match iteration
+  and `MaterialRuleList` first-match iteration. Both preserve original
+  ordering and short-circuiting; they do not change terrain rules or seed.
+  This does NOT include ModernFix's Forge-specific classloader, registry,
+  texture, resource-pack or memory-layout replacements.
+
+- **Async 0.2.6+alpha-26.3** — AxalotL, Alchemy, Bliss, FurryMileon,
+  Grider and jediminer543. Source provided as `Async-26.3.zip`.
+  Adapted `ParallelProcessor.CostModel`'s 25% EWMA to bound SofronPack's
+  own **server-thread** chunk snapshot acquisition and background prefetch
+  submission, using actual measured snapshot costs. The asynchronous
+  compression worker pool remains as before. The main thread still owns
+  all block, entity and biome reads, preserving world correctness.
+  Full multithreaded entity ticking and Async's world/AI lock-rewrite mixins
+  have **not** been incorporated: the supplied source still uses alpha
+  version numbering and these require independent world-concurrency
+  regression tests alongside Lithium.
+
+The user reports permission from upstream authors for integration. The
+supplied ZIP archives contain no complete standalone license file: source
+authorship and this provenance record have been preserved; distribution
+terms should be independently verified before external release.
+
 ## Analyzed but not yet ported or enabled
 
 - **EntityCulling:** multithreaded CPU occlusion testing requires a
