@@ -47,6 +47,14 @@ public final class SofronCloudAirflow {
         static final Mask MASK = loadVanillaClouds();
     }
 
+    /** Start atlas decoding before someone first flies into a cloud. */
+    public static void warmUp() {
+        Thread.ofVirtual().name("SofronPack-Cloud-Mask").start(() -> {
+            // One-time, render-backend-independent resource decoding.
+            Mask ignored = CloudTexture.MASK;
+        });
+    }
+
     private static Mask loadVanillaClouds() {
         // This is a standard Minecraft client resource, not a new texture
         // distributed or modified by SofronPack. In an integrated server its
