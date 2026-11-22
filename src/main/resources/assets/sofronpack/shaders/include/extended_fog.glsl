@@ -51,16 +51,25 @@ float sofronRegularDistanceFog(float distanceChunks) {
     return t * t * (3.0 - 2.0 * t);
 }
 
-// Keep the established volumetric effect unchanged, including its existing
-// cloud/low-Y opacity bonus and exponential vertical ray density profile.
+// Volumetric fog cannot cover anything closer than 2 horizontal chunks.
+// Fade in smoothly between 2 and 6 chunks to avoid a visible ring.
+float sofronVolumetricNearFade(float distanceChunks) {
+    float t = clamp((distanceChunks - 2.0) / 4.0, 0.0, 1.0);
+    return t * t * (3.0 - 2.0 * t);
+}
+
+// Keep the established weather curve and exponential vertical density. The
+// Java-side Y bonus now changes continuously across cloud/underground levels.
 float sofronVolumeFogAtDistance(vec3 relative, float distanceChunks,
                                 float environmentalStart, float environmentalEnd) {
+    float nearFade = sofronVolumetricNearFade(distanceChunks);
+    if (nearFade <= 0.0) return 0.0;
     float base = sofronExtendedFog(distanceChunks, sofronFogStrength(environmentalEnd));
     base = clamp(base + sofronAltitudeFogBonus(environmentalStart), 0.0, 1.0);
-    if (base <= 0.0 || base >= 1.0) return base;
+    if (base <= 0.0 || base >= 1.0) return base * nearFade;
     float h = clamp(relative.y / 384.0, -1.0, 1.0);
     float density = abs(h) < 0.01 ? 1.0 - 0.5 * h : (1.0 - exp(-h)) / h;
-    return 1.0 - pow(1.0 - base, density);
+    return (1.0 - pow(1.0 - base, density)) * nearFade;
 }
 
 float sofronVolumeFog(vec3 relative, float environmentalStart, float environmentalEnd) {

@@ -18,15 +18,29 @@ Between control points the curve uses `smoothstep`; intermediate weather
 strengths blend the clear and storm curves. As before, deep cave influence can
 increase the effective weather/fog strength.
 
-**Cloud altitude**: from Y=256 to 383 add 8% opacity; Y=384 to 511 add
-16%; from Y=512 upwards add 24%. These thresholds use the existing
-`CloudBandLayout`.
+**Cloud altitude**: each +8% stage around the existing Y=256, Y=384, Y=512
+cloud decks now fades smoothly across **32 vertical blocks**, centered on its
+deck. The three windows are Y=240..272, Y=368..400 and Y=496..528.
+At a deck's center, half of that stage's 8% bonus has faded in. Beyond the
+highest transition, the cloud bonus totals +24%.
 
-**Low altitude**: below Y=60 add 8% per commenced 40 blocks: Y=59..20 is
-+8%, 19..-20 is +16%, -21..-60 is +24%, and so on. All bonuses add to the
-horizontal fog curve and the result is clamped to 100%. The existing vertical
-exponential density profile still applies when a target is above or below
-the camera.
+**Low altitude**: below Y=60, each successive 40-block band adds +8%, but
+now fades in over its first **16 blocks** using smoothstep: Y=60..44,
+Y=20..4, Y=-20..-36, and so on. Outside transition windows the
+bonus remains flat until the next band. At Y=60 the below-ground
+bonus is 0%, at Y=52 it is 4%, and at Y=44 it is 8%.
+
+**Volumetric near-field limit**: volumetric opacity is always **0% within
+2 horizontal chunks (32 blocks)** of the camera, regardless of clouds,
+weather, depth or cave influence. It smoothly fades into its full previous
+strength across 2..6 chunks (32..96 blocks). The same fade applies after
+the exponential vertical-ray density profile, so geometry viewed steeply
+up/down cannot bypass the minimum horizontal radius.
+
+The altitude bonuses still add to the established weather-dependent
+volumetric curve and clamp to 100%. The existing vertical exponential
+ray-density profile remains. Non-volumetric distance fog stays independent,
+starting gradually at 8 chunks and ending at 128 chunks.
 
 The opt-in Extended World mixin communicates the weather/cave factor with
 `environmentalEnd = 2048 - 1024 * influence` and the altitude factor via
@@ -56,3 +70,11 @@ The transition is deliberately gentle near eight chunks, and opacity reaches
 100% at exactly 128 chunks. No new vertex data, GPU buffers, uniforms or
 per-frame CPU biome sampling are needed. Outside Extended World, vanilla fog
 behaviour remains unchanged.
+
+## Volumetric smoothing implementation
+
+The CPU altitude result is encoded once in `FogData.environmentalStart`,
+then shared by the Sodium and distant LOD shaders. Neither shader samples
+biomes or computes altitude steps in the fragment loop. The volume near fade
+uses a single smoothstep over the 2..6 horizontal chunk interval. The regular
+8..128-chunk fog and the near/far LOD handoff are unmodified.

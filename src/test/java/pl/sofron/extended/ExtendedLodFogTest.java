@@ -27,33 +27,78 @@ class ExtendedLodFogTest {
         assertEquals(1f, ExtendedLodFog.opacity(Double.POSITIVE_INFINITY), 1e-5f);
     }
 
-    @Test void bonusesFollowActualCloudDeckHeights() {
-        assertEquals(0f, ExtendedLodFog.altitudeBonus(255.9), 1e-5f);
-        assertEquals(.08f, ExtendedLodFog.altitudeBonus(256), 1e-5f);
-        assertEquals(.08f, ExtendedLodFog.altitudeBonus(383.9), 1e-5f);
-        assertEquals(.16f, ExtendedLodFog.altitudeBonus(384), 1e-5f);
-        assertEquals(.16f, ExtendedLodFog.altitudeBonus(511.9), 1e-5f);
-        assertEquals(.24f, ExtendedLodFog.altitudeBonus(512), 1e-5f);
+    @Test void cloudBonusesRampSmoothlyAcrossActualCloudDecks() {
+        assertEquals(0f, ExtendedLodFog.altitudeBonus(240), 1e-5f);
+        assertEquals(.04f, ExtendedLodFog.altitudeBonus(256), 1e-5f);
+        assertEquals(.08f, ExtendedLodFog.altitudeBonus(272), 1e-5f);
+        assertEquals(.08f, ExtendedLodFog.altitudeBonus(368), 1e-5f);
+        assertEquals(.12f, ExtendedLodFog.altitudeBonus(384), 1e-5f);
+        assertEquals(.16f, ExtendedLodFog.altitudeBonus(400), 1e-5f);
+        assertEquals(.16f, ExtendedLodFog.altitudeBonus(496), 1e-5f);
+        assertEquals(.20f, ExtendedLodFog.altitudeBonus(512), 1e-5f);
+        assertEquals(.24f, ExtendedLodFog.altitudeBonus(528), 1e-5f);
         assertEquals(.24f, ExtendedLodFog.altitudeBonus(900), 1e-5f);
     }
 
-    @Test void lowYUsesEightPercentPerCommencedFortyBlocks() {
+    @Test void undergroundBonusesRiseSmoothlyAfterEveryFortyBlocks() {
         assertEquals(0f, ExtendedLodFog.altitudeBonus(60), 1e-5f);
-        assertEquals(.08f, ExtendedLodFog.altitudeBonus(59), 1e-5f);
+        assertTrue(ExtendedLodFog.altitudeBonus(59) > 0f);
+        assertTrue(ExtendedLodFog.altitudeBonus(59) < .01f);
+        assertEquals(.04f, ExtendedLodFog.altitudeBonus(52), 1e-5f);
+        assertEquals(.08f, ExtendedLodFog.altitudeBonus(44), 1e-5f);
         assertEquals(.08f, ExtendedLodFog.altitudeBonus(20), 1e-5f);
-        assertEquals(.16f, ExtendedLodFog.altitudeBonus(19), 1e-5f);
+        assertEquals(.12f, ExtendedLodFog.altitudeBonus(12), 1e-5f);
+        assertEquals(.16f, ExtendedLodFog.altitudeBonus(4), 1e-5f);
         assertEquals(.16f, ExtendedLodFog.altitudeBonus(-20), 1e-5f);
-        assertEquals(.24f, ExtendedLodFog.altitudeBonus(-21), 1e-5f);
+        assertEquals(.20f, ExtendedLodFog.altitudeBonus(-28), 1e-5f);
+        assertEquals(.24f, ExtendedLodFog.altitudeBonus(-36), 1e-5f);
         assertEquals(.24f, ExtendedLodFog.altitudeBonus(-60), 1e-5f);
-        assertEquals(.32f, ExtendedLodFog.altitudeBonus(-61), 1e-5f);
         assertEquals(0f, ExtendedLodFog.altitudeBonus(Double.NaN), 1e-5f);
+    }
+
+    @Test void noHardAltitudeBandSeamsForAscendingOrDescendingCamera() {
+        for (double threshold : new double[] {60, 20, -20, -60, 256, 384, 512}) {
+            assertEquals(ExtendedLodFog.altitudeBonus(threshold - .001),
+                    ExtendedLodFog.altitudeBonus(threshold + .001), 1e-4f);
+        }
+        float previous = ExtendedLodFog.altitudeBonus(100);
+        for (double y = 99.75; y >= -100; y -= .25) {
+            float current = ExtendedLodFog.altitudeBonus(y);
+            assertTrue(current >= previous - 1e-5f);
+            previous = current;
+        }
+        previous = ExtendedLodFog.altitudeBonus(200);
+        for (double y = 200.25; y <= 600; y += .25) {
+            float current = ExtendedLodFog.altitudeBonus(y);
+            assertTrue(current >= previous - 1e-5f);
+            previous = current;
+        }
+    }
+
+    @Test void twoChunkVolumetricExclusionAndSoftOnset() {
+        for (float weather : new float[] {0f, .5f, 1f}) {
+            for (double y : new double[]{-64, 70, 256, 384, 512, 900}) {
+                for (double chunks : new double[]{-1, 0, .5, 1, 1.999, 2}) {
+                    assertEquals(0f, ExtendedLodFog.opacity(chunks, weather, y), 1e-6f);
+                    assertEquals(0f, ExtendedLodFog.combinedOpacity(chunks, weather, y), 1e-6f);
+                }
+            }
+        }
+        assertEquals(0f, ExtendedLodFog.volumetricNearFade(2), 1e-6f);
+        assertEquals(.15625f, ExtendedLodFog.volumetricNearFade(3), 1e-6f);
+        assertEquals(.5f, ExtendedLodFog.volumetricNearFade(4), 1e-6f);
+        assertEquals(1f, ExtendedLodFog.volumetricNearFade(6), 1e-6f);
+        assertTrue(ExtendedLodFog.opacity(3, 1f, 512) > 0f);
+        assertTrue(ExtendedLodFog.opacity(3, 1f, 512) < ExtendedLodFog.opacity(6, 1f, 512));
+        assertEquals(.24f, ExtendedLodFog.opacity(6, 0f, 600), 1e-5f);
+        assertEquals(0f, ExtendedLodFog.regularOpacity(6), 1e-5f);
     }
 
     @Test void bonusesAddAndClampToOne() {
         assertEquals(.40f, ExtendedLodFog.opacity(64, 0f, 300), 1e-5f);
-        assertEquals(.88f, ExtendedLodFog.opacity(32, 1f, 512), 1e-5f);
-        assertEquals(1f, ExtendedLodFog.opacity(96, 1f, -64), 1e-5f);
-        assertEquals(.24f, ExtendedLodFog.opacity(0, 0f, 512), 1e-5f);
+        assertEquals(.88f, ExtendedLodFog.opacity(32, 1f, 600), 1e-5f);
+        assertEquals(1f, ExtendedLodFog.opacity(96, 1f, -120), 1e-5f);
+        assertEquals(0f, ExtendedLodFog.opacity(0, 0f, 600), 1e-5f);
     }
 
     @Test void regularDistanceFogBeginsAtEightAndEndsAt128() {
@@ -94,7 +139,7 @@ class ExtendedLodFogTest {
     }
 
     @Test void sharedShaderUniformsEncodeAndDecodeAltitudeAndWeather() {
-        for (double y : new double[]{-64, -20, 20, 59, 60, 255, 256, 384, 512, 900})
+        for (double y : new double[]{-64, -28, -20, 4, 12, 20, 44, 52, 59, 60, 240, 256, 272, 384, 512, 900})
             assertEquals(ExtendedLodFog.altitudeBonus(y),
                 ExtendedLodFog.altitudeBonusFromEnvironmentalStart(
                     ExtendedLodFog.environmentalStartForAltitude(y)), 1e-5f);
