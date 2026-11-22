@@ -1,6 +1,3 @@
-/* SofronPack optimization component. Licensing and contributor notices:
- * LEGAL_NOTICE.md (distributed with this source).
- */
 package pl.sofron.optimization.mixin;
 
 import net.minecraft.core.Direction;
@@ -20,7 +17,7 @@ public abstract class SofronAabbMathMixin {
     @Shadow @Final public double maxY;
     @Shadow @Final public double maxZ;
 
-    /** @author SofronPack integration (see LEGAL_NOTICE.md)
+    /** Equivalent optimized hot path. */
     @Overwrite
     public double min(Direction.Axis axis) {
         return switch (axis) {
@@ -30,7 +27,7 @@ public abstract class SofronAabbMathMixin {
         };
     }
 
-    /** @author SofronPack integration (see LEGAL_NOTICE.md)
+    /** Equivalent optimized hot path. */
     @Overwrite
     public double max(Direction.Axis axis) {
         return switch (axis) {

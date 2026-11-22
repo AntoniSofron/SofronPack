@@ -1,10 +1,3 @@
-/*
- * Adapted for SofronPack from ImmediatelyFast 26.3:
- * https://github.com/RaphiMC/ImmediatelyFast
- * Copyright (C) 2023-2026 RK_01/RaphiMC and contributors.
- * Licensed under GNU LGPL v3 or later.
- * Source attribution and license details: THIRD_PARTY_OPTIMIZATIONS.md
- */
 package pl.sofron.optimization.gui;
 
 import java.util.Arrays;

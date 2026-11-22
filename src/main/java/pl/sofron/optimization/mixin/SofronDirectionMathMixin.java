@@ -1,6 +1,3 @@
-/* SofronPack optimization component. Licensing and contributor notices:
- * LEGAL_NOTICE.md (distributed with this source).
- */
 package pl.sofron.optimization.mixin;
 
 import net.minecraft.core.Direction;
@@ -16,13 +13,13 @@ public abstract class SofronDirectionMathMixin {
     @Shadow @Final private static Direction[] VALUES;
     @Shadow @Final private int oppositeIndex;
 
-    /** @author SofronPack integration (see LEGAL_NOTICE.md)
+    /** Equivalent optimized hot path. */
     @Overwrite
     public Direction getOpposite() {
         return VALUES[oppositeIndex];
     }
 
-    /** @author SofronPack integration (see LEGAL_NOTICE.md)
+    /** Equivalent optimized hot path. */
     @Overwrite
     public static Direction getRandom(RandomSource random) {
         return VALUES[random.nextInt(VALUES.length)];
