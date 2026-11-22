@@ -476,7 +476,11 @@ public final class ExtendedWorldLodRenderer {
         long key = ExtendedVoxelStore.pack(tx, tz);
         long detail = detailAt(tx, tz, cx, cz);
         boolean preview = !MESHES.containsKey(key);
-        boolean refreshedPreview = REFRESHED_PREVIEWS.remove(key);
+        // On first re-entry, display the saved preview immediately. After it
+        // reaches the GPU, refresh it using any newly sampled live preview.
+        // Existing on-screen tiles still update directly as before.
+        boolean refreshedPreview = REFRESHED_PREVIEWS.contains(key) && !preview;
+        if (refreshedPreview) REFRESHED_PREVIEWS.remove(key);
         Path meshCache = ExtendedVoxelStore.meshCacheDirectory();
 
         var chunks = new ExtendedVoxelStore.VoxelChunk[(TILE + 2) * (TILE + 2)];
@@ -577,6 +581,7 @@ public final class ExtendedWorldLodRenderer {
             if (mesh.quads() == 0) {
                 GpuTile previous = MESHES.remove(key);
                 if (previous != null) previous.close();
+                if (!DIRTY.contains(key)) REFRESHED_PREVIEWS.remove(key);
                 continue;
             }
             // Already packed on the worker, or loaded from the world folder.
@@ -602,6 +607,14 @@ public final class ExtendedWorldLodRenderer {
             }
             region.upload(packed);
             MESHES.put(key, new GpuTile(region, mesh.quads(), job.detail));
+            if (mesh.fromDisk()) {
+                // Restore the previously visible terrain first; then, if a
+                // transient terrain preview has changed, reconcile it without
+                // leaving a gap during the startup frame.
+                if (REFRESHED_PREVIEWS.contains(key)) markDirty(key);
+            } else if (!DIRTY.contains(key)) {
+                REFRESHED_PREVIEWS.remove(key);
+            }
             if (job.detail != detailAt(tx, tz, cx, cz)) markDirty(key);
             if (!loggedFirstUpload) {
                 loggedFirstUpload = true;
