@@ -12,11 +12,10 @@ public final class ExtendedWorldOptions {
     public static BooleanOptionBuilder build(ConfigBuilder builder) {
         var option = builder.createBooleanOption(Identifier.parse("sofronpack:extended_world"));
         option.setName(Component.literal("Większy świat (tekstury bloków, 128 chunków)"));
-        option.setTooltip(Component.literal("Wokselowy świat do 128 chunków. Dla oszczędzania GPU " +
-                "zwykłe chunki w Nadziemiu renderują się maksymalnie do 20 chunków " +
-                "(suwak pozostaje bez zmian). Parametr normalRenderCap w " +
-                "config/sofronpack-extended-world.json: 0 wyłącza ten limit. " +
-                "Odległość symulacji pozostaje bez zmian."));
+        option.setTooltip(Component.literal("SofronPack wyświetla wokselowy teren do 128 chunków, " +
+                "zachowując pełny zasięg zwykłego renderowania i symulacji. " +
+                "Optymalizacja GPU: wspólna transformacja sceny, ponowne " +
+                "wykorzystywanie buforów oraz odciążanie niewidocznych kafelków."));
         option.setBinding(value -> ExtendedWorldConfig.get().setEnabled(value),
                 () -> ExtendedWorldConfig.get().enabled);
         option.setDefaultValue(false);

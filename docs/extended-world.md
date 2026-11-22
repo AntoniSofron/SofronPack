@@ -269,3 +269,43 @@ blocks, 1×1/2×2/4×4 distance levels, LOD radius, four fog bands, cloud
 layers and leaf textures are unchanged. At the memory cap, more distant
 tiles may be deferred to maintain a stable game; maximum coverage and
 graphics performance must be measured on the user's machine.
+
+## v0.1.48 — GPU architecture optimized without forced view or tile limits
+
+Reverses the user-rejected v0.1.47 restrictions. The native render-distance
+slider is again honored **exactly** (including 32 chunks), and the distant
+renderer still reaches 128 chunks. All fixed LOD GPU-byte, tile-count,
+per-tile-size and per-frame draw ceilings are removed. Old
+`normalRenderCap` configuration fields are ignored and the mixin that
+overrode the effective native distance is no longer installed. The 1×1
+(0–48), 2×2 (49–96), 4×4 (97–128) source-resolution scheme, the block
+cache, foliage, clouds, fog, and biome/worldgen rules remain unchanged.
+
+This version targets the **mechanisms of excessive GPU allocations**:
+
+* **Shared per-frame LOD dynamic transform:** every 4×4-chunk tile's
+  X/Z vertices are rebased on the CPU at upload to a common camera-facing
+  floating origin. The RenderPearl dynamic-transforms uniform is written
+  **once for the entire LOD pass** rather than once per individual tile.
+  The anchor is updated only when the player moves 8192 blocks from it;
+  all terrain remains camera-relative and precise at large world coordinates.
+* **GPU buffer reuse:** updates and LOD-level changes that fit in an
+  existing VBO overwrite its contents instead of destroying and reallocating.
+  When a tile grows, the old GPU buffer is released before allocating the
+  replacement, avoiding large double-allocation peaks. Only a small 12.5%
+  allocation reserve is used to reduce churn.
+* **Visibility-driven GPU residency:** a cached geometry buffer not drawn
+  for 180 rendered LOD frames is freed. The exact underlying snapshot is
+  never discarded. Moving/turning back requeues the tile so no fixed tile
+  or memory budget artificially hides distant terrain.
+* **Seamless native handoff:** the CPU skips fully covered near tiles; for
+  partially ready normal chunks, depth testing lets ordinary terrain
+  replace LOD geometry while the latter remains gap-free beneath it.
+  This avoids a separate per-tile GPU readiness uniform.
+
+The actual GPU/driver memory requirements still depend on hardware,
+terrain complexity and the selected normal view distance; there is no
+theoretical guarantee that an arbitrarily complex scene cannot exhaust a
+GPU. The in-world smoke test checks shader activation and single-player
+rendering, while the user should verify sustained flight at 32 ordinary
+chunks with hardware monitoring to assess memory and frame times.
