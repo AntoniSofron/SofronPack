@@ -56,6 +56,7 @@ public final class ExtendedLodMeshCache {
             });
     private static final AtomicLong INDEX_COUNTER = new AtomicLong();
     private static volatile DirectoryIndex currentIndex;
+    private static volatile DirectoryIndex previousIndex;
 
     private static final class DirectoryIndex {
         final Path root;
@@ -73,7 +74,14 @@ public final class ExtendedLodMeshCache {
         synchronized (ExtendedLodMeshCache.class) {
             active = currentIndex;
             if (active != null && active.root.equals(root)) return active;
+            DirectoryIndex previous = previousIndex;
+            if (previous != null && previous.root.equals(root)) {
+                previousIndex = active;
+                currentIndex = previous;
+                return previous;
+            }
             DirectoryIndex fresh = new DirectoryIndex(root);
+            previousIndex = active;
             currentIndex = fresh;
             INDEX_WORKER.execute(() -> scan(fresh));
             return fresh;
@@ -227,14 +235,12 @@ public final class ExtendedLodMeshCache {
             } catch (AtomicMoveNotSupportedException unsupported) {
                 Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING);
             }
-            // Do not replace the current world's in-memory index if a
-            // worker from an older world finishes its final disk write.
-            DirectoryIndex found = currentIndex;
-            if (found == null) found = index(root);
-            if (found != null && found.root.equals(root)) {
-                found.available = true;
-                found.paths.add(target);
-            }
+            // Two recent world indexes are retained so async writes from an
+            // unloading world never lose their bookkeeping, while memory
+            // remains bounded and lookups perform no filesystem operations.
+            DirectoryIndex found = index(root);
+            found.available = true;
+            found.paths.add(target);
         } catch (IOException problem) {
             warn("write", problem);
         } finally {
