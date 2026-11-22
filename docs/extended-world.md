@@ -181,3 +181,38 @@ The first two stages have a larger dispatch budget when the server is
 healthy, but still respect a strict maximum of 12 outstanding jobs
 and back off if the server is overloaded. This describes task priority;
 it is not a measured 10x worldgen speedup.
+
+## v0.1.45 — precise stored voxels, distance-dependent displayed voxels
+
+The integrated worldgen and persisted `ExtendedVoxelStore` keep each real
+source block at **full 1×1 resolution**. Rendering is separate:
+
+| Horizontal chunk distance | Visible LOD XZ voxel footprint |
+| --- | --- |
+| 0–48 inclusive | 1×1 |
+| 49–96 inclusive | 2×2 |
+| 97–128 inclusive | 4×4 |
+
+The Y coordinate of the real-volume mesher is **not** reduced. Exact source
+data are never downsampled or written back into the saved cache as a result
+of changing the displayed LOD. Initial, incomplete terrain can temporarily
+use a very coarse preview; when the source chunks are available, it is
+replaced by the appropriate 1×1/2×2/4×4 volume mesh.
+
+Both the tile's packed resolution fingerprint and every source chunk's
+(including halo neighbours) selected mip level are derived from the camera
+chunk position. Previous full-source meshes incorrectly passed an all-zero
+mip-level array, and marked fully captured GPU tiles with a permanent
+`-2` detail value; together these forced 1×1 resolution regardless of
+distance. Both behaviours have been removed. On player movement, the
+tile can rebuild at the new correct resolution without regenerating the
+source world. The old visible GPU buffer remains in place until its
+replacement is ready. Original four-stage fog, seven generation stages,
+normal-chunk handoff, and the vanilla-only distant leaves remain intact.
+
+This reduces horizontal voxel-grid visits from a maximum of 256 per
+chunk per sampled Y layer (1×1) to 64 (2×2) or 16 (4×4), before greedy
+surface merging. It does not guarantee a proportional FPS improvement:
+cache decoding, Y detail, chunk generation and GPU driver overhead can
+still dominate. Benchmark first paint, GPU vertices, frame times, and
+memory across the three distance rings on actual hardware.
