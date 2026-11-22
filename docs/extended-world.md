@@ -25,6 +25,15 @@ been removed: triangles with synthetic map colours are no longer used.
 * The far projection extends to 128 chunks without changing the normal render
   or simulation distance.
 
+## Unified scheduling and memory (v0.1.55)
+
+SofronPack's voxel snapshots now reuse immutable palette strings across
+chunks without sharing mutable palette arrays. The chunk prefetcher also
+adapts its near-cache capture and distant request budgets to measured
+snapshot processing cost, within fixed CPU and in-flight limits. Encoding
+remains asynchronous; world block access stays on the integrated server
+thread. These changes do not depend on OpenGL or Vulkan.
+
 ## Persistence / gameplay
 
 * Integrated single-player worlds generate FULL chunks gradually out to a

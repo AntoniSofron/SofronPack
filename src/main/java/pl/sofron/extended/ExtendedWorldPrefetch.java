@@ -9,6 +9,7 @@ import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.level.storage.LevelResource;
 import pl.sofron.extended.mixin.ExtendedChunkFutureAccess;
+import pl.sofron.optimization.scheduler.SofronChunkWorkBudget;
 
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -37,6 +38,9 @@ public final class ExtendedWorldPrefetch {
     private static final long[] OFFSETS = spiralOffsets(RADIUS);
     private static final int MAX_PENDING = Math.clamp(Runtime.getRuntime().availableProcessors() * 2, 8, 32);
     private static final AtomicInteger ENCODER_THREADS = new AtomicInteger();
+    // SofronPack adaptive cost model. World access still
+    // occurs exclusively on the integrated server thread.
+    private static SofronChunkWorkBudget captureCost = new SofronChunkWorkBudget(250_000);
     private static final ExecutorService ENCODERS = Executors.newFixedThreadPool(2, task -> {
         Thread thread = new Thread(task, "SofronPack-LOD-Encode-" + ENCODER_THREADS.incrementAndGet());
         thread.setDaemon(true);
@@ -98,6 +102,7 @@ public final class ExtendedWorldPrefetch {
             edited.clear();
             finalOnUnload.clear();
             epoch++;
+            captureCost = new SofronChunkWorkBudget(250_000);
             centerX = centerZ = scanAnchorX = scanAnchorZ = Integer.MIN_VALUE;
         });
     }
@@ -124,6 +129,7 @@ public final class ExtendedWorldPrefetch {
             edited.clear();
             finalOnUnload.clear();
             epoch++;
+            captureCost = new SofronChunkWorkBudget(250_000);
         }
 
         int cx = player.chunkPosition().x(), cz = player.chunkPosition().z();
@@ -149,7 +155,8 @@ public final class ExtendedWorldPrefetch {
         int normal = Math.max(2, server.getPlayerList().getViewDistance());
         boolean busyServer = server.getAverageTickTimeNanos() > 35_000_000L;
         if (!busyServer || ticks % 5 == 0) {
-            refreshNearby(server, level, cx, cz, normal, busyServer ? 1 : 2);
+            int nearLimit = busyServer ? 1 : captureCost.budget(4, 2_000_000L);
+            refreshNearby(server, level, cx, cz, normal, nearLimit);
         }
 
         if ((++ticks % 40) == 0) ExtendedVoxelStore.flush();
@@ -159,6 +166,9 @@ public final class ExtendedWorldPrefetch {
         // Throttle hard as soon as server tick duration becomes critical.
         if (busyServer && ticks % 4 != 0) return;
         int submitBudget = busyServer ? 1 : stageIndex == 0 ? 8 : stageIndex == 1 ? 6 : 4;
+        if (!busyServer) {
+            submitBudget = Math.min(submitBudget, captureCost.budget(8, 3_000_000L));
+        }
         long requestEpoch = epoch;
         long[] requests = new long[submitBudget];
         int submitted = 0, requestCount = 0, inspected = 0;
@@ -245,7 +255,7 @@ public final class ExtendedWorldPrefetch {
     private static void encodeAndPublish(MinecraftServer server, ServerLevel level,
                                          net.minecraft.world.level.chunk.ChunkAccess chunk, long key) {
         long requestEpoch = epoch;
-        var captured = ExtendedVoxelStore.captureSections(level, chunk);
+        var captured = captureTimed(level, chunk);
         CompletableFuture.supplyAsync(captured, ENCODERS)
                 .whenComplete((encoded, error) -> server.execute(() -> {
                     try {
@@ -288,7 +298,7 @@ public final class ExtendedWorldPrefetch {
             long requestEpoch = epoch;
             nearbyPending++;
             try {
-                var captured = ExtendedVoxelStore.captureSections(level, chunk);
+                var captured = captureTimed(level, chunk);
                 CompletableFuture.supplyAsync(captured, ENCODERS)
                         .whenComplete((encoded, failure) -> server.execute(() -> {
                             try {
@@ -312,6 +322,17 @@ public final class ExtendedWorldPrefetch {
                 nearbyPending = Math.max(0, nearbyPending - 1);
                 System.err.println("[SofronPack] Nearby voxel queue: " + rejected.getMessage());
             }
+        }
+    }
+
+    /** Timing only; keep all block/biome reads on the owning server thread. */
+    private static java.util.function.Supplier<ExtendedVoxelStore.VoxelChunk> captureTimed(
+            ServerLevel level, net.minecraft.world.level.chunk.ChunkAccess chunk) {
+        long start = System.nanoTime();
+        try {
+            return ExtendedVoxelStore.captureSections(level, chunk);
+        } finally {
+            captureCost.sample(System.nanoTime() - start);
         }
     }
 
