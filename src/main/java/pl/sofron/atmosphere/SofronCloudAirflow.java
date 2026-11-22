@@ -172,7 +172,8 @@ public final class SofronCloudAirflow {
         Player player = entity instanceof Player p ? p : null;
         boolean gliding = player != null && player.isFallFlying();
         boolean flying = player != null
-                && (player.isSpectator() || player.getAbilities().flying || gliding);
+                && (player.isSpectator() || gliding
+                    || (player.getAbilities().flying && !player.onGround()));
         if (player != null && player.isPassenger()) return delta;
         boolean riddenGhast = entity instanceof HappyGhast ghast
                 && ghast.getControllingPassenger() instanceof Player;
