@@ -14,7 +14,8 @@
     "SofronLithiumAabbMixin",
     "SofronLithiumPistonDirectionMixin",
     "SofronLithiumPistonResolverMixin",
-    "SofronLithiumRedstoneDirectionMixin"
+    "SofronLithiumRedstoneDirectionMixin",
+    "SofronOreBitsetMixin"
   ],
   "client": [
     "SofronRenderTypeFeatureRendererInvoker",
