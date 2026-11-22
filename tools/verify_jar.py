@@ -164,13 +164,14 @@ with zipfile.ZipFile(jar) as z:
     assert b"in uvec4 PackedA" in vertex_shader
     assert b"gl_VertexIndex" in vertex_shader
     assert b"coordinate(corner * 3" in vertex_shader
-    # Full captured volumes must use distance-dependent 1/2/4-block
-    # meshes rather than permanently rendering all distant tiles at 1x1.
+    # Full captured volumes must use all four distance-dependent
+    # 1/2/4/8-block rings rather than forcing distant 1x1 geometry.
     lod_levels = pathlib.Path(
         "src/main/java/pl/sofron/extended/ExtendedLodLevels.java").read_text()
-    assert "distanceChunks <= 48" in lod_levels
+    assert "distanceChunks <= 40" in lod_levels
+    assert "distanceChunks <= 64" in lod_levels
     assert "distanceChunks <= 96" in lod_levels
-    assert "return 2;" in lod_levels
+    assert "return 3;" in lod_levels
     assert "ringForChunk(" in lod_levels
     assert "pl/sofron/extended/ExtendedVolumeMesh.class" in files
     renderer_source = pathlib.Path(
