@@ -122,9 +122,13 @@ public final class ExtendedWorldLodRenderer {
     // A full horizon scan is spread over many frames. New camera positions
     // request another pass without aborting an already-progressing scan.
     private static final int HORIZON_TILES_PER_FRAME = 128;
+    // Scan from the player outward, so cached nearby terrain appears first,
+    // rather than waiting for half of a row-major 128-chunk horizon pass.
+    private static final long[] HORIZON_ORDER =
+            pl.sofron.extended.ExtendedWorldPrefetch.spiralOffsets(FAR / TILE + 1);
     private static final long HORIZON_SCAN_TIME_NS = 1_500_000L;
     private static boolean horizonScanning, horizonAgain, horizonForce;
-    private static int horizonCursor, horizonMinTX, horizonMinTZ, horizonWidth, horizonDepth;
+    private static int horizonCursor, horizonAnchorTX, horizonAnchorTZ;
     private static final ArrayDeque<Long> expiredMeshes = new ArrayDeque<>();
     private static final ArrayDeque<Long> expiredDirty = new ArrayDeque<>();
     private static final ArrayList<Long> reprioritize = new ArrayList<>();
@@ -198,7 +202,7 @@ public final class ExtendedWorldLodRenderer {
             boolean force = centerX == Integer.MIN_VALUE || changedDistance;
             centerX = cx; centerZ = cz; lastRenderDistance = distance;
             if (!horizonScanning) {
-                beginHorizonScan(minTX, maxTX, minTZ, maxTZ, force);
+                beginHorizonScan(cx, cz, force);
             } else {
                 horizonAgain = true;
             }
@@ -298,31 +302,28 @@ public final class ExtendedWorldLodRenderer {
         }
     }
 
-    private static void beginHorizonScan(int minTX, int maxTX, int minTZ, int maxTZ,
-                                         boolean force) {
+    private static void beginHorizonScan(int cx, int cz, boolean force) {
         horizonScanning = true;
         horizonAgain = false;
         horizonForce = force;
         horizonCursor = 0;
-        horizonMinTX = minTX;
-        horizonMinTZ = minTZ;
-        horizonWidth = maxTX - minTX + 1;
-        horizonDepth = maxTZ - minTZ + 1;
+        horizonAnchorTX = Math.floorDiv(cx, TILE);
+        horizonAnchorTZ = Math.floorDiv(cz, TILE);
     }
 
     private static void scanHorizon(Path meshCache, int minTX, int maxTX,
                                     int minTZ, int maxTZ, int cx, int cz, int distance) {
         if (!horizonScanning) return;
         long start = System.nanoTime();
-        int total = horizonWidth * horizonDepth;
-        for (int scanned = 0; horizonCursor < total
+        for (int scanned = 0; horizonCursor < HORIZON_ORDER.length
                 && scanned < HORIZON_TILES_PER_FRAME; scanned++) {
             if (scanned > 0 && System.nanoTime() - start >= HORIZON_SCAN_TIME_NS)
                 break;
-            int tx = horizonMinTX + horizonCursor / horizonDepth;
-            int tz = horizonMinTZ + horizonCursor % horizonDepth;
-            horizonCursor++;
-            if (outsideHorizon(tx, tz, cx, cz)
+            long offset = HORIZON_ORDER[horizonCursor++];
+            int tx = horizonAnchorTX + (int)(offset >> 32);
+            int tz = horizonAnchorTZ + (int)offset;
+            if (tx < minTX || tx > maxTX || tz < minTZ || tz > maxTZ
+                    || outsideHorizon(tx, tz, cx, cz)
                     || tileEntirelyInsideHandoff(tx, tz, cx, cz, distance)) continue;
             long key = ExtendedVoxelStore.pack(tx, tz);
             GpuTile current = MESHES.get(key);
@@ -333,10 +334,10 @@ public final class ExtendedWorldLodRenderer {
                 markDirty(key);
             }
         }
-        if (horizonCursor >= total) {
+        if (horizonCursor >= HORIZON_ORDER.length) {
             horizonScanning = false;
             if (horizonAgain)
-                beginHorizonScan(minTX, maxTX, minTZ, maxTZ, false);
+                beginHorizonScan(cx, cz, false);
         }
     }
 
