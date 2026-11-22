@@ -48,8 +48,8 @@ import com.mojang.renderpearl.api.textures.FilterMode;
  * discover, link to, or load Voxy.
  *
  * Four-by-four-chunk tiles share paginated GPU buffers, storing one packed
- * 48-byte instance for each quad. Only changed source chunks invalidate
- * geometry; native render distance remains under Sodium's own control.
+ * 48-byte instance for each quad. Source changes and camera-distance band
+ * crossings invalidate geometry; native render distance stays unchanged.
  * Meshing/uploads still use small time budgets, never a visibility cap.
  */
 public final class ExtendedWorldLodRenderer {
@@ -76,6 +76,11 @@ public final class ExtendedWorldLodRenderer {
     private record Candidate(long key, int priority, long distance) {}
     private static final PriorityQueue<Candidate> candidates = new PriorityQueue<>(
             Comparator.comparingInt(Candidate::priority).thenComparingLong(Candidate::distance));
+    // Cached meshes need to shrink as the player travels AWAY from them, even
+    // when those chunks are behind the camera and are no longer in the view cone.
+    private static final PriorityQueue<Candidate> reductions = new PriorityQueue<>(
+            Comparator.comparingLong(Candidate::distance).thenComparingInt(Candidate::priority));
+    private static boolean scheduleReductionNext;
     private static final Set<Long> queued = new HashSet<>();
     private static float queueLookX, queueLookZ;
     private static int queueX = Integer.MIN_VALUE, queueZ;
@@ -200,11 +205,12 @@ public final class ExtendedWorldLodRenderer {
                 queueLookX = view.x(); queueLookZ = view.z();
                 queued.clear();
                 candidates.clear();
+                reductions.clear();
                 for (long key : DIRTY) enqueue(key);
             }
             long meshDeadline = System.nanoTime() + FRAME_MESH_BUDGET_NS;
             for (int rebuilt = 0; rebuilt < UPLOADS_PER_FRAME && pending.size() < 2; ) {
-                var candidate = candidates.poll();
+                var candidate = pollCandidate();
                 if (candidate == null) break;
                 long key = candidate.key();
                 queued.remove(key);
@@ -377,13 +383,32 @@ public final class ExtendedWorldLodRenderer {
     private static void enqueue(long key) {
         if (queueX == Integer.MIN_VALUE || queued.contains(key) || pending.containsKey(key)) return;
         int tx = (int)(key >> 32), tz = (int)key;
-        if (outsideHorizon(tx, tz, queueX, queueZ)
-                || !isInView(tx, tz, queueX * 16d + 8, queueZ * 16d + 8, queueLookX, queueLookZ)) return;
+        if (outsideHorizon(tx, tz, queueX, queueZ)) return;
+        GpuTile current = MESHES.get(key);
+        boolean reduction = current != null && ExtendedLodLevels.requiresCoarsening(
+                current.detail(), detailAt(tx, tz, queueX, queueZ));
+        // New geometry and upgrades are view-prioritised. Downgrades must
+        // also run behind the player or old 1x1 GPU meshes never get reduced.
+        if (!reduction && !isInView(tx, tz, queueX * 16d + 8,
+                queueZ * 16d + 8, queueLookX, queueLookZ)) return;
         int dx = tx * TILE + TILE / 2 - queueX, dz = tz * TILE + TILE / 2 - queueZ;
         int band = pl.sofron.extended.ExtendedLodStages.indexForRadius(Math.max(Math.abs(dx), Math.abs(dz)));
-        int pass = band * 2 + (MESHES.containsKey(key) ? 1 : 0);
+        int pass = band * 2 + (current != null ? 1 : 0);
         queued.add(key);
-        candidates.add(new Candidate(key, pass, (long)dx * dx + (long)dz * dz));
+        Candidate candidate = new Candidate(key, pass, (long)dx * dx + (long)dz * dz);
+        if (reduction) reductions.add(candidate);
+        else candidates.add(candidate);
+    }
+
+    private static Candidate pollCandidate() {
+        // Reserve every other submitted mesh job for distance reductions.
+        // This is independent of which direction the player looks, so a
+        // continuous flow of newly generated tiles cannot starve downgrades.
+        Candidate next = !reductions.isEmpty() && (candidates.isEmpty() || scheduleReductionNext)
+                ? reductions.poll() : candidates.poll();
+        if (next == null) next = reductions.poll();
+        if (next != null) scheduleReductionNext = !scheduleReductionNext;
+        return next;
     }
 
     private static long detailAt(int tx, int tz, int cx, int cz) {
@@ -485,12 +510,15 @@ public final class ExtendedWorldLodRenderer {
             if (geometryArena == null) geometryArena = new ExtendedGpuGeometryArena(device);
             GpuTile previous = MESHES.get(key);
             ExtendedGpuGeometryArena.Region region;
-            if (previous != null && previous.region.size() >= packed.remaining()) {
-                // In-place upload into the same shared GPU allocation.
+            if (previous != null && previous.region.size() >= packed.remaining()
+                    && previous.region.size() <= (long)packed.remaining() * 2) {
+                // Reuse similarly sized regions to avoid needless GPU churn.
                 region = previous.region;
             } else {
-                // Retire an undersized old allocation BEFORE asking the
-                // driver for a replacement, so no double-VRAM spike.
+                // Also retire OVERSIZED regions when moving to a coarser mip:
+                // otherwise the geometry shrinks visually but stays at 1x1
+                // allocation size forever. Release BEFORE allocating again
+                // to prevent a temporary double-VRAM spike.
                 if (previous != null) {
                     MESHES.remove(key);
                     previous.close();
@@ -557,6 +585,8 @@ public final class ExtendedWorldLodRenderer {
         geometryArena = null;
         DIRTY.clear();
         candidates.clear();
+        reductions.clear();
+        scheduleReductionNext = false;
         queued.clear();
         queueX = Integer.MIN_VALUE;
     }
