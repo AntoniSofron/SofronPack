@@ -428,7 +428,7 @@ public final class ExtendedWorldPrefetch {
 
     static long pack(int x, int z) { return ExtendedVoxelStore.pack(x, z); }
 
-    static long[] spiralOffsets(int radius) {
+    public static long[] spiralOffsets(int radius) {
         if (radius < 0 || radius > 256) throw new IllegalArgumentException("radius");
         int side = radius * 2 + 1;
         long[] result = new long[side * side];
