@@ -8,7 +8,7 @@ import com.mojang.renderpearl.api.device.GpuDevice;
 import pl.sofron.extended.ExtendedPackedQuads;
 
 /**
- * Paginated GPU vertex arena for Voxy-style packed quad instances.
+ * Paginated GPU vertex arena for SofronPack packed quad instances.
  *
  * Unlike one GpuBuffer per LOD tile, dozens/hundreds of tile allocations
  * share one physical buffer and old ranges are recycled after chunk edits.

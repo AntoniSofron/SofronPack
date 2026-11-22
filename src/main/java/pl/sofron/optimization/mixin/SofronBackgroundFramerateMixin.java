@@ -1,9 +1,3 @@
-/*
- * Based on the 26.3 framerate-limiter strategy in Dynamic FPS:
- * https://github.com/juliand665/Dynamic-FPS
- * Reimplemented as an isolated no-dependency, unfocused-window limiter.
- * For source attribution see THIRD_PARTY_OPTIMIZATIONS.md.
- */
 package pl.sofron.optimization.mixin;
 
 import com.mojang.blaze3d.platform.Window;

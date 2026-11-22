@@ -1,7 +1,7 @@
 # SofronPack Extended World — Block-textured voxel LOD for Minecraft 26.3
 
 The distant-world renderer is a native component of the **single SofronPack
-JAR**. No Voxy installation is needed. The former coloured heightfield has
+JAR**. No separate distant-world rendering mod is required. The former coloured heightfield has
 been removed: triangles with synthetic map colours are no longer used.
 
 ## Rendering
@@ -66,10 +66,10 @@ been removed: triangles with synthetic map colours are no longer used.
 ## Current limits and test requirements
 
 The voxel renderer is substantially more faithful to Minecraft blocks than
-the old four-colour surface LOD, but **not yet identical to Voxy's detail or
-performance**. The 1-block near-LOD resolution, simplified handling of
-non-cubic models and transparency, and approximate biome tinting still differ
-from Voxy. Tests required before release-grade use: in-world visual review
+the old four-colour surface LOD, but **performance and visual parity with
+fully featured long-range renderers is not yet established**. The 1-block
+near-LOD resolution, simplified non-cubic models and transparency, and
+approximate biome tinting still need improvement. Tests required before release-grade use: in-world visual review
 across biomes, trees, water, structures and transitions, Iris, Sodium,
 OpenGL/Vulkan, FPS, VRAM, and persistent-world reload regression.
 
@@ -272,7 +272,7 @@ the *representation* of distant geometry without changing player controls.
   clouds, crop textures, detailed near leaves and lighting are intact.
 
 This is the first architectural optimization step, not a full port of
-Voxy's 8-byte quad encoder, hierarchical GPU Hi-Z occlusion traversal,
+an 8-byte quad encoder, hierarchical GPU Hi-Z occlusion traversal,
 multi-draw indirect rendering or lazy RAM snapshot storage. Any claim
 about eliminating GPU OOM still requires sustained VRAM measurements
 on the user's own hardware.

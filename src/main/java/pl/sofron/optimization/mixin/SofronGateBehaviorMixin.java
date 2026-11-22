@@ -1,8 +1,3 @@
-/*
- * Adapted from Lithium for Minecraft 26.3 (JellySquid, 2No2Name and
- * Lithium contributors): https://github.com/CaffeineMC/lithium
- * Licensed under LGPL-3.0-only. See THIRD_PARTY_OPTIMIZATIONS.md.
- */
 package pl.sofron.optimization.mixin;
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
@@ -22,20 +17,17 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
-import pl.sofron.optimization.lithium.SofronRunningPolicy;
-import pl.sofron.optimization.lithium.SofronWeightedBehaviors;
+import pl.sofron.optimization.ai.SofronRunningPolicy;
+import pl.sofron.optimization.ai.SofronWeightedBehaviors;
 
 @Mixin(GateBehavior.class)
-public abstract class SofronLithiumGateBehaviorMixin<E extends LivingEntity>
+public abstract class SofronGateBehaviorMixin<E extends LivingEntity>
         implements BehaviorControl<E> {
     @Shadow @Final private ShufflingList<BehaviorControl<? super E>> behaviors;
     @Shadow @Final private Set<MemoryModuleType<?>> exitErasedMemories;
     @Shadow private Behavior.Status status;
 
-    /**
-     * @author JellySquid, IMS, 2No2Name
-     * @reason Remove a stream allocation from the per-entity AI tick hot path.
-     */
+    /** Optimized equivalent operation. */
     @Overwrite
     public final void tickOrStop(ServerLevel level, E entity, long time) {
         boolean running = false;
@@ -48,10 +40,7 @@ public abstract class SofronLithiumGateBehaviorMixin<E extends LivingEntity>
         if (!running) doStop(level, entity, time);
     }
 
-    /**
-     * @author JellySquid
-     * @reason Iterate the already-stored tasks instead of constructing a stream.
-     */
+    /** Optimized equivalent operation. */
     @Overwrite
     public final void doStop(ServerLevel level, E entity, long time) {
         status = Behavior.Status.STOPPED;

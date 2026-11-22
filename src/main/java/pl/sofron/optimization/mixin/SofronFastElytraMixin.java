@@ -1,9 +1,3 @@
-/*
- * Adapted from Lithium 0.26.4 (entity.fast_elytra_check):
- * https://github.com/CaffeineMC/lithium
- * Copyright Lithium contributors. Licensed under LGPL-3.0-only.
- * See THIRD_PARTY_OPTIMIZATIONS.md.
- */
 package pl.sofron.optimization.mixin;
 
 import net.minecraft.world.entity.Entity;

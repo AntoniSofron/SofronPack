@@ -3,7 +3,7 @@ package pl.sofron.extended;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.LinkedHashMap;
-import me.cortex.voxy.client.core.util.ScanMesher2D;
+import pl.sofron.extended.mesh.SofronScanMesher2D;
 import net.minecraft.core.Direction;
 import pl.sofron.extended.ExtendedVoxelMesher.MaterialResolver;
 import pl.sofron.extended.ExtendedVoxelMesher.MaterialUV;
@@ -255,7 +255,7 @@ public final class ExtendedVolumeMesh {
                 && !(own == next ? id == other : own.source.palette()[id].equals(next.source.palette()[other])));
     }
 
-    private final class Plane extends ScanMesher2D {
+    private final class Plane extends SofronScanMesher2D {
         final Volume v;
         final MaterialResolver materials;
         final int face, ox, oz, step, yStep;

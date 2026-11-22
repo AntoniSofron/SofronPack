@@ -5,7 +5,6 @@
   "name": "SofronPack",
   "description": "Terrain, plants and lighting.",
   "environment": "*",
-  "license": "All Rights Reserved",
   "entrypoints": {
     "main": [
       "pl.sofron.terralab.TerraLabMod",

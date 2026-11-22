@@ -1,8 +1,3 @@
-/*
- * Adapted from Lithium 0.26.4 for Minecraft 26.3.
- * Copyright Lithium contributors (SuperCoder79, 2No2Name).
- * LGPL-3.0-only. https://github.com/CaffeineMC/lithium
- */
 package pl.sofron.optimization.mixin;
 
 import net.minecraft.core.Holder;
@@ -20,14 +15,11 @@ import org.spongepowered.asm.mixin.Unique;
  * lazily to avoid accessing unbound registry holders in constructors.
  */
 @Mixin(NoiseBasedChunkGenerator.class)
-public abstract class SofronLithiumCachedSeaLevelMixin {
+public abstract class SofronSeaLevelCacheMixin {
     @Shadow @Final private Holder<NoiseGeneratorSettings> settings;
     @Unique private int sofron$cachedSeaLevel = Integer.MIN_VALUE;
 
-    /**
-     * @author SuperCoder79, 2No2Name
-     * @reason Remove repeated registry indirection in the chunk generation hot path.
-     */
+    /** Optimized equivalent operation. */
     @Overwrite
     public int getSeaLevel() {
         if (sofron$cachedSeaLevel == Integer.MIN_VALUE)

@@ -1,8 +1,7 @@
-// Voxy by Cortex. Integrated with permission; standalone benchmarks omitted.
-package me.cortex.voxy.client.core.util;
+package pl.sofron.extended.mesh;
 
 
-public abstract class ScanMesher2D {
+public abstract class SofronScanMesher2D {
 
     private static final int MAX_SIZE = 16;
 

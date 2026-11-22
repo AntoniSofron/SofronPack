@@ -48,7 +48,7 @@ import com.mojang.renderpearl.api.textures.FilterMode;
 /**
  * Native RenderPearl (OpenGL + Vulkan) renderer of compact distant surface
  * tiles. The renderer is a client component of SofronPack itself: it does not
- * discover, link to, or load Voxy.
+ * discover or load a separate long-range renderer.
  *
  * Four-by-four-chunk tiles share paginated GPU buffers, storing one packed
  * 48-byte instance for each quad. Source changes and camera-distance band
