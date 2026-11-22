@@ -190,7 +190,16 @@ with zipfile.ZipFile(jar) as z:
     # not repacked on the GPU upload thread.
     assert "ExtendedPackedQuads.pack(result.vertices())" in renderer
     assert "ExtendedLodMeshCache.load(" in renderer
-    assert "ExtendedLodMeshCache.save(" in renderer
+    assert "ExtendedLodMeshCache.saveDeferred(" in renderer
+    assert "GPU_UPLOAD_TIME_BUDGET_NS" in renderer
+    assert "ExtendedLodMeshCache.indexGeneration(" in renderer
+    assert "pl/sofron/optimization/SofronFrameTiming.class" in files
+    lod_cache = pathlib.Path(
+        "src/main/java/pl/sofron/extended/ExtendedLodMeshCache.java").read_text()
+    assert "new java.io.RandomAccessFile(" in lod_cache
+    assert "java.util.zip.InflaterInputStream" in lod_cache
+    assert "new java.util.concurrent.ArrayBlockingQueue<>(4)" in lod_cache
+    assert "Files.walk(index.root, 2)" in lod_cache
     assert "pl/sofron/extended/ExtendedLodMeshCache.class" in files
     assert "pl/sofron/extended/ExtendedLodMeshFingerprint.class" in files
     assert "pass.drawIndexed(6, tile.quads, 0, 0, 0)" in renderer
