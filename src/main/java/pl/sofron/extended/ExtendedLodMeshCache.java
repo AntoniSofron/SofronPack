@@ -2,7 +2,6 @@ package pl.sofron.extended;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -14,11 +13,15 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Stream;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.zip.CRC32;
-import java.util.zip.DataFormatException;
 import java.util.zip.Deflater;
-import java.util.zip.DeflaterOutputStream;
 import java.util.zip.Inflater;
 
 /**
@@ -39,6 +42,70 @@ public final class ExtendedLodMeshCache {
     private static final int MAX_PACKED_BYTES = 96 * 1024 * 1024;
     private static final int HEADER_BYTES = 4 * 6 + 8 + HASH_BYTES + 4 * 2;
     private static final AtomicBoolean warned = new AtomicBoolean();
+    // Render-thread filesystem probes caused visible frame-time spikes when
+    // the world-save SSD was busy. Build the file index on an I/O worker.
+    private static final ExecutorService INDEX_WORKER =
+            Executors.newSingleThreadExecutor(job -> {
+                Thread worker = new Thread(job, "SofronPack-LOD-Index");
+                worker.setDaemon(true);
+                worker.setPriority(Thread.MIN_PRIORITY);
+                return worker;
+            });
+    private static final AtomicLong INDEX_COUNTER = new AtomicLong();
+    private static volatile DirectoryIndex currentIndex;
+    private static volatile DirectoryIndex previousIndex;
+
+    private static final class DirectoryIndex {
+        final Path root;
+        final long generation = INDEX_COUNTER.incrementAndGet();
+        final Set<Path> paths = ConcurrentHashMap.newKeySet();
+        volatile boolean available;
+        volatile boolean complete;
+        DirectoryIndex(Path root) { this.root = root; }
+    }
+
+    private static DirectoryIndex index(Path root) {
+        if (root == null) return null;
+        DirectoryIndex active = currentIndex;
+        if (active != null && active.root.equals(root)) return active;
+        synchronized (ExtendedLodMeshCache.class) {
+            active = currentIndex;
+            if (active != null && active.root.equals(root)) return active;
+            DirectoryIndex previous = previousIndex;
+            if (previous != null && previous.root.equals(root)) {
+                previousIndex = active;
+                currentIndex = previous;
+                return previous;
+            }
+            DirectoryIndex fresh = new DirectoryIndex(root);
+            previousIndex = active;
+            currentIndex = fresh;
+            INDEX_WORKER.execute(() -> scan(fresh));
+            return fresh;
+        }
+    }
+
+    private static void scan(DirectoryIndex index) {
+        try {
+            if (!Files.isDirectory(index.root)) return;
+            index.available = true;
+            // World root / r.X.Z / tile.slm. Only metadata is inspected.
+            try (Stream<Path> files = Files.walk(index.root, 2)) {
+                files.filter(path -> path.getFileName().toString().endsWith(".slm"))
+                        .forEach(index.paths::add);
+            }
+        } catch (IOException error) {
+            warn("index", error);
+        } finally {
+            index.complete = true;
+        }
+    }
+
+    /** Changes once when the background directory scan finishes. */
+    public static long indexGeneration(Path root) {
+        DirectoryIndex found = index(root);
+        return found != null && found.complete ? found.generation : Long.MIN_VALUE;
+    }
 
     public record Packed(ByteBuffer vertices, int quads, boolean fromDisk) {
         public Packed(ByteBuffer vertices, int quads) {
@@ -58,15 +125,21 @@ public final class ExtendedLodMeshCache {
                 .resolve("t." + tileX + "." + tileZ + "." + Long.toUnsignedString(detail, 16) + ".slm");
     }
 
-    /** Only a cheap file-existence probe; no disk I/O for geometry on the render thread. */
+    /** Lock-free, disk-I/O-free test on the render thread. */
     public static boolean hasSaved(Path root, int tx, int tz, long detail) {
-        return root != null && Files.isRegularFile(fileFor(root, tx, tz, detail));
+        DirectoryIndex found = index(root);
+        return found != null && found.paths.contains(fileFor(root, tx, tz, detail));
     }
 
     public static boolean exists(Path root) {
-        return root != null && Files.isDirectory(root);
+        DirectoryIndex found = index(root);
+        return found != null && found.available;
     }
 
+    /**
+     * Decode directly from a compressed file into a direct GPU-ready buffer.
+     * Never allocate whole compressed AND raw copies in the Java heap.
+     */
     public static Packed load(Path root, int tx, int tz, long detail, byte[] fingerprint) {
         if (root == null || fingerprint.length != HASH_BYTES) return null;
         Path file = fileFor(root, tx, tz, detail);
@@ -79,40 +152,42 @@ public final class ExtendedLodMeshCache {
                 if (in.readInt() != MAGIC || in.readInt() != VERSION
                         || in.readInt() != tx || in.readInt() != tz
                         || in.readLong() != detail) return null;
-                byte[] storedHash = in.readNBytes(HASH_BYTES);
-                if (!Arrays.equals(fingerprint, storedHash)) return null;
+                if (!Arrays.equals(fingerprint, in.readNBytes(HASH_BYTES))) return null;
                 int quads = in.readInt(), rawBytes = in.readInt();
-                int compressedBytes = in.readInt(), crc = in.readInt();
+                int compressedBytes = in.readInt(), expectedCrc = in.readInt();
                 if (quads <= 0 || rawBytes <= 0 || rawBytes > MAX_PACKED_BYTES
                         || rawBytes % ExtendedPackedQuads.QUAD_BYTES != 0
                         || (long) quads * ExtendedPackedQuads.QUAD_BYTES != rawBytes
                         || compressedBytes <= 0 || compressedBytes > MAX_PACKED_BYTES
                         || length != HEADER_BYTES + compressedBytes) return null;
-                byte[] encoded = in.readNBytes(compressedBytes);
-                if (encoded.length != compressedBytes) return null;
-                byte[] raw = new byte[rawBytes];
+
+                ByteBuffer result = ByteBuffer.allocateDirect(rawBytes).order(ByteOrder.nativeOrder());
+                CRC32 checksum = new CRC32();
+                byte[] staging = new byte[65536];
                 Inflater inflater = new Inflater();
-                int decoded = 0;
                 try {
-                    inflater.setInput(encoded);
-                    while (decoded < rawBytes && !inflater.finished()) {
-                        int n = inflater.inflate(raw, decoded, rawBytes - decoded);
-                        if (n == 0) return null;
-                        decoded += n;
+                    // All compressed bytes belong to this file, so the stream
+                    // never reads data from the next LOD record.
+                    java.util.zip.InflaterInputStream decoded =
+                            new java.util.zip.InflaterInputStream(in, inflater, 65536);
+                    int remaining = rawBytes;
+                    while (remaining > 0) {
+                        int received = decoded.read(staging, 0, Math.min(remaining, staging.length));
+                        if (received <= 0) return null;
+                        checksum.update(staging, 0, received);
+                        result.put(staging, 0, received);
+                        remaining -= received;
                     }
-                    if (decoded != rawBytes || !inflater.finished() || inflater.getRemaining() != 0)
-                        return null;
-                } catch (DataFormatException invalid) {
+                    if (decoded.read() != -1 || !inflater.finished()
+                            || inflater.getRemaining() != 0
+                            || (int) checksum.getValue() != expectedCrc) return null;
+                } catch (java.util.zip.ZipException invalid) {
                     return null;
                 } finally {
                     inflater.end();
                 }
-                CRC32 checksum = new CRC32();
-                checksum.update(raw);
-                if ((int) checksum.getValue() != crc) return null;
-                ByteBuffer buffer = ByteBuffer.allocateDirect(rawBytes).order(ByteOrder.nativeOrder());
-                buffer.put(raw).flip();
-                return new Packed(buffer, quads, true);
+                result.flip();
+                return new Packed(result, quads, true);
             }
         } catch (IOException | IllegalArgumentException problem) {
             warn("read", problem);
@@ -120,6 +195,10 @@ public final class ExtendedLodMeshCache {
         }
     }
 
+    /**
+     * Persist compressed geometry with only two reusable 64 KiB staging
+     * buffers, instead of two additional copies as large as the whole mesh.
+     */
     public static void save(Path root, int tx, int tz, long detail, byte[] fingerprint, Packed packed) {
         if (root == null || fingerprint.length != HASH_BYTES) return;
         int size = packed.vertices().remaining();
@@ -127,35 +206,58 @@ public final class ExtendedLodMeshCache {
         Path target = fileFor(root, tx, tz, detail);
         Path temporary = target.resolveSibling(target.getFileName() + ".tmp");
         try {
-            byte[] raw = new byte[size];
-            packed.vertices().duplicate().get(raw);
-            CRC32 checksum = new CRC32();
-            checksum.update(raw);
-            ByteArrayOutputStream compressed = new ByteArrayOutputStream(Math.min(size, 65536));
-            Deflater deflater = new Deflater(Deflater.BEST_SPEED);
-            try {
-                try (DeflaterOutputStream zlib = new DeflaterOutputStream(compressed, deflater, 65536)) {
-                    zlib.write(raw);
-                }
-            } finally {
-                deflater.end();
-            }
-            if (compressed.size() > MAX_PACKED_BYTES) return;
             Files.createDirectories(target.getParent());
-            try (DataOutputStream out = new DataOutputStream(
-                    new BufferedOutputStream(Files.newOutputStream(temporary,
-                            StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING), 65536))) {
-                out.writeInt(MAGIC);
-                out.writeInt(VERSION);
-                out.writeInt(tx);
-                out.writeInt(tz);
-                out.writeLong(detail);
-                out.write(fingerprint);
-                out.writeInt(packed.quads());
-                out.writeInt(size);
-                out.writeInt(compressed.size());
-                out.writeInt((int) checksum.getValue());
-                compressed.writeTo(out);
+            try (java.io.RandomAccessFile output = new java.io.RandomAccessFile(temporary.toFile(), "rw")) {
+                output.setLength(0);
+                output.writeInt(MAGIC);
+                output.writeInt(VERSION);
+                output.writeInt(tx);
+                output.writeInt(tz);
+                output.writeLong(detail);
+                output.write(fingerprint);
+                output.writeInt(packed.quads());
+                output.writeInt(size);
+                output.writeInt(0); // compressed length patched below
+                output.writeInt(0); // CRC32 patched below
+                long dataStart = output.getFilePointer();
+
+                CRC32 checksum = new CRC32();
+                Deflater deflater = new Deflater(Deflater.BEST_SPEED);
+                byte[] input = new byte[65536];
+                try {
+                    // Deflater may correctly consume input without producing
+                    // bytes yet; let DeflaterOutputStream handle that state
+                    // instead of treating a zero-length deflate as failure.
+                    java.io.OutputStream sink = new java.io.OutputStream() {
+                        @Override public void write(int b) throws IOException {
+                            output.write(b);
+                        }
+                        @Override public void write(byte[] bytes, int off, int len) throws IOException {
+                            output.write(bytes, off, len);
+                        }
+                        @Override public void close() {
+                            // Keep RandomAccessFile open to patch CRC and size.
+                        }
+                    };
+                    try (java.util.zip.DeflaterOutputStream compressor =
+                                 new java.util.zip.DeflaterOutputStream(sink, deflater, 65536)) {
+                        ByteBuffer vertices = packed.vertices().duplicate();
+                        while (vertices.hasRemaining()) {
+                            int count = Math.min(input.length, vertices.remaining());
+                            vertices.get(input, 0, count);
+                            checksum.update(input, 0, count);
+                            compressor.write(input, 0, count);
+                        }
+                    }
+                } finally {
+                    deflater.end();
+                }
+
+                long compressedSize = output.getFilePointer() - dataStart;
+                if (compressedSize <= 0 || compressedSize > MAX_PACKED_BYTES) return;
+                output.seek(dataStart - 8);
+                output.writeInt((int) compressedSize);
+                output.writeInt((int) checksum.getValue());
             }
             try {
                 Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE,
@@ -163,11 +265,69 @@ public final class ExtendedLodMeshCache {
             } catch (AtomicMoveNotSupportedException unsupported) {
                 Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING);
             }
+            DirectoryIndex found = index(root);
+            found.available = true;
+            found.paths.add(target);
         } catch (IOException problem) {
             warn("write", problem);
         } finally {
             try { Files.deleteIfExists(temporary); }
             catch (IOException ignored) { }
+        }
+    }
+
+    // A small bounded save queue avoids retaining hundreds of large GPU
+    // buffers in RAM. Under saturation the LOD meshing worker (never the
+    // server or render thread) performs the write itself as backpressure.
+    private static final java.util.concurrent.ThreadPoolExecutor SAVE_WORKER =
+            new java.util.concurrent.ThreadPoolExecutor(1, 1, 0L,
+                    java.util.concurrent.TimeUnit.MILLISECONDS,
+                    new java.util.concurrent.ArrayBlockingQueue<>(4),
+                    job -> {
+                        Thread thread = new Thread(job, "SofronPack-LOD-Save");
+                        thread.setDaemon(true);
+                        thread.setPriority(Thread.MIN_PRIORITY);
+                        return thread;
+                    }, (task, executor) -> {
+                        // Saturated cache I/O must backpressure the LOD
+                        // meshing worker, never spawn concurrent writers
+                        // targeting the same tile's temporary file.
+                        try {
+                            executor.getQueue().put(task);
+                        } catch (InterruptedException interrupted) {
+                            Thread.currentThread().interrupt();
+                            task.run(); // preserve the already-generated cache
+                        }
+                    });
+
+    private static final java.util.concurrent.Phaser SAVES_IN_FLIGHT =
+            new java.util.concurrent.Phaser(1);
+
+    public static void saveDeferred(Path root, int tx, int tz, long detail,
+                                    byte[] fingerprint, Packed packed) {
+        if (root == null || packed.vertices().remaining() == 0) return;
+        byte[] immutableFingerprint = fingerprint.clone();
+        SAVES_IN_FLIGHT.register();
+        SAVE_WORKER.execute(() -> {
+            try {
+                save(root, tx, tz, detail, immutableFingerprint, packed);
+            } finally {
+                SAVES_IN_FLIGHT.arriveAndDeregister();
+            }
+        });
+    }
+
+    /** Keep completed LODs durable when the integrated server closes. */
+    public static void awaitPendingSaves() {
+        int phase = SAVES_IN_FLIGHT.arrive();
+        try {
+            SAVES_IN_FLIGHT.awaitAdvanceInterruptibly(phase, 45,
+                    java.util.concurrent.TimeUnit.SECONDS);
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            System.err.println("[SofronPack] LOD save interrupted during world shutdown");
+        } catch (java.util.concurrent.TimeoutException timedOut) {
+            System.err.println("[SofronPack] LOD save still finishing after shutdown timeout");
         }
     }
 

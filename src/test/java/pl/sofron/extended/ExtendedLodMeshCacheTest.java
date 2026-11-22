@@ -36,6 +36,26 @@ class ExtendedLodMeshCacheTest {
         assertNull(ExtendedLodMeshCache.load(saveFolder, -7, 18, 0x00001000L, hash));
     }
 
+    @Test void largeMeshesRoundTripAcrossStreamingCompressionBufferBoundaries() {
+        byte[] hash = new byte[32];
+        Arrays.fill(hash, (byte) 0x36);
+        var original = tile(12_000); // 576 KiB of native 48-byte quad records
+        ExtendedLodMeshCache.saveDeferred(saveFolder, -12, 9, 0x11aabbccL, hash, original);
+        ExtendedLodMeshCache.awaitPendingSaves();
+        var saved = ExtendedLodMeshCache.load(saveFolder, -12, 9, 0x11aabbccL, hash);
+        assertNotNull(saved, "Background save must complete before shutdown barrier");
+        assertEquals(original.quads(), saved.quads());
+        assertEquals(original.vertices(), saved.vertices());
+    }
+
+    @Test void savedFileIsVisibleToTheInMemoryIndexWithoutFilesystemPolling() {
+        byte[] hash = new byte[32];
+        ExtendedLodMeshCache.save(saveFolder, -11, 17, 0x11aabbccL, hash, tile(2));
+        assertTrue(ExtendedLodMeshCache.hasSaved(saveFolder, -11, 17, 0x11aabbccL));
+        assertFalse(ExtendedLodMeshCache.hasSaved(saveFolder, -11, 17, 0x11223344L));
+        assertTrue(ExtendedLodMeshCache.exists(saveFolder));
+    }
+
     @Test void invalidatesOnWorldOrTextureFingerprintChange() {
         byte[] hash = new byte[32];
         ExtendedLodMeshCache.save(saveFolder, 2, 3, 0L, hash, tile(4));

@@ -6,6 +6,33 @@ import java.util.Arrays;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ExtendedVoxelLodTest {
+    @org.junit.jupiter.api.Test
+    void backgroundArchiveWriterPersistsLatestVoxelAndRetainsLegacyFormat(
+            @org.junit.jupiter.api.io.TempDir java.nio.file.Path save) throws Exception {
+        ExtendedVoxelStore.open(save, "minecraft:overworld");
+        try {
+            short[] data = new short[16 * 16];
+            var air = new String[]{"minecraft:air", "minecraft:stone"};
+            for (int i = 0; i < 100; i++) {
+                data[0] = (short)(i % 2);
+                var chunk = ExtendedVoxelStore.encode(-8, 27, -64, 1, air, data);
+                assertTrue(ExtendedVoxelStore.put(chunk));
+            }
+            assertEquals(1, ExtendedVoxelStore.count());
+            ExtendedVoxelStore.flush();
+        } finally {
+            ExtendedVoxelStore.close();
+        }
+        ExtendedVoxelStore.open(save, "minecraft:overworld");
+        try {
+            var restored = ExtendedVoxelStore.get(-8, 27);
+            assertNotNull(restored, "All queued writes must finish on world close");
+            assertEquals(1, restored.unpack()[0], "Newest chunk update must win");
+        } finally {
+            ExtendedVoxelStore.close();
+        }
+    }
+
     @Test void compressedVoxelPaletteRoundTripsWithoutChangingMaterials() throws Exception {
         short[] blocks = new short[ExtendedVoxelStore.GRID * ExtendedVoxelStore.GRID * 20];
         Arrays.fill(blocks, (short) 1);

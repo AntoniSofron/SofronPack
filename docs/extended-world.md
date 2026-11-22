@@ -34,6 +34,42 @@ snapshot processing cost, within fixed CPU and in-flight limits. Encoding
 remains asynchronous; world block access stays on the integrated server
 thread. These changes do not depend on OpenGL or Vulkan.
 
+## Frame-time and cache I/O improvements (v0.1.56)
+
+To mitigate freezes while maintaining full 128-chunk LOD coverage:
+
+- Compressed voxel snapshots are appended to the save on a dedicated
+  low-priority archive writer. Game ticks update in-memory voxels and enqueue
+  coalesced writes; disk flushes never occur inline on the server tick.
+  World close waits for the pending archive writes and optional compaction,
+  retaining the previous v4 archive format.
+- Unloaded chunks copy their live section data on the owning server thread,
+  but compression and publication run on the existing bounded encoder pool.
+  Generation-future completions are staged in a small queue. The tick
+  processes at most two captured chunk volumes and uses a 1.5 ms shared
+  snapshot budget when adding a second capture; the normal simulation
+  and render distances remain unchanged.
+- Render-frame LOD file existence checks use an in-memory index built by
+  a background directory scanner, not repeated SSD metadata calls.
+  Cache-index completion triggers a one-time visible tile rescan.
+- Meshed tiles become available to the GPU without waiting for cache
+  compression. Cache files are compressed using streaming 64 KiB buffers
+  instead of allocating whole raw and compressed heap copies, and saved by
+  a dedicated bounded I/O worker. At world shutdown, pending completed mesh
+  saves are drained to keep previously visited terrain persistent.
+- GPU uploads remain incremental, now with at most four tiles, 8 MiB and
+  approximately 2 ms of additional transfer submissions per frame.
+  These are **per-frame work budgets**, not render-distance or LOD caps.
+- If any SofronPack stage consumes unusually long, `latest.log` receives a
+  rate-limited `[SofronPack] Frame-time diagnostic:` line indicating
+  whether the issue was an LOD server tick, section snapshot, or GPU frame
+  preparation. Such lines supplement but do not replace a JVM/OS profiler.
+
+These improvements reduce known blocking paths, but cannot guarantee zero
+stutters from Java garbage collection, vanilla chunk generation, the disk
+pagefile, shaders or GPU drivers. Compare frame-time percentiles in the same
+world, using the same settings, to measure actual improvement.
+
 ## Persistence / gameplay
 
 * Integrated single-player worlds generate FULL chunks gradually out to a

@@ -190,7 +190,16 @@ with zipfile.ZipFile(jar) as z:
     # not repacked on the GPU upload thread.
     assert "ExtendedPackedQuads.pack(result.vertices())" in renderer
     assert "ExtendedLodMeshCache.load(" in renderer
-    assert "ExtendedLodMeshCache.save(" in renderer
+    assert "ExtendedLodMeshCache.saveDeferred(" in renderer
+    assert "GPU_UPLOAD_TIME_BUDGET_NS" in renderer
+    assert "ExtendedLodMeshCache.indexGeneration(" in renderer
+    assert "pl/sofron/optimization/SofronFrameTiming.class" in files
+    lod_cache = pathlib.Path(
+        "src/main/java/pl/sofron/extended/ExtendedLodMeshCache.java").read_text()
+    assert "new java.io.RandomAccessFile(" in lod_cache
+    assert "java.util.zip.InflaterInputStream" in lod_cache
+    assert "new java.util.concurrent.ArrayBlockingQueue<>(4)" in lod_cache
+    assert "Files.walk(index.root, 2)" in lod_cache
     assert "pl/sofron/extended/ExtendedLodMeshCache.class" in files
     assert "pl/sofron/extended/ExtendedLodMeshFingerprint.class" in files
     assert "pass.drawIndexed(6, tile.quads, 0, 0, 0)" in renderer
@@ -217,7 +226,10 @@ with zipfile.ZipFile(jar) as z:
     assert "levels[i] = ExtendedLodLevels.ringForChunk(chunkX, chunkZ, cx, cz)" in renderer_source
     assert "new Pending(detail, task)" in renderer_source
     assert "new Pending(captured == TILE * TILE ? -2 : detail, task)" not in renderer_source
-    assert "current.detail() != wantedDetail" in renderer_source
+    assert "current.detail() != detail" in renderer_source
+    assert "scanHorizon(meshCache" in renderer_source
+    assert "HORIZON_TILES_PER_FRAME = 128" in renderer_source
+    assert "reprioritizeCursor < reprioritize.size()" in renderer_source
     assert "if (job.detail != detailAt(tx, tz, cx, cz)) markDirty(key)" in renderer_source
 
     assert b"sofronVolumeFog(fogRelative, FogEnvironmentalEnd)" in extended_shader

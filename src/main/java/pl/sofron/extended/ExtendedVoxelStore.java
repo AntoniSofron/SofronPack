@@ -83,13 +83,56 @@ public final class ExtendedVoxelStore {
         }
     }
 
+    // All voxel archive I/O runs off the integrated server and render threads.
+    // The single writer preserves append order and prevents concurrent compaction.
+    private static final ExecutorService WRITE_IO = Executors.newSingleThreadExecutor(job -> {
+        Thread thread = new Thread(job, "SofronPack-LOD-Archive");
+        thread.setDaemon(true);
+        thread.setPriority(Thread.MIN_PRIORITY);
+        return thread;
+    });
+
     private static final class Session {
         final Path file;
         final ConcurrentHashMap<Long, VoxelChunk> chunks = new ConcurrentHashMap<>();
         final ConcurrentLinkedQueue<Long> changed = new ConcurrentLinkedQueue<>();
         DataOutputStream output;
         int unflushed;
+        final ConcurrentHashMap<Long, VoxelChunk> queuedUpdates = new ConcurrentHashMap<>();
+        final ConcurrentLinkedQueue<Long> writeOrder = new ConcurrentLinkedQueue<>();
+        final java.util.concurrent.atomic.AtomicBoolean writerScheduled =
+                new java.util.concurrent.atomic.AtomicBoolean();
         Session(Path file) { this.file = file; }
+
+        void queue(VoxelChunk voxel) {
+            long key = pack(voxel.chunkX(), voxel.chunkZ());
+            // Multiple updates of the same chunk share one pending write.
+            if (queuedUpdates.put(key, voxel) == null) writeOrder.add(key);
+            schedule();
+        }
+
+        private void schedule() {
+            if (writerScheduled.compareAndSet(false, true)) WRITE_IO.execute(this::drain);
+        }
+
+        private void drain() {
+            try {
+                Long key;
+                while ((key = writeOrder.poll()) != null) {
+                    VoxelChunk voxel = queuedUpdates.remove(key);
+                    if (voxel == null) continue;
+                    try {
+                        add(voxel);
+                    } catch (IOException problem) {
+                        System.err.println("[SofronPack] Background voxel write: "
+                                + problem.getMessage());
+                    }
+                }
+            } finally {
+                writerScheduled.set(false);
+                if (!writeOrder.isEmpty()) schedule();
+            }
+        }
 
         void load() throws IOException {
             Files.createDirectories(file.getParent());
@@ -142,7 +185,7 @@ public final class ExtendedVoxelStore {
             output.writeInt(payload.length);
             output.writeInt((int)checksum.getValue());
             output.write(payload);
-            if (++unflushed >= 16) flush();
+            if (++unflushed >= 256) flush();
         }
 
         void flush() throws IOException {
@@ -151,6 +194,22 @@ public final class ExtendedVoxelStore {
         }
 
         void close() {
+            // World shutdown is a durability barrier: all queued records and
+            // compaction must finish before opening the next world archive.
+            try {
+                WRITE_IO.submit(() -> {
+                    drain();
+                    closeFile();
+                }).get();
+            } catch (InterruptedException interruption) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException("Interrupted closing voxel archive", interruption);
+            } catch (java.util.concurrent.ExecutionException error) {
+                throw new IllegalStateException("Voxel archive writer failed", error.getCause());
+            }
+        }
+
+        private void closeFile() {
             try {
                 if (output != null) output.close();
                 output = null;
@@ -207,12 +266,12 @@ public final class ExtendedVoxelStore {
 
     public static synchronized void flush() {
         Session session = current;
-        if (session != null) {
+        if (session != null) WRITE_IO.execute(() -> {
             try { session.flush(); }
             catch (IOException ex) {
-                System.err.println("[SofronPack] Voxel LOD flush: " + ex.getMessage());
+                System.err.println("[SofronPack] Background voxel flush: " + ex.getMessage());
             }
-        }
+        });
     }
 
     /** World-specific directory for persistent packed render meshes. */
@@ -243,15 +302,10 @@ public final class ExtendedVoxelStore {
         long id = pack(voxel.chunkX(), voxel.chunkZ());
         VoxelChunk old = s.chunks.get(id);
         if (voxel.same(old)) return false;
-        try {
-            s.add(voxel);
-            s.chunks.put(id, voxel);
-            s.changed.add(id);
-            return true;
-        } catch (IOException ex) {
-            System.err.println("[SofronPack] Voxel LOD write: " + ex.getMessage());
-            return false;
-        }
+        s.chunks.put(id, voxel);
+        s.changed.add(id);
+        s.queue(voxel);
+        return true;
     }
 
     /**
@@ -274,6 +328,17 @@ public final class ExtendedVoxelStore {
 
     /** Copy compact section palettes on the server thread. The encoder owns every copy. */
     public static java.util.function.Supplier<VoxelChunk> captureSections(ServerLevel level, ChunkAccess chunk) {
+        long start = System.nanoTime();
+        try {
+            return snapshotSections(level, chunk);
+        } finally {
+            pl.sofron.optimization.SofronFrameTiming.reportIfSlow(
+                    "chunk section snapshot", start, 8_000_000L);
+        }
+    }
+
+    private static java.util.function.Supplier<VoxelChunk> snapshotSections(
+            ServerLevel level, ChunkAccess chunk) {
         int chunkX = chunk.getPos().x(), chunkZ = chunk.getPos().z(), minY = level.getMinY();
         var live = chunk.getSections();
         var sections = new LevelChunkSection[live.length];

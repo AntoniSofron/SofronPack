@@ -13,6 +13,8 @@ import java.nio.file.Path;
 import pl.sofron.extended.ExtendedLodMeshCache;
 import pl.sofron.extended.ExtendedLodMeshFingerprint;
 import java.util.HashMap;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
@@ -62,9 +64,10 @@ public final class ExtendedWorldLodRenderer {
     // them on re-entry without allocating all 128 chunks in a single frame.
     private static final int JOBS_PER_FRAME = 12;
     private static final int MAX_PENDING = 16;
-    private static final int GPU_UPLOADS_PER_FRAME = 8;
+    private static final int GPU_UPLOADS_PER_FRAME = 4;
     // Prevent first-frame GPU spikes when restoring many large forest meshes.
-    private static final int GPU_BYTES_PER_FRAME = 16 * 1024 * 1024;
+    private static final int GPU_BYTES_PER_FRAME = 8 * 1024 * 1024;
+    private static final long GPU_UPLOAD_TIME_BUDGET_NS = 2_000_000L;
     private static final ExecutorService WORKER = Executors.newSingleThreadExecutor(job -> {
         Thread thread = new Thread(job, "SofronPack-LOD-Mesh");
         thread.setDaemon(true);
@@ -111,8 +114,25 @@ public final class ExtendedWorldLodRenderer {
     private static GpuBuffer longProjection;
     private static final ByteBuffer PROJECTION_STAGING = ByteBuffer.allocateDirect(64).order(ByteOrder.nativeOrder());
     private static long worldGeneration = Long.MIN_VALUE;
+    private static long lastMeshIndexGeneration = Long.MIN_VALUE;
     private static int centerX = Integer.MIN_VALUE, centerZ = Integer.MIN_VALUE;
     private static int lastRenderDistance;
+
+    // Never traverse all 4,000+ distant tiles in a single render frame.
+    // A full horizon scan is spread over many frames. New camera positions
+    // request another pass without aborting an already-progressing scan.
+    private static final int HORIZON_TILES_PER_FRAME = 128;
+    // Scan from the player outward, so cached nearby terrain appears first,
+    // rather than waiting for half of a row-major 128-chunk horizon pass.
+    private static final long[] HORIZON_ORDER =
+            pl.sofron.extended.ExtendedWorldPrefetch.spiralOffsets(FAR / TILE + 1);
+    private static final long HORIZON_SCAN_TIME_NS = 1_500_000L;
+    private static boolean horizonScanning, horizonAgain, horizonForce;
+    private static int horizonCursor, horizonAnchorTX, horizonAnchorTZ;
+    private static final ArrayDeque<Long> expiredMeshes = new ArrayDeque<>();
+    private static final ArrayDeque<Long> expiredDirty = new ArrayDeque<>();
+    private static final ArrayList<Long> reprioritize = new ArrayList<>();
+    private static int reprioritizeCursor;
     private static final Map<Long, Integer> readyColumns = new HashMap<>();
     private static int readyCursor;
     private static boolean failed;
@@ -133,6 +153,16 @@ public final class ExtendedWorldLodRenderer {
      * retirement must never happen inside a live Vulkan render pass.
      */
     public static void prepareFrame(double cameraX, double cameraZ) {
+        long start = System.nanoTime();
+        try {
+            prepareFrameInternal(cameraX, cameraZ);
+        } finally {
+            pl.sofron.optimization.SofronFrameTiming.reportIfSlow(
+                    "LOD GPU preparation", start, 25_000_000L);
+        }
+    }
+
+    private static void prepareFrameInternal(double cameraX, double cameraZ) {
         Minecraft mc = Minecraft.getInstance();
         if (!ExtendedWorldConfig.get().enabled || mc.level == null
                 || mc.getSingleplayerServer() == null || mc.player == null) {
@@ -150,6 +180,10 @@ public final class ExtendedWorldLodRenderer {
             worldGeneration = ExtendedVoxelStore.generation();
         }
         Path meshCache = ExtendedVoxelStore.meshCacheDirectory();
+        long indexRevision = ExtendedLodMeshCache.indexGeneration(meshCache);
+        boolean indexReady = indexRevision != Long.MIN_VALUE
+                && indexRevision != lastMeshIndexGeneration;
+        if (indexReady) lastMeshIndexGeneration = indexRevision;
         if (ExtendedVoxelStore.count() == 0 && !ExtendedLodMeshCache.exists(meshCache)) return;
         if (ATLAS.refreshModels()) {
             clearMeshes();
@@ -162,40 +196,24 @@ public final class ExtendedWorldLodRenderer {
         int minTX = Math.floorDiv(cx - FAR, TILE), maxTX = Math.floorDiv(cx + FAR, TILE);
         int minTZ = Math.floorDiv(cz - FAR, TILE), maxTZ = Math.floorDiv(cz + FAR, TILE);
         updateNormalCoverage(mc, cx, cz, distance);
-        if (centerX != cx || centerZ != cz || lastRenderDistance != distance) {
-            boolean first = centerX == Integer.MIN_VALUE || lastRenderDistance != distance;
+        boolean moved = centerX != cx || centerZ != cz;
+        boolean changedDistance = lastRenderDistance != distance;
+        if (moved || changedDistance || indexReady) {
+            boolean force = centerX == Integer.MIN_VALUE || changedDistance;
             centerX = cx; centerZ = cz; lastRenderDistance = distance;
-            for (int tx = minTX; tx <= maxTX; tx++) for (int tz = minTZ; tz <= maxTZ; tz++) {
-                long key = ExtendedVoxelStore.pack(tx, tz);
-                if (outsideHorizon(tx, tz, cx, cz) || tileEntirelyInsideHandoff(tx, tz, cx, cz, distance)) continue;
-                GpuTile current = MESHES.get(key);
-                long wantedDetail = detailAt(tx, tz, cx, cz);
-                // Fully generated chunks are NOT exempt from LOD changes.
-                // Even an all-real tile must be re-meshed when the camera
-                // crosses any 40/64/96-chunk resolution boundary.
-                boolean detailChanged = current != null && current.detail() != wantedDetail;
-                if ((current == null || first || detailChanged)
-                        && (hasChunkData(tx, tz)
-                            || ExtendedLodMeshCache.hasSaved(meshCache, tx, tz, wantedDetail))) {
-                    markDirty(key);
-                }
+            if (!horizonScanning) {
+                beginHorizonScan(cx, cz, force);
+            } else {
+                horizonAgain = true;
             }
-            // Avoid retaining coordinates from worlds/areas the player has
-            // left. They were previously scanned again on every frame.
-            DIRTY.removeIf(key -> {
-                int tx = (int)(key >> 32), tz = (int)(long)key;
-                return tx < minTX || tx > maxTX || tz < minTZ || tz > maxTZ;
-            });
-            Iterator<Map.Entry<Long, GpuTile>> it = MESHES.entrySet().iterator();
-            while (it.hasNext()) {
-                Map.Entry<Long, GpuTile> entry = it.next();
-                int tx = (int)(entry.getKey() >> 32), tz = (int)(long)entry.getKey();
-                if (tx < minTX || tx > maxTX || tz < minTZ || tz > maxTZ) {
-                    entry.getValue().close();
-                    it.remove();
-                }
+            if (moved || changedDistance) {
+                // Copy keys only; individual GPU buffers are retired gradually.
+                if (expiredMeshes.isEmpty()) expiredMeshes.addAll(MESHES.keySet());
+                if (expiredDirty.isEmpty()) expiredDirty.addAll(DIRTY);
             }
         }
+        scanHorizon(meshCache, minTX, maxTX, minTZ, maxTZ, cx, cz, distance);
+        retireOutOfRange(minTX, maxTX, minTZ, maxTZ);
 
         // Publish surface changes to the GPU gradually; do not iterate every
         // saved chunk or upload the whole LOD mesh when one surface changes.
@@ -224,14 +242,33 @@ public final class ExtendedWorldLodRenderer {
             // Pick the nearest visible dirty tile. Random HashSet iteration
             // caused important close LOD chunks to appear after far-off ones.
             var view = mc.gameRenderer.mainCamera().forwardVector();
-            if (queueX != cx || queueZ != cz || Math.abs(queueLookX - view.x()) > .05f
-                    || Math.abs(queueLookZ - view.z()) > .05f) {
+            // Do not re-sort thousands of dirty tiles for every one-chunk
+            // movement or tiny mouse turn. Rebuild in bounded slices.
+            boolean reorient = queueX == Integer.MIN_VALUE
+                    || Math.abs(queueX - cx) >= 4 || Math.abs(queueZ - cz) >= 4
+                    || Math.abs(queueLookX - view.x()) > .30f
+                    || Math.abs(queueLookZ - view.z()) > .30f;
+            if (reorient && reprioritizeCursor >= reprioritize.size()) {
                 queueX = cx; queueZ = cz;
                 queueLookX = view.x(); queueLookZ = view.z();
                 queued.clear();
                 candidates.clear();
                 reductions.clear();
-                for (long key : DIRTY) enqueue(key);
+                reprioritize.clear();
+                reprioritize.addAll(DIRTY);
+                reprioritizeCursor = 0;
+            }
+            long priorityStart = System.nanoTime();
+            for (int scanned = 0;
+                    reprioritizeCursor < reprioritize.size() && scanned < 128;
+                    scanned++) {
+                if (scanned > 0 && System.nanoTime() - priorityStart >= 1_500_000L)
+                    break;
+                enqueue(reprioritize.get(reprioritizeCursor++));
+            }
+            if (reprioritizeCursor >= reprioritize.size()) {
+                reprioritize.clear();
+                reprioritizeCursor = 0;
             }
             long meshDeadline = System.nanoTime() + FRAME_MESH_BUDGET_NS;
             int freshJobs = 0;
@@ -262,6 +299,67 @@ public final class ExtendedWorldLodRenderer {
                     + problem.getMessage());
             close();
             failed = true;
+        }
+    }
+
+    private static void beginHorizonScan(int cx, int cz, boolean force) {
+        horizonScanning = true;
+        horizonAgain = false;
+        horizonForce = force;
+        horizonCursor = 0;
+        horizonAnchorTX = Math.floorDiv(cx, TILE);
+        horizonAnchorTZ = Math.floorDiv(cz, TILE);
+    }
+
+    private static void scanHorizon(Path meshCache, int minTX, int maxTX,
+                                    int minTZ, int maxTZ, int cx, int cz, int distance) {
+        if (!horizonScanning) return;
+        long start = System.nanoTime();
+        for (int scanned = 0; horizonCursor < HORIZON_ORDER.length
+                && scanned < HORIZON_TILES_PER_FRAME; scanned++) {
+            if (scanned > 0 && System.nanoTime() - start >= HORIZON_SCAN_TIME_NS)
+                break;
+            long offset = HORIZON_ORDER[horizonCursor++];
+            int tx = horizonAnchorTX + (int)(offset >> 32);
+            int tz = horizonAnchorTZ + (int)offset;
+            if (tx < minTX || tx > maxTX || tz < minTZ || tz > maxTZ
+                    || outsideHorizon(tx, tz, cx, cz)
+                    || tileEntirelyInsideHandoff(tx, tz, cx, cz, distance)) continue;
+            long key = ExtendedVoxelStore.pack(tx, tz);
+            GpuTile current = MESHES.get(key);
+            long detail = detailAt(tx, tz, cx, cz);
+            if ((current == null || horizonForce || current.detail() != detail)
+                    && (hasChunkData(tx, tz)
+                        || ExtendedLodMeshCache.hasSaved(meshCache, tx, tz, detail))) {
+                markDirty(key);
+            }
+        }
+        if (horizonCursor >= HORIZON_ORDER.length) {
+            horizonScanning = false;
+            if (horizonAgain)
+                beginHorizonScan(cx, cz, false);
+        }
+    }
+
+    private static void retireOutOfRange(int minTX, int maxTX, int minTZ, int maxTZ) {
+        long start = System.nanoTime();
+        for (int retired = 0; retired < 128; retired++) {
+            if (retired > 0 && System.nanoTime() - start >= 1_500_000L) break;
+            if (!expiredMeshes.isEmpty()) {
+                long key = expiredMeshes.removeFirst();
+                int tx = (int)(key >> 32), tz = (int)key;
+                if (tx < minTX || tx > maxTX || tz < minTZ || tz > maxTZ) {
+                    GpuTile tile = MESHES.remove(key);
+                    if (tile != null) tile.close();
+                }
+            } else if (!expiredDirty.isEmpty()) {
+                long key = expiredDirty.removeFirst();
+                int tx = (int)(key >> 32), tz = (int)key;
+                if (tx < minTX || tx > maxTX || tz < minTZ || tz > maxTZ)
+                    DIRTY.remove(key);
+            } else {
+                break;
+            }
         }
     }
 
@@ -548,10 +646,12 @@ public final class ExtendedWorldLodRenderer {
             // be replayed directly at the next launch without re-meshing.
             ByteBuffer packed = ExtendedPackedQuads.pack(result.vertices());
             var ready = new ExtendedLodMeshCache.Packed(packed, result.quads());
-            ExtendedLodMeshCache.save(meshCache, tx, tz, savedDetail, fingerprint, ready);
+            // Render the finished tile immediately; compress and write its
+            // persistent cache on a separate bounded low-priority I/O worker.
+            ExtendedLodMeshCache.saveDeferred(meshCache, tx, tz, savedDetail, fingerprint, ready);
             if (meshCache != null && !loggedFirstDiskSave) {
                 loggedFirstDiskSave = true;
-                System.out.println("[SofronPack] Persistent LOD: writing compressed meshes to world save");
+                System.out.println("[SofronPack] Persistent LOD: queued compressed mesh save");
             }
             return ready;
         }, WORKER);
@@ -563,7 +663,10 @@ public final class ExtendedWorldLodRenderer {
     private static void finishMeshes(int minX, int maxX, int minZ, int maxZ, int cx, int cz) {
         var jobs = pending.entrySet().iterator();
         int uploaded = 0, transferredBytes = 0;
+        long startUpload = System.nanoTime();
         while (jobs.hasNext() && uploaded < GPU_UPLOADS_PER_FRAME) {
+            if (uploaded > 0 && System.nanoTime() - startUpload >= GPU_UPLOAD_TIME_BUDGET_NS)
+                break; // GPU work is amortized over frames, never discarded.
             var entry = jobs.next();
             var job = entry.getValue();
             if (!job.result.isDone()) continue;
@@ -605,7 +708,9 @@ public final class ExtendedWorldLodRenderer {
                 }
                 region = geometryArena.allocate(packed.remaining());
             }
-            region.upload(packed);
+            // Keep the original buffer view stable until deferred cache I/O
+            // finishes, even if the GPU backend consumes the upload view.
+            region.upload(packed.duplicate());
             MESHES.put(key, new GpuTile(region, mesh.quads(), job.detail));
             if (mesh.fromDisk()) {
                 // Restore the previously visible terrain first; then, if a
@@ -677,6 +782,12 @@ public final class ExtendedWorldLodRenderer {
         reductions.clear();
         scheduleReductionNext = false;
         queued.clear();
+        reprioritize.clear();
+        reprioritizeCursor = 0;
+        expiredMeshes.clear();
+        expiredDirty.clear();
+        horizonScanning = horizonAgain = horizonForce = false;
+        horizonCursor = 0;
         queueX = Integer.MIN_VALUE;
     }
 
@@ -690,6 +801,7 @@ public final class ExtendedWorldLodRenderer {
         quadIndices = null;
         longProjection = null;
         device = null;
+        lastMeshIndexGeneration = Long.MIN_VALUE;
         worldGeneration = Long.MIN_VALUE;
         centerX = centerZ = Integer.MIN_VALUE;
         lastRenderDistance = 0;
