@@ -23,14 +23,9 @@ with zipfile.ZipFile(jar) as z:
     assert mod["version"] == version
     assert len(mod["entrypoints"]["main"]) == 2
     assert len(mod["entrypoints"]["client"]) == 2
-    assert len(mod["mixins"]) == 7
-    assert "sofron-modernfix.mixins.json" in mod["mixins"]
-    modernfix = json.loads(z.read("sofron-modernfix.mixins.json"))
-    assert "SofronSurfaceRuleSequenceMixin" in modernfix["mixins"]
-    assert "SofronMaterialRuleListMixin" in modernfix["mixins"]
+    assert len(mod["mixins"]) == 6
     for optimized in (
-        "pl/sofron/optimization/modernfix/SofronSurfaceRuleSequenceMixin.class",
-        "pl/sofron/optimization/modernfix/SofronMaterialRuleListMixin.class",
+        "pl/sofron/optimization/modernfix/SofronMaterialNameInterner.class",
         "pl/sofron/optimization/async/SofronAdaptiveWorkBudget.class",
     ):
         assert optimized in files, optimized
