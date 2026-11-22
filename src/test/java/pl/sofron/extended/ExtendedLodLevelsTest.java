@@ -41,6 +41,37 @@ class ExtendedLodLevelsTest {
         assertEquals(3, ExtendedLodLevels.ringForChunk(100, 0, 0, 0));
     }
 
+    @Test void oldOneBlockGpuMeshIsReducedAsCameraMovesAwayAndRefinedOnReturn() {
+        // Four-by-four chunks around x=60. The source data does not change,
+        // only the per-chunk display level selected by the moving camera.
+        long near = tileLevels(15, 0, 60, 0);
+        long middle = tileLevels(15, 0, 10, 0);
+        long far = tileLevels(15, 0, -10, 0);
+        long furthest = tileLevels(15, 0, -40, 0);
+        assertEquals(0L, near, "Initial 1x1 view must contain 16 level-zero chunks");
+        assertTrue(ExtendedLodLevels.requiresCoarsening(near, middle));
+        assertTrue(ExtendedLodLevels.requiresCoarsening(middle, far));
+        assertTrue(ExtendedLodLevels.requiresCoarsening(far, furthest));
+        assertFalse(ExtendedLodLevels.requiresCoarsening(furthest, near),
+                "Returning to previously visited terrain is a refinement, not a reduction");
+        assertFalse(ExtendedLodLevels.requiresCoarsening(middle, middle));
+    }
+
+    @Test void mixedResolutionTileReducesEvenIfOnlyOneChunkCrossesABoundary() {
+        long old = 0b01_01_00_00L;
+        long target = 0b01_10_00_00L;
+        assertTrue(ExtendedLodLevels.requiresCoarsening(old, target));
+        assertFalse(ExtendedLodLevels.requiresCoarsening(target, old));
+    }
+
+    private static long tileLevels(int tileX, int tileZ, int cameraX, int cameraZ) {
+        long packed = 0;
+        for (int z = 0; z < 4; z++) for (int x = 0; x < 4; x++)
+            packed |= (long) ExtendedLodLevels.ringForChunk(
+                    tileX * 4 + x, tileZ * 4 + z, cameraX, cameraZ) << (2 * (z * 4 + x));
+        return packed;
+    }
+
     @Test void usesSquareChunkRingsAndIgnoresCameraHeight() {
         assertEquals(0, ExtendedLodLevels.ringForChunk(40, 40, 0, 0));
         assertEquals(1, ExtendedLodLevels.ringForChunk(41, 0, 0, 0));
