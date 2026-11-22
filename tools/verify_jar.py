@@ -125,6 +125,25 @@ with zipfile.ZipFile(jar) as z:
     assert "pl/sofron/extended/ExtendedLodStages.class" in files
     assert "int pass = band * 2" in pathlib.Path(
         "src/main/java/pl/sofron/extended/client/ExtendedWorldLodRenderer.java").read_text()
+    # v0.1.50: four display rings with the full, previously missing 8x8 mip.
+    levels_code = pathlib.Path(
+        "src/main/java/pl/sofron/extended/ExtendedLodLevels.java").read_text()
+    surface_code = pathlib.Path(
+        "src/main/java/pl/sofron/extended/ExtendedSurfaceMesh.java").read_text()
+    volume_code = pathlib.Path(
+        "src/main/java/pl/sofron/extended/ExtendedVolumeMesh.java").read_text()
+    render_code = pathlib.Path(
+        "src/main/java/pl/sofron/extended/client/ExtendedWorldLodRenderer.java").read_text()
+    assert "distanceChunks <= 40" in levels_code
+    assert "distanceChunks <= 64" in levels_code
+    assert "distanceChunks <= 96" in levels_code
+    assert "return 3;" in levels_code
+    assert "new short[4][]" in volume_code
+    assert "new short[256], new short[64], new short[16], new short[4]" in surface_code
+    assert "level <= 3" in surface_code
+    assert "previewDetailAt(tx, tz, cx, cz)" in render_code
+    assert "ring << (2 * (z * TILE + x))" in render_code
+
     # Actual packed quad data is a GPU instance (48B vs 96B legacy).
     packed = pathlib.Path(
         "src/main/java/pl/sofron/extended/ExtendedPackedQuads.java").read_text()
@@ -145,13 +164,14 @@ with zipfile.ZipFile(jar) as z:
     assert b"in uvec4 PackedA" in vertex_shader
     assert b"gl_VertexIndex" in vertex_shader
     assert b"coordinate(corner * 3" in vertex_shader
-    # Full captured volumes must use distance-dependent 1/2/4-block
-    # meshes rather than permanently rendering all distant tiles at 1x1.
+    # Full captured volumes must use all four distance-dependent
+    # 1/2/4/8-block rings rather than forcing distant 1x1 geometry.
     lod_levels = pathlib.Path(
         "src/main/java/pl/sofron/extended/ExtendedLodLevels.java").read_text()
-    assert "distanceChunks <= 48" in lod_levels
+    assert "distanceChunks <= 40" in lod_levels
+    assert "distanceChunks <= 64" in lod_levels
     assert "distanceChunks <= 96" in lod_levels
-    assert "return 2;" in lod_levels
+    assert "return 3;" in lod_levels
     assert "ringForChunk(" in lod_levels
     assert "pl/sofron/extended/ExtendedVolumeMesh.class" in files
     renderer_source = pathlib.Path(

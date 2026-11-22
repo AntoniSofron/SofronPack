@@ -147,7 +147,7 @@ public final class ExtendedWorldLodRenderer {
                 long wantedDetail = detailAt(tx, tz, cx, cz);
                 // Fully generated chunks are NOT exempt from LOD changes.
                 // Even an all-real tile must be re-meshed when the camera
-                // crosses the 48/96-chunk resolution boundaries.
+                // crosses any 40/64/96-chunk resolution boundary.
                 boolean detailChanged = current != null && current.detail() != wantedDetail;
                 if ((current == null || first || detailChanged) && hasChunkData(tx, tz)) {
                     markDirty(key);
@@ -396,6 +396,21 @@ public final class ExtendedWorldLodRenderer {
         return levels;
     }
 
+    /**
+     * Two bits per chunk already cover all four LOD rings (0..3).
+     * Keep incomplete previews >=4x4 nearby, and >=8x8 in the farthest
+     * ring, without changing persistent generated chunk resolution.
+     */
+    private static long previewDetailAt(int tx, int tz, int cx, int cz) {
+        long result = 0;
+        for (int z = 0; z < TILE; z++) for (int x = 0; x < TILE; x++) {
+            int level = ExtendedLodLevels.ringForChunk(
+                    tx * TILE + x, tz * TILE + z, cx, cz);
+            result |= (long)Math.max(2, level) << (2 * (z * TILE + x));
+        }
+        return result;
+    }
+
     private static void scheduleTile(int tx, int tz, int cx, int cz) {
         long key = ExtendedVoxelStore.pack(tx, tz);
         long detail = detailAt(tx, tz, cx, cz);
@@ -422,8 +437,11 @@ public final class ExtendedWorldLodRenderer {
         var surface = surfaces;
         var volume = volumes;
         boolean firstSurface = preview && real > 0 && real < TILE * TILE;
-        if (firstSurface) detail = 0x1_aaaa_aaaaL;
-        long resolution = real == 0 ? 0xaaaa_aaaaL : detail;
+        if (firstSurface) detail = previewDetailAt(tx, tz, cx, cz);
+        // The first terrain preview is intentionally 4x4 near the camera,
+        // but 8x8 beyond 96 chunks: even a transient preview must respect
+        // the very coarse farthest display ring.
+        long resolution = real == 0 ? previewDetailAt(tx, tz, cx, cz) : detail;
         int captured = real;
         var task = CompletableFuture.supplyAsync(() -> {
             if (firstSurface || captured == 0)

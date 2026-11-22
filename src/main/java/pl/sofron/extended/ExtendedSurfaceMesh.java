@@ -25,7 +25,7 @@ public final class ExtendedSurfaceMesh {
         final String[] palette;
         final int minimum, grass, foliage, water;
         // Store the winning full-resolution column index for each coarser footprint.
-        final short[][] winner = {new short[256], new short[64], new short[16]};
+        final short[][] winner = {new short[256], new short[64], new short[16], new short[4]};
         final int[] height = new int[256];
         final short[] top = new short[256], side = new short[256];
 
@@ -89,8 +89,9 @@ public final class ExtendedSurfaceMesh {
 
         private void reduce() {
             // Occupied-child reduction follows Voxy's hierarchical mip selection.
-            // At the surface, retain the highest occupied child through both levels.
-            for (int level = 1; level <= 2; level++) {
+            // Keep the highest occupied child through all three reduction levels,
+            // including the 8x8 farthest ring; never sample an empty corner.
+            for (int level = 1; level <= 3; level++) {
                 int width = 16 >> level;
                 for (int z = 0; z < width; z++) for (int x = 0; x < width; x++) {
                     int child = (z * width * 2 + x) * 2;

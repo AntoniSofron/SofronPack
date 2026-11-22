@@ -48,10 +48,14 @@ class ExtendedVolumeMeshTest {
         var medium = mesher.build(chunks, levels, (name, face) -> white);
         levels[7] = 2;
         var far = mesher.build(chunks, levels, (name, face) -> white);
+        levels[7] = 3;
+        var furthest = mesher.build(chunks, levels, (name, face) -> white);
         assertTrue(full.quads() > medium.quads(),
-                "2x2 distance mip must emit fewer faces than the exact 1x1 mesh");
+                "2x2 distance mip must emit fewer faces than exact 1x1");
         assertTrue(medium.quads() >= far.quads(),
-                "4x4 distance mip must not require more faces than 2x2");
+                "4x4 distance mip must not exceed 2x2");
+        assertTrue(far.quads() >= furthest.quads(),
+                "8x8 distance mip must not exceed 4x4");
         assertArrayEquals(exact, stored.unpack(),
                 "Rendering with coarser mips must never change saved 1x1 data");
     }
@@ -75,8 +79,11 @@ class ExtendedVolumeMeshTest {
         var medium = mesher.build(chunks, levels, mat);
         levels[7] = 2;
         var far = mesher.build(chunks, levels, mat);
+        levels[7] = 3;
+        var furthest = mesher.build(chunks, levels, mat);
         assertTrue(exact.quads() > medium.quads());
         assertTrue(medium.quads() >= far.quads());
+        assertTrue(far.quads() >= furthest.quads());
         assertArrayEquals(cells, chunks[7].unpack());
         // Medium LOD water Y is still exact: water's native top is 64
         // minus the retained one-ninth-block surface inset.
@@ -90,6 +97,21 @@ class ExtendedVolumeMeshTest {
         for (int i = 4; i < exact.vertices().limit(); i += ExtendedVoxelMesher.VERTEX_BYTES)
             if (Math.abs(exact.vertices().getFloat(i) - 61f) < 0.001f) exactTop = true;
         assertTrue(exactTop);
+    }
+
+    @Test void eightBlockMipKeepsAnOccupiedChildOffTheSamplingGrid() {
+        short[] cells = new short[16 * 16 * 16];
+        cells[11 * 256 + 7 * 16 + 7] = 1;
+        var chunks = new ExtendedVoxelStore.VoxelChunk[36];
+        chunks[7] = ExtendedVoxelStore.encode(0, 0, -64, 16, 0, 0, 0,
+                new String[]{"minecraft:air", "minecraft:stone"}, cells);
+        int[] levels = new int[36];
+        java.util.Arrays.fill(levels, 3);
+        var white = new ExtendedVoxelMesher.MaterialUV(0, 0, 1, 1, 0xffffff, false);
+        var mesh = new ExtendedVolumeMesh().build(chunks, levels, (name, face) -> white);
+        assertEquals(6, mesh.quads(),
+                "Occupied voxel not aligned to 8x8 sample grid must remain visible");
+        assertArrayEquals(cells, chunks[7].unpack());
     }
 
     @Test void fourBlockMipKeepsAnOccupiedChildOffTheSamplingGrid() {

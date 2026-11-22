@@ -66,7 +66,7 @@ class ExtendedSurfaceMeshTest {
         var uv = new ExtendedVoxelMesher.MaterialUV(0, 0, 1, 1, -1, true);
         var surface = new ExtendedSurfaceMesh().build(0, chunks, (name, face) -> uv);
         var volumes = new ExtendedVolumeMesh();
-        for (int level = 0; level < 2; level++) {
+        for (int level = 0; level < 3; level++) {
             int[] levels = new int[36];
             levels[7] = level;
             levels[8] = level + 1;
@@ -98,7 +98,7 @@ class ExtendedSurfaceMeshTest {
                 new String[]{"minecraft:air", "minecraft:stone"}, cells);
         var builder = new ExtendedSurfaceMesh();
         var white = new ExtendedVoxelMesher.MaterialUV(0, 0, 1, 1, 0xffffff, false);
-        for (int detail : new int[]{1, 2, 4}) {
+        for (int detail : new int[]{1, 2, 4, 8}) {
             var mesh = builder.build(Integer.numberOfTrailingZeros(detail), chunks, (name, face) -> white);
             assertTrue(mesh.quads() > 0);
             var vertices = mesh.vertices();
@@ -108,6 +108,22 @@ class ExtendedSurfaceMeshTest {
             assertEquals(16f, highest);
         }
     }
+    @Test void farEightByEightPreviewKeepsSeaLevelAndOffGridSummits() {
+        short[] cells = new short[16 * 16 * 16];
+        cells[15 * 256 + 7 * 16 + 11] = 1;
+        var chunks = new ExtendedVoxelStore.VoxelChunk[36];
+        chunks[7] = ExtendedVoxelStore.encode(0, 0, 0, 16, 0, 0, 0,
+                new String[]{"minecraft:air", "minecraft:stone"}, cells);
+        var material = new ExtendedVoxelMesher.MaterialUV(0, 0, 1, 1, 0xffffff, false);
+        // Source chunk at the first 4x4 tile slot, ring=3 encoded in 2 bits.
+        var mesh = new ExtendedSurfaceMesh().build(3L, chunks, (name, face) -> material);
+        assertTrue(mesh.quads() > 0);
+        float maximum = Float.NEGATIVE_INFINITY;
+        for (int i = 4; i < mesh.vertices().limit(); i += ExtendedVoxelMesher.VERTEX_BYTES)
+            maximum = Math.max(maximum, mesh.vertices().getFloat(i));
+        assertEquals(16f, maximum, "8x8 previews must preserve the highest occupied child");
+    }
+
     @Test void integratedScanMesherReducesAFlatChunkToOneTexturedTop() {
         short[] cells = new short[16 * 16 * 16];
         java.util.Arrays.fill(cells, 0, 256, (short)1);

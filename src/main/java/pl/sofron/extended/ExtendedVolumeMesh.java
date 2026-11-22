@@ -27,7 +27,8 @@ public final class ExtendedVolumeMesh {
 
     private static final class Volume {
         final VoxelChunk source;
-        final short[][] cells = new short[3][];
+        // 1/2/4/8 XZ samples per generated voxel footprint.
+        final short[][] cells = new short[4][];
         final int[] opacity;
         final ExtendedVoxelMesher.ModelFace[][] shapes;
         final int top;
