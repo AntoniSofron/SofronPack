@@ -177,6 +177,16 @@ public final class ExtendedWorldPrefetch {
     }
 
     private static void tick(MinecraftServer server) {
+        long start = System.nanoTime();
+        try {
+            tickInternal(server);
+        } finally {
+            pl.sofron.optimization.SofronFrameTiming.reportIfSlow(
+                    "LOD server tick", start, 20_000_000L);
+        }
+    }
+
+    private static void tickInternal(MinecraftServer server) {
         // The integrated server shares the database with its own client.
         // Never generate chunks without authority on an external server.
         if (!server.isSingleplayer() || !ExtendedWorldConfig.get().enabled) {

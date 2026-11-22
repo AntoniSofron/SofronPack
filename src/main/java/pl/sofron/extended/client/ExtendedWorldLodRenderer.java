@@ -135,6 +135,16 @@ public final class ExtendedWorldLodRenderer {
      * retirement must never happen inside a live Vulkan render pass.
      */
     public static void prepareFrame(double cameraX, double cameraZ) {
+        long start = System.nanoTime();
+        try {
+            prepareFrameInternal(cameraX, cameraZ);
+        } finally {
+            pl.sofron.optimization.SofronFrameTiming.reportIfSlow(
+                    "LOD GPU preparation", start, 25_000_000L);
+        }
+    }
+
+    private static void prepareFrameInternal(double cameraX, double cameraZ) {
         Minecraft mc = Minecraft.getInstance();
         if (!ExtendedWorldConfig.get().enabled || mc.level == null
                 || mc.getSingleplayerServer() == null || mc.player == null) {
