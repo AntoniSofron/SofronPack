@@ -626,7 +626,9 @@ public final class ExtendedWorldLodRenderer {
                 }
                 region = geometryArena.allocate(packed.remaining());
             }
-            region.upload(packed);
+            // Keep the original buffer view stable until deferred cache I/O
+            // finishes, even if the GPU backend consumes the upload view.
+            region.upload(packed.duplicate());
             MESHES.put(key, new GpuTile(region, mesh.quads(), job.detail));
             if (mesh.fromDisk()) {
                 // Restore the previously visible terrain first; then, if a
