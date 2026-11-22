@@ -94,6 +94,15 @@ public final class SofronCloudAirflow {
 
     public static boolean inCloud(double x, double z, double bottomY,
                                   double topY, long worldTime) {
+        // No texture decode, allocations or cloud-cell lookups at normal
+        // gameplay altitudes. Only the eight-block cloud slabs need the mask.
+        if (topY <= CloudBandLayout.LOW
+                || (bottomY >= CloudBandLayout.LOW + CLOUD_THICKNESS
+                    && topY <= CloudBandLayout.MIDDLE)
+                || (bottomY >= CloudBandLayout.MIDDLE + CLOUD_THICKNESS
+                    && topY <= CloudBandLayout.HIGH)
+                || bottomY >= CloudBandLayout.HIGH + CLOUD_THICKNESS)
+            return false;
         Mask mask = CloudTexture.MASK;
         double[] xs = {x, x - 1.0, x + 1.0};
         double[] zs = {z, z - 1.0, z + 1.0};
@@ -114,6 +123,7 @@ public final class SofronCloudAirflow {
         if (!poweredFlight && !freeFall) return motion;
         if (poweredFlight) {
             double factor = altitudeFactor(altitude) * (inCloud ? CLOUD_FLIGHT_FACTOR : 1.0);
+            if (factor == 1.0 && !inCloud) return motion;
             double vertical = inCloud && freeFall
                     ? motion.y * CLOUD_FALL_FACTOR : motion.y * factor;
             return new Vec3(motion.x * factor, vertical, motion.z * factor);
@@ -124,7 +134,11 @@ public final class SofronCloudAirflow {
     }
 
     public static Vec3 modifyMovement(Entity entity, MoverType mover, Vec3 delta) {
-        if (mover != MoverType.SELF || !entity.level().dimension().equals(Level.OVERWORLD))
+        // Every moving entity calls this method, but cloud winds affect only
+        // players and piloted happy ghasts. Keep all other paths nearly free.
+        if (mover != MoverType.SELF
+                || (!(entity instanceof Player) && !(entity instanceof HappyGhast))
+                || !entity.level().dimension().equals(Level.OVERWORLD))
             return delta;
         Player player = entity instanceof Player p ? p : null;
         boolean gliding = player != null && player.isFallFlying();
