@@ -285,11 +285,35 @@ public final class ExtendedLodMeshCache {
                         return thread;
                     }, new java.util.concurrent.ThreadPoolExecutor.CallerRunsPolicy());
 
+    private static final java.util.concurrent.Phaser SAVES_IN_FLIGHT =
+            new java.util.concurrent.Phaser(1);
+
     public static void saveDeferred(Path root, int tx, int tz, long detail,
                                     byte[] fingerprint, Packed packed) {
         if (root == null || packed.vertices().remaining() == 0) return;
         byte[] immutableFingerprint = fingerprint.clone();
-        SAVE_WORKER.execute(() -> save(root, tx, tz, detail, immutableFingerprint, packed));
+        SAVES_IN_FLIGHT.register();
+        SAVE_WORKER.execute(() -> {
+            try {
+                save(root, tx, tz, detail, immutableFingerprint, packed);
+            } finally {
+                SAVES_IN_FLIGHT.arriveAndDeregister();
+            }
+        });
+    }
+
+    /** Keep completed LODs durable when the integrated server closes. */
+    public static void awaitPendingSaves() {
+        int phase = SAVES_IN_FLIGHT.arrive();
+        try {
+            SAVES_IN_FLIGHT.awaitAdvanceInterruptibly(phase, 45,
+                    java.util.concurrent.TimeUnit.SECONDS);
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            System.err.println("[SofronPack] LOD save interrupted during world shutdown");
+        } catch (java.util.concurrent.TimeoutException timedOut) {
+            System.err.println("[SofronPack] LOD save still finishing after shutdown timeout");
+        }
     }
 
     private static void warn(String action, Exception problem) {

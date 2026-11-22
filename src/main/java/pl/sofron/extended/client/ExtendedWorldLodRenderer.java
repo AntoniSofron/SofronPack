@@ -564,10 +564,12 @@ public final class ExtendedWorldLodRenderer {
             // be replayed directly at the next launch without re-meshing.
             ByteBuffer packed = ExtendedPackedQuads.pack(result.vertices());
             var ready = new ExtendedLodMeshCache.Packed(packed, result.quads());
-            ExtendedLodMeshCache.save(meshCache, tx, tz, savedDetail, fingerprint, ready);
+            // Render the finished tile immediately; compress and write its
+            // persistent cache on a separate bounded low-priority I/O worker.
+            ExtendedLodMeshCache.saveDeferred(meshCache, tx, tz, savedDetail, fingerprint, ready);
             if (meshCache != null && !loggedFirstDiskSave) {
                 loggedFirstDiskSave = true;
-                System.out.println("[SofronPack] Persistent LOD: writing compressed meshes to world save");
+                System.out.println("[SofronPack] Persistent LOD: queued compressed mesh save");
             }
             return ready;
         }, WORKER);

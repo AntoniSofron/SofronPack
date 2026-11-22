@@ -161,6 +161,7 @@ public final class ExtendedWorldPrefetch {
         ServerLifecycleEvents.SERVER_STOPPING.register(server -> {
             ExtendedTerrainPreview.clear();
             finishUnloadEncoding();
+            ExtendedLodMeshCache.awaitPendingSaves();
             ExtendedVoxelStore.close();
             pending = nearbyPending = 0;
             READY_CAPTURES.clear();
