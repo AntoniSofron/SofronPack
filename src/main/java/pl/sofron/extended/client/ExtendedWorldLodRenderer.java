@@ -9,6 +9,9 @@ import com.mojang.renderpearl.api.pipeline.DepthStencilState;
 import com.mojang.renderpearl.api.pipeline.CompareOp;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.file.Path;
+import pl.sofron.extended.ExtendedLodMeshCache;
+import pl.sofron.extended.ExtendedLodMeshFingerprint;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -55,7 +58,11 @@ import com.mojang.renderpearl.api.textures.FilterMode;
 public final class ExtendedWorldLodRenderer {
     private static final int TILE = ExtendedVoxelMesher.TILE_CHUNKS;
     private static final int FAR = ExtendedWorldConfig.DISTANT_RADIUS_CHUNKS;
-    private static final int UPLOADS_PER_FRAME = 2;
+    // Cached meshes only require disk decoding + GPU upload. Submit more of
+    // them on re-entry without allocating all 128 chunks in a single frame.
+    private static final int JOBS_PER_FRAME = 12;
+    private static final int MAX_PENDING = 16;
+    private static final int GPU_UPLOADS_PER_FRAME = 8;
     private static final ExecutorService WORKER = Executors.newSingleThreadExecutor(job -> {
         Thread thread = new Thread(job, "SofronPack-LOD-Mesh");
         thread.setDaemon(true);
@@ -63,7 +70,7 @@ public final class ExtendedWorldLodRenderer {
     });
     private static ExtendedSurfaceMesh surfaces = new ExtendedSurfaceMesh();
     private static ExtendedVolumeMesh volumes = new ExtendedVolumeMesh();
-    private record Pending(long detail, CompletableFuture<ExtendedVoxelMesher.Mesh> result) {}
+    private record Pending(long detail, CompletableFuture<ExtendedLodMeshCache.Packed> result) {}
     private static final Map<Long, Pending> pending = new HashMap<>();
     private static final long FRAME_MESH_BUDGET_NS = 5_000_000L;
     // No artificial 20-chunk normal view cap or 128/256 MiB GPU quotas:
@@ -72,6 +79,10 @@ public final class ExtendedWorldLodRenderer {
     private static final int MAX_QUADS = ExtendedVoxelMesher.MAX_QUADS;
     private static final Map<Long, GpuTile> MESHES = new HashMap<>();
     private static final Set<Long> DIRTY = new HashSet<>();
+    // Transient terrain predictions do not have a persistent world fingerprint.
+    // If a newer preview arrives, rebuild it rather than replaying an older
+    // preview mesh that had the same captured voxel neighbours.
+    private static final Set<Long> REFRESHED_PREVIEWS = new HashSet<>();
 
     private record Candidate(long key, int priority, long distance) {}
     private static final PriorityQueue<Candidate> candidates = new PriorityQueue<>(
@@ -130,7 +141,8 @@ public final class ExtendedWorldLodRenderer {
             device = now;
             worldGeneration = ExtendedVoxelStore.generation();
         }
-        if (ExtendedVoxelStore.count() == 0) return;
+        Path meshCache = ExtendedVoxelStore.meshCacheDirectory();
+        if (ExtendedVoxelStore.count() == 0 && !ExtendedLodMeshCache.exists(meshCache)) return;
         if (ATLAS.refreshModels()) {
             clearMeshes();
             centerX = centerZ = Integer.MIN_VALUE;
@@ -154,7 +166,9 @@ public final class ExtendedWorldLodRenderer {
                 // Even an all-real tile must be re-meshed when the camera
                 // crosses any 40/64/96-chunk resolution boundary.
                 boolean detailChanged = current != null && current.detail() != wantedDetail;
-                if ((current == null || first || detailChanged) && hasChunkData(tx, tz)) {
+                if ((current == null || first || detailChanged)
+                        && (hasChunkData(tx, tz)
+                            || ExtendedLodMeshCache.hasSaved(meshCache, tx, tz, wantedDetail))) {
                     markDirty(key);
                 }
             }
@@ -191,7 +205,10 @@ public final class ExtendedWorldLodRenderer {
             Long key = ExtendedTerrainPreview.pollChanged();
             if (key == null) break;
             int x = (int)(key >> 32), z = (int)(long)key;
-            if (x >= minTX && x <= maxTX && z >= minTZ && z <= maxTZ) markDirty(key);
+            if (x >= minTX && x <= maxTX && z >= minTZ && z <= maxTZ) {
+                REFRESHED_PREVIEWS.add(key);
+                markDirty(key);
+            }
         }
         try {
             finishMeshes(minTX, maxTX, minTZ, maxTZ, cx, cz);
@@ -209,7 +226,8 @@ public final class ExtendedWorldLodRenderer {
                 for (long key : DIRTY) enqueue(key);
             }
             long meshDeadline = System.nanoTime() + FRAME_MESH_BUDGET_NS;
-            for (int rebuilt = 0; rebuilt < UPLOADS_PER_FRAME && pending.size() < 2; ) {
+            int freshJobs = 0;
+            for (int rebuilt = 0; rebuilt < JOBS_PER_FRAME && pending.size() < MAX_PENDING; ) {
                 var candidate = pollCandidate();
                 if (candidate == null) break;
                 long key = candidate.key();
@@ -217,9 +235,18 @@ public final class ExtendedWorldLodRenderer {
                 if (!DIRTY.contains(key) || pending.containsKey(key)) continue;
                 int tx = (int)(key >> 32), tz = (int)key;
                 if (outsideHorizon(tx, tz, cx, cz) || tileEntirelyInsideHandoff(tx, tz, cx, cz, distance)) continue;
+                // Preserve the old two-new-mesh-per-frame budget while allowing
+                // up to twelve already-saved LOD tiles to be restored promptly.
+                boolean cached = ExtendedLodMeshCache.hasSaved(meshCache, tx, tz,
+                        detailAt(tx, tz, cx, cz));
+                if (!cached && freshJobs >= 2) {
+                    enqueue(key);
+                    break;
+                }
                 DIRTY.remove(key);
                 scheduleTile(tx, tz, cx, cz);
                 rebuilt++;
+                if (!cached) freshJobs++;
                 // The shared arena reuses freed space; no fixed tile eviction.
                 if (System.nanoTime() >= meshDeadline) break;
             }
@@ -440,6 +467,8 @@ public final class ExtendedWorldLodRenderer {
         long key = ExtendedVoxelStore.pack(tx, tz);
         long detail = detailAt(tx, tz, cx, cz);
         boolean preview = !MESHES.containsKey(key);
+        boolean refreshedPreview = REFRESHED_PREVIEWS.remove(key);
+        Path meshCache = ExtendedVoxelStore.meshCacheDirectory();
 
         var chunks = new ExtendedVoxelStore.VoxelChunk[(TILE + 2) * (TILE + 2)];
         // The old code left this array at all zeros, so fully generated
@@ -468,18 +497,40 @@ public final class ExtendedWorldLodRenderer {
         // the very coarse farthest display ring.
         long resolution = real == 0 ? previewDetailAt(tx, tz, cx, cz) : detail;
         int captured = real;
+        long savedDetail = detail;
         var task = CompletableFuture.supplyAsync(() -> {
-            if (firstSurface || captured == 0)
-                return surface.build(resolution, chunks, materials, tx, tz, predictions);
-            // Any finished chunk can refine independently of the other 15 in its tile.
-            var exact = volume.build(chunks, levels, materials);
-            if (captured == TILE * TILE) return exact;
-            var remaining = surface.buildMissing(resolution, chunks, materials, tx, tz, predictions);
-            if (remaining.quads() == 0) return exact;
-            var combined = ByteBuffer.allocateDirect(exact.vertices().remaining() + remaining.vertices().remaining())
-                    .order(ByteOrder.nativeOrder());
-            combined.put(exact.vertices()).put(remaining.vertices()).flip();
-            return new ExtendedVoxelMesher.Mesh(combined, exact.quads() + remaining.quads());
+            byte[] fingerprint = ExtendedLodMeshFingerprint.of(chunks, materials);
+            if (!refreshedPreview) {
+                var restored = ExtendedLodMeshCache.load(meshCache, tx, tz, savedDetail, fingerprint);
+                if (restored != null) return restored;
+            }
+            ExtendedVoxelMesher.Mesh result;
+            if (firstSurface || captured == 0) {
+                result = surface.build(resolution, chunks, materials, tx, tz, predictions);
+            } else {
+                // Any finished chunk can refine independently of the other 15 in its tile.
+                var exact = volume.build(chunks, levels, materials);
+                if (captured == TILE * TILE) {
+                    result = exact;
+                } else {
+                    var remaining = surface.buildMissing(resolution, chunks, materials, tx, tz, predictions);
+                    if (remaining.quads() == 0) {
+                        result = exact;
+                    } else {
+                        var combined = ByteBuffer.allocateDirect(exact.vertices().remaining() + remaining.vertices().remaining())
+                                .order(ByteOrder.nativeOrder());
+                        combined.put(exact.vertices()).put(remaining.vertices()).flip();
+                        result = new ExtendedVoxelMesher.Mesh(combined, exact.quads() + remaining.quads());
+                    }
+                }
+            }
+            // Save *the display geometry* as well as its 1x1 source snapshot:
+            // all four LOD bands (including mixed-resolution boundaries) can
+            // be replayed directly at the next launch without re-meshing.
+            ByteBuffer packed = ExtendedPackedQuads.pack(result.vertices());
+            var ready = new ExtendedLodMeshCache.Packed(packed, result.quads());
+            ExtendedLodMeshCache.save(meshCache, tx, tz, savedDetail, fingerprint, ready);
+            return ready;
         }, WORKER);
         // Keep the actual per-chunk detail map even for completely generated
         // tiles. The previous -2 sentinel permanently locked them at 1x1.
@@ -488,7 +539,8 @@ public final class ExtendedWorldLodRenderer {
 
     private static void finishMeshes(int minX, int maxX, int minZ, int maxZ, int cx, int cz) {
         var jobs = pending.entrySet().iterator();
-        while (jobs.hasNext()) {
+        int uploaded = 0;
+        while (jobs.hasNext() && uploaded < GPU_UPLOADS_PER_FRAME) {
             var entry = jobs.next();
             var job = entry.getValue();
             if (!job.result.isDone()) continue;
@@ -498,15 +550,15 @@ public final class ExtendedWorldLodRenderer {
             if (tx < minX || tx > maxX || tz < minZ || tz > maxZ) continue;
             if (DIRTY.contains(key)) enqueue(key);
             var mesh = job.result.join();
+            uploaded++;
             if (mesh.quads() == 0) {
                 GpuTile previous = MESHES.remove(key);
                 if (previous != null) previous.close();
                 continue;
             }
-            // Pack the old builder's 96-byte quads down to 48 bytes on CPU.
-            // Existing meshers remain untouched; resource-pack geometry,
-            // real Y coordinates, fluids and biome tints all stay intact.
-            ByteBuffer packed = ExtendedPackedQuads.pack(mesh.vertices());
+            // Already packed on the worker, or loaded from the world folder.
+            // No 3D meshing or compression on the render/GPU upload thread.
+            ByteBuffer packed = mesh.vertices();
             if (geometryArena == null) geometryArena = new ExtendedGpuGeometryArena(device);
             GpuTile previous = MESHES.get(key);
             ExtendedGpuGeometryArena.Region region;
@@ -584,6 +636,7 @@ public final class ExtendedWorldLodRenderer {
         if (geometryArena != null) geometryArena.close();
         geometryArena = null;
         DIRTY.clear();
+        REFRESHED_PREVIEWS.clear();
         candidates.clear();
         reductions.clear();
         scheduleReductionNext = false;
