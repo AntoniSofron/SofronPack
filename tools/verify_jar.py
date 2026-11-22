@@ -143,7 +143,7 @@ with zipfile.ZipFile(jar) as z:
     assert "pl/sofron/extended/client/ExtendedArenaRanges.class" in files
     vertex_shader = z.read("assets/minecraft/shaders/core/sofronpack/extended_voxel.vsh")
     assert b"in uvec4 PackedA" in vertex_shader
-    assert b"gl_VertexID" in vertex_shader
+    assert b"gl_VertexIndex" in vertex_shader
     assert b"coordinate(corner * 3" in vertex_shader
     # Full captured volumes must use distance-dependent 1/2/4-block
     # meshes rather than permanently rendering all distant tiles at 1x1.

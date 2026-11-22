@@ -6,7 +6,7 @@
 
 // 48 bytes PER QUAD at instance rate, rather than 96 bytes per quad
 // (four 24-byte vertices). The fixed six-index quad buffer reconstructs
-// its four corners with gl_VertexID; works with RenderPearl OpenGL/Vulkan.
+// its four corners with gl_VertexIndex; works with RenderPearl OpenGL/Vulkan.
 layout(location = 0) in uvec4 PackedA;
 layout(location = 1) in uvec4 PackedB;
 layout(location = 2) in uvec4 PackedC;
@@ -46,7 +46,7 @@ vec2 unpackRange(float value) {
 }
 
 void main() {
-    int corner = gl_VertexID & 3;
+    int corner = gl_VertexIndex & 3;
     vec3 Position = vec3(
             coordinate(corner * 3),
             coordinate(corner * 3 + 1),
