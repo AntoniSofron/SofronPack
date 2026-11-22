@@ -116,6 +116,8 @@ public final class ExtendedWorldLodRenderer {
     private static boolean failed;
     private static boolean loggedFirstUpload;
     private static boolean loggedFirstDraw;
+    private static boolean loggedFirstDiskRestore;
+    private static boolean loggedFirstDiskSave;
 
     private record GpuTile(ExtendedGpuGeometryArena.Region region, int quads, long detail)
             implements AutoCloseable {
@@ -507,7 +509,13 @@ public final class ExtendedWorldLodRenderer {
             byte[] fingerprint = ExtendedLodMeshFingerprint.of(chunks, materials);
             if (!refreshedPreview) {
                 var restored = ExtendedLodMeshCache.load(meshCache, tx, tz, savedDetail, fingerprint);
-                if (restored != null) return restored;
+                if (restored != null) {
+                    if (!loggedFirstDiskRestore) {
+                        loggedFirstDiskRestore = true;
+                        System.out.println("[SofronPack] Persistent LOD: restored packed mesh from world save");
+                    }
+                    return restored;
+                }
             }
             ExtendedVoxelMesher.Mesh result;
             if (firstSurface || captured == 0) {
@@ -535,6 +543,10 @@ public final class ExtendedWorldLodRenderer {
             ByteBuffer packed = ExtendedPackedQuads.pack(result.vertices());
             var ready = new ExtendedLodMeshCache.Packed(packed, result.quads());
             ExtendedLodMeshCache.save(meshCache, tx, tz, savedDetail, fingerprint, ready);
+            if (meshCache != null && !loggedFirstDiskSave) {
+                loggedFirstDiskSave = true;
+                System.out.println("[SofronPack] Persistent LOD: writing compressed meshes to world save");
+            }
             return ready;
         }, WORKER);
         // Keep the actual per-chunk detail map even for completely generated
@@ -662,6 +674,6 @@ public final class ExtendedWorldLodRenderer {
         worldGeneration = Long.MIN_VALUE;
         centerX = centerZ = Integer.MIN_VALUE;
         lastRenderDistance = 0;
-        loggedFirstUpload = loggedFirstDraw = false;
+        loggedFirstUpload = loggedFirstDraw = loggedFirstDiskRestore = loggedFirstDiskSave = false;
     }
 }
