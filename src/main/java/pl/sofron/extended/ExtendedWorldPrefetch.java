@@ -76,9 +76,13 @@ public final class ExtendedWorldPrefetch {
     }
 
     private static void drainReadyCaptures(MinecraftServer server) {
-        while (!READY_CAPTURES.isEmpty() && canCapture()) {
+        // Reserve capacity for nearby edits: distant generation futures
+        // cannot monopolize both snapshot slots indefinitely.
+        int processed = 0;
+        while (processed < 1 && !READY_CAPTURES.isEmpty() && canCapture()) {
             ReadyCapture ready = READY_CAPTURES.removeFirst();
             if (ready.epoch() != epoch || ready.level() != lastLevel) continue;
+            processed++;
             try {
                 encodeAndPublish(server, ready.level(), ready.chunk(), ready.key());
             } catch (RuntimeException problem) {

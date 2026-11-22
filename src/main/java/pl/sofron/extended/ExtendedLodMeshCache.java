@@ -227,8 +227,11 @@ public final class ExtendedLodMeshCache {
             } catch (AtomicMoveNotSupportedException unsupported) {
                 Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING);
             }
-            DirectoryIndex found = index(root);
-            if (found != null) {
+            // Do not replace the current world's in-memory index if a
+            // worker from an older world finishes its final disk write.
+            DirectoryIndex found = currentIndex;
+            if (found == null) found = index(root);
+            if (found != null && found.root.equals(root)) {
                 found.available = true;
                 found.paths.add(target);
             }
