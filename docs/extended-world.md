@@ -36,6 +36,27 @@ been removed: triangles with synthetic map colours are no longer used.
   `sofronpack-extended-world/*.voxel.v4.bin` files, separately by dimension.
   It uses compressed material indices, full block-state property strings, versioned records, checksums and per-chunk real biome grass, foliage and water tints. Old
   `*.surface.bin` heightfields are **not** used, so they can safely be ignored.
+* **v0.1.53: persistent rendered LODs.** Every 4x4-chunk tile actually
+  rendered by the mod is stored as compressed, backend-neutral 48-byte quad
+  instances. Each used 1x1, 2x2, 4x4 and 8x8 display level-map is saved
+  independently under
+  `sofronpack-extended-world/<dimension>/lod-mesh-v1/r.<region>/t.<tile>.<detail>.slm`
+  in the single-player save. All these files belong to this save, not a
+  global Minecraft cache. They can be deleted safely to rebuild geometry from
+  the separately retained `*.voxel.v4.bin` snapshots.
+* On re-entering a previously explored area, the renderer prioritises
+  saved mesh files and uploads decoded quads without re-running the voxel
+  mesher. GPU uploads remain batched to avoid out-of-memory spikes: the full
+  horizon cannot appear within literally a single frame. Previously generated
+  terrain appears as cached files stream in, normally much faster than
+  rebuilding the world from scratch.
+* Cached meshes are validated using the saved real chunks (including edge
+  neighbours) and the actual current model/texture atlas; edited chunks and
+  resource pack changes cause regeneration instead of stale rendering.
+  Newly generated preview geometry invalidates an older cached preview.
+* Only level variants that have actually been rendered are written; this does
+  not precompute four expensive complete meshes for every chunk of the world.
+  Extra disk use depends on explored area and geometry complexity.
 * Loaded nearby chunks are resampled at a limited rate. Distant cached chunks
   stay frozen until they return to the normal view radius.
 * Game mechanics, entities, redstone, crops and ticks remain constrained to

@@ -210,6 +210,14 @@ public final class ExtendedVoxelStore {
         }
     }
 
+    /** World-specific directory for persistent packed render meshes. */
+    public static Path meshCacheDirectory() {
+        Session s = current;
+        if (s == null) return null;
+        String name = s.file.getFileName().toString().replace(".voxel.v4.bin", "");
+        return s.file.getParent().resolve(name).resolve("lod-mesh-v1");
+    }
+
     public static long generation() { return generation; }
     public static int count() { Session s = current; return s == null ? 0 : s.chunks.size(); }
     public static boolean has(int x, int z) {

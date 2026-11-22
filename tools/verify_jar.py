@@ -154,7 +154,13 @@ with zipfile.ZipFile(jar) as z:
     assert "QUAD_BYTES = 48" in packed
     assert "VertexFormat.builder(1)" in pipeline
     assert "GpuFormat.RGBA32_UINT" in pipeline
-    assert "ExtendedPackedQuads.pack(mesh.vertices())" in renderer
+    # Packed instances are now built and persisted on the LOD worker,
+    # not repacked on the GPU upload thread.
+    assert "ExtendedPackedQuads.pack(result.vertices())" in renderer
+    assert "ExtendedLodMeshCache.load(" in renderer
+    assert "ExtendedLodMeshCache.save(" in renderer
+    assert "pl/sofron/extended/ExtendedLodMeshCache.class" in files
+    assert "pl/sofron/extended/ExtendedLodMeshFingerprint.class" in files
     assert "pass.drawIndexed(6, tile.quads, 0, 0, 0)" in renderer
     assert "new ExtendedGpuGeometryArena(device)" in renderer
     assert "trimGpuCache(" not in renderer
