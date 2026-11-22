@@ -23,7 +23,23 @@ with zipfile.ZipFile(jar) as z:
     assert mod["version"] == version
     assert len(mod["entrypoints"]["main"]) == 2
     assert len(mod["entrypoints"]["client"]) == 2
-    assert len(mod["mixins"]) == 5
+    assert len(mod["mixins"]) == 6
+    assert "sofron-optimization.mixins.json" in mod["mixins"]
+    optimized = json.loads(z.read("sofron-optimization.mixins.json"))
+    assert optimized["plugin"] == "pl.sofron.optimization.SofronOptimizationMixinPlugin"
+    for required in (
+        "pl/sofron/optimization/gui/SofronScreenRectangleQuadTree.class",
+        "pl/sofron/optimization/gui/SofronSpatialGuiArrayList.class",
+        "pl/sofron/optimization/mixin/SofronFastGuiIntersectionMixin.class",
+        "pl/sofron/optimization/mixin/SofronFastGuiNodeMixin.class",
+        "pl/sofron/optimization/mixin/SofronFastGlyphConsumerMixin.class",
+        "pl/sofron/optimization/mixin/SofronGlPassFramebufferMixin.class",
+        "pl/sofron/optimization/mixin/SofronGlSurfacePresentMixin.class",
+        "pl/sofron/optimization/mixin/SofronFastElytraMixin.class",
+        "pl/sofron/optimization/mixin/SofronBackgroundFramerateMixin.class",
+        "licenses/THIRD_PARTY_LGPL_3_0.txt",
+    ):
+        assert required in files, required
     assert "sofron-extended.mixins.json" in mod["mixins"]
     assert "sofron-extended-client.mixins.json" in mod["mixins"]
     far_mixins = json.loads(z.read("sofron-extended-client.mixins.json"))
