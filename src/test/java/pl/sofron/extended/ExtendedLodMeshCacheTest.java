@@ -36,6 +36,14 @@ class ExtendedLodMeshCacheTest {
         assertNull(ExtendedLodMeshCache.load(saveFolder, -7, 18, 0x00001000L, hash));
     }
 
+    @Test void savedFileIsVisibleToTheInMemoryIndexWithoutFilesystemPolling() {
+        byte[] hash = new byte[32];
+        ExtendedLodMeshCache.save(saveFolder, -11, 17, 0x11aabbccL, hash, tile(2));
+        assertTrue(ExtendedLodMeshCache.hasSaved(saveFolder, -11, 17, 0x11aabbccL));
+        assertFalse(ExtendedLodMeshCache.hasSaved(saveFolder, -11, 17, 0x11223344L));
+        assertTrue(ExtendedLodMeshCache.exists(saveFolder));
+    }
+
     @Test void invalidatesOnWorldOrTextureFingerprintChange() {
         byte[] hash = new byte[32];
         ExtendedLodMeshCache.save(saveFolder, 2, 3, 0L, hash, tile(4));

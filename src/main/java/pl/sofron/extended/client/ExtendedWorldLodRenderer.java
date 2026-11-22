@@ -62,9 +62,10 @@ public final class ExtendedWorldLodRenderer {
     // them on re-entry without allocating all 128 chunks in a single frame.
     private static final int JOBS_PER_FRAME = 12;
     private static final int MAX_PENDING = 16;
-    private static final int GPU_UPLOADS_PER_FRAME = 8;
+    private static final int GPU_UPLOADS_PER_FRAME = 4;
     // Prevent first-frame GPU spikes when restoring many large forest meshes.
-    private static final int GPU_BYTES_PER_FRAME = 16 * 1024 * 1024;
+    private static final int GPU_BYTES_PER_FRAME = 8 * 1024 * 1024;
+    private static final long GPU_UPLOAD_TIME_BUDGET_NS = 2_000_000L;
     private static final ExecutorService WORKER = Executors.newSingleThreadExecutor(job -> {
         Thread thread = new Thread(job, "SofronPack-LOD-Mesh");
         thread.setDaemon(true);
@@ -111,6 +112,7 @@ public final class ExtendedWorldLodRenderer {
     private static GpuBuffer longProjection;
     private static final ByteBuffer PROJECTION_STAGING = ByteBuffer.allocateDirect(64).order(ByteOrder.nativeOrder());
     private static long worldGeneration = Long.MIN_VALUE;
+    private static long lastMeshIndexGeneration = Long.MIN_VALUE;
     private static int centerX = Integer.MIN_VALUE, centerZ = Integer.MIN_VALUE;
     private static int lastRenderDistance;
     private static final Map<Long, Integer> readyColumns = new HashMap<>();
@@ -150,6 +152,10 @@ public final class ExtendedWorldLodRenderer {
             worldGeneration = ExtendedVoxelStore.generation();
         }
         Path meshCache = ExtendedVoxelStore.meshCacheDirectory();
+        long indexRevision = ExtendedLodMeshCache.indexGeneration(meshCache);
+        boolean indexReady = indexRevision != Long.MIN_VALUE
+                && indexRevision != lastMeshIndexGeneration;
+        if (indexReady) lastMeshIndexGeneration = indexRevision;
         if (ExtendedVoxelStore.count() == 0 && !ExtendedLodMeshCache.exists(meshCache)) return;
         if (ATLAS.refreshModels()) {
             clearMeshes();
@@ -162,7 +168,7 @@ public final class ExtendedWorldLodRenderer {
         int minTX = Math.floorDiv(cx - FAR, TILE), maxTX = Math.floorDiv(cx + FAR, TILE);
         int minTZ = Math.floorDiv(cz - FAR, TILE), maxTZ = Math.floorDiv(cz + FAR, TILE);
         updateNormalCoverage(mc, cx, cz, distance);
-        if (centerX != cx || centerZ != cz || lastRenderDistance != distance) {
+        if (centerX != cx || centerZ != cz || lastRenderDistance != distance || indexReady) {
             boolean first = centerX == Integer.MIN_VALUE || lastRenderDistance != distance;
             centerX = cx; centerZ = cz; lastRenderDistance = distance;
             for (int tx = minTX; tx <= maxTX; tx++) for (int tz = minTZ; tz <= maxTZ; tz++) {
@@ -563,7 +569,10 @@ public final class ExtendedWorldLodRenderer {
     private static void finishMeshes(int minX, int maxX, int minZ, int maxZ, int cx, int cz) {
         var jobs = pending.entrySet().iterator();
         int uploaded = 0, transferredBytes = 0;
+        long startUpload = System.nanoTime();
         while (jobs.hasNext() && uploaded < GPU_UPLOADS_PER_FRAME) {
+            if (uploaded > 0 && System.nanoTime() - startUpload >= GPU_UPLOAD_TIME_BUDGET_NS)
+                break; // GPU work is amortized over frames, never discarded.
             var entry = jobs.next();
             var job = entry.getValue();
             if (!job.result.isDone()) continue;
@@ -690,6 +699,7 @@ public final class ExtendedWorldLodRenderer {
         quadIndices = null;
         longProjection = null;
         device = null;
+        lastMeshIndexGeneration = Long.MIN_VALUE;
         worldGeneration = Long.MIN_VALUE;
         centerX = centerZ = Integer.MIN_VALUE;
         lastRenderDistance = 0;
