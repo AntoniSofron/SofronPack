@@ -216,3 +216,42 @@ surface merging. It does not guarantee a proportional FPS improvement:
 cache decoding, Y detail, chunk generation and GPU driver overhead can
 still dominate. Benchmark first paint, GPU vertices, frame times, and
 memory across the three distance rings on actual hardware.
+
+## v0.1.49 — packed GPU instances, shared geometry arena and vertical preservation
+
+The pre-crash v0.1.46 remains the rollback reference. This version rebuilds
+the *representation* of distant geometry without changing player controls.
+
+- **48 bytes per quad on the GPU vs 96 bytes in v0.1.46.** An explicit
+  48-byte instanced vertex format contains four signed fixed-point XYZ
+  positions at 1/32-block precision (12 × 16-bit), four pairs of 16-bit
+  normalized model UVs (or original bit-exact repeated atlas endpoints),
+  the preserved 4-byte color/lighting/emission, and flags. The vertex
+  shader reconstructs the four corners using `gl_VertexIndex`. There is
+  just one indexed draw per visible tile regardless of quad count. Shader
+  and pipeline use RenderPearl's instance step rate, not GL-only SSBOs.
+  The server-side palette and world-save format are unchanged. This saves
+  exactly 50% of raw quad vertex payload for the same number of quads;
+  it does not promise 50% total GPU memory reduction.
+- **Shared geometry pool.** Multiple tiles suballocate free ranges from
+  4 MiB RenderPearl vertex-buffer pages. Range coalescing and in-place
+  uploads reuse old GPU memory on edits and distance-LOD transitions.
+  Pages no longer containing allocations are returned to the driver,
+  while the last empty page is reused. There is no forced native 20-chunk
+  cap and no fixed 64-draw or 256 MiB geometry budget.
+- **Vertical detail policy:** within **0–48 chunks, all Y coordinates
+  remain exact at one-block resolution**. At 49–96 chunks, opaque side
+  walls may merge in 2-block-tall slabs; at 97–128 chunks in 4-block
+  slabs. **Top/bottom faces, fluids, foliage and cutout geometry always
+  retain exact Y**, including the vanilla sea-level surface.
+  This selective policy avoids the unnatural coarse waterline that
+  would result from blindly mipping the entire world volume in Y.
+- **Original source preserved:** cached voxels, exact real Y, worldgen,
+  progressive preview, 1×1/2×2/4×4 XZ rings, 128-chunk horizon, fog,
+  clouds, crop textures, detailed near leaves and lighting are intact.
+
+This is the first architectural optimization step, not a full port of
+Voxy's 8-byte quad encoder, hierarchical GPU Hi-Z occlusion traversal,
+multi-draw indirect rendering or lazy RAM snapshot storage. Any claim
+about eliminating GPU OOM still requires sustained VRAM measurements
+on the user's own hardware.

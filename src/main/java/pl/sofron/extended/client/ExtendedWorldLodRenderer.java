@@ -47,9 +47,10 @@ import com.mojang.renderpearl.api.textures.FilterMode;
  * tiles. The renderer is a client component of SofronPack itself: it does not
  * discover, link to, or load Voxy.
  *
- * Only 16x16-chunk tiles receive GPU buffers. Each changed source chunk
- * invalidates its tile. The normal render distance remains under Sodium's
- * control; all meshing/uploads have a hard per-frame budget.
+ * Four-by-four-chunk tiles share paginated GPU buffers, storing one packed
+ * 48-byte instance for each quad. Only changed source chunks invalidate
+ * geometry; native render distance remains under Sodium's own control.
+ * Meshing/uploads still use small time budgets, never a visibility cap.
  */
 public final class ExtendedWorldLodRenderer {
     private static final int TILE = ExtendedVoxelMesher.TILE_CHUNKS;

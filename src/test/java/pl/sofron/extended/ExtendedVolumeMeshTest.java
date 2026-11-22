@@ -65,17 +65,26 @@ class ExtendedVolumeMeshTest {
         var chunks = new ExtendedVoxelStore.VoxelChunk[36];
         chunks[7] = ExtendedVoxelStore.encode(0, 0, 60, 16, 0, 0, 0,
                 new String[]{"minecraft:air", "minecraft:stone", "minecraft:water[level=0]"}, cells);
-        var material = new ExtendedVoxelMesher.MaterialUV(0, 0, 1, 1, 0xffffff, false);
         var mesher = new ExtendedVolumeMesh();
         int[] levels = new int[36];
-        var exact = mesher.build(chunks, levels, (name, face) -> material);
+        ExtendedVoxelMesher.MaterialResolver mat = (name, face) ->
+                new ExtendedVoxelMesher.MaterialUV(0, 0, 1, 1, 0xffffff,
+                        name.startsWith("minecraft:water"));
+        var exact = mesher.build(chunks, levels, mat);
         levels[7] = 1;
-        var medium = mesher.build(chunks, levels, (name, face) -> material);
+        var medium = mesher.build(chunks, levels, mat);
         levels[7] = 2;
-        var far = mesher.build(chunks, levels, (name, face) -> material);
+        var far = mesher.build(chunks, levels, mat);
         assertTrue(exact.quads() > medium.quads());
         assertTrue(medium.quads() >= far.quads());
         assertArrayEquals(cells, chunks[7].unpack());
+        // Medium LOD water Y is still exact: water's native top is 64
+        // minus the retained one-ninth-block surface inset.
+        boolean waterSurface = false;
+        for (int i = 4; i < medium.vertices().limit(); i += ExtendedVoxelMesher.VERTEX_BYTES)
+            if (Math.abs(medium.vertices().getFloat(i) - (64f - 1f / 9f)) < .001f)
+                waterSurface = true;
+        assertTrue(waterSurface, "Distant water Y must never be snapped to slab height");
         // Near: all top and bottom faces retain their original real Y.
         boolean exactTop = false;
         for (int i = 4; i < exact.vertices().limit(); i += ExtendedVoxelMesher.VERTEX_BYTES)
