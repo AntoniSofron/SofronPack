@@ -31,7 +31,8 @@
     "sofron-atmosphere.mixins.json",
     "sofron-extended.mixins.json",
     "sofron-extended-client.mixins.json",
-    "sofron-optimization.mixins.json"
+    "sofron-optimization.mixins.json",
+    "sofron-modernfix.mixins.json"
   ],
   "icon": "assets/sofronpack/icon.png"
 }
