@@ -122,6 +122,23 @@ with zipfile.ZipFile(jar) as z:
     assert "pl/sofron/extended/ExtendedLodStages.class" in files
     assert "int pass = band * 2" in pathlib.Path(
         "src/main/java/pl/sofron/extended/client/ExtendedWorldLodRenderer.java").read_text()
+    # Full captured volumes must use distance-dependent 1/2/4-block
+    # meshes rather than permanently rendering all distant tiles at 1x1.
+    lod_levels = pathlib.Path(
+        "src/main/java/pl/sofron/extended/ExtendedLodLevels.java").read_text()
+    assert "distanceChunks <= 48" in lod_levels
+    assert "distanceChunks <= 96" in lod_levels
+    assert "return 2;" in lod_levels
+    assert "ringForChunk(" in lod_levels
+    assert "pl/sofron/extended/ExtendedVolumeMesh.class" in files
+    renderer_source = pathlib.Path(
+        "src/main/java/pl/sofron/extended/client/ExtendedWorldLodRenderer.java").read_text()
+    assert "levels[i] = ExtendedLodLevels.ringForChunk(chunkX, chunkZ, cx, cz)" in renderer_source
+    assert "new Pending(detail, task)" in renderer_source
+    assert "new Pending(captured == TILE * TILE ? -2 : detail, task)" not in renderer_source
+    assert "current.detail() != wantedDetail" in renderer_source
+    assert "if (job.detail != detailAt(tx, tz, cx, cz)) markDirty(key)" in renderer_source
+
     assert b"sofronVolumeFog(fogRelative, FogEnvironmentalEnd)" in extended_shader
     # Original three-layer 0.1.33 build (17a6daf), distinct from main's same-name JAR.
     import hashlib
