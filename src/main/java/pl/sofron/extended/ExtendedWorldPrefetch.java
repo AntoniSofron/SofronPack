@@ -22,6 +22,7 @@ import net.minecraft.world.level.TicketStorage;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerChunkEvents;
 import java.util.LinkedHashSet;
 import java.util.HashSet;
+import java.util.ArrayDeque;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
@@ -55,6 +56,37 @@ public final class ExtendedWorldPrefetch {
     private static long epoch;
     private static int ticks, cursor, nearbyCursor, stageIndex;
     private static int pending, nearbyPending;
+    private static final int MAX_CAPTURES_PER_TICK = 2;
+    private static final long CAPTURE_TICK_NS = 1_500_000L;
+    private static int capturesThisTick;
+    private static long captureTickStart;
+
+    // Completed generation futures may arrive in a burst on the server
+    // thread. Defer their immutable snapshots and process at most two per
+    // tick rather than copying a large batch in one frame.
+    private record ReadyCapture(ServerLevel level,
+                                net.minecraft.world.level.chunk.ChunkAccess chunk,
+                                long key, long epoch) {}
+    private static final ArrayDeque<ReadyCapture> READY_CAPTURES = new ArrayDeque<>();
+
+    private static boolean canCapture() {
+        return capturesThisTick < MAX_CAPTURES_PER_TICK
+                && (capturesThisTick == 0
+                    || System.nanoTime() - captureTickStart < CAPTURE_TICK_NS);
+    }
+
+    private static void drainReadyCaptures(MinecraftServer server) {
+        while (!READY_CAPTURES.isEmpty() && canCapture()) {
+            ReadyCapture ready = READY_CAPTURES.removeFirst();
+            if (ready.epoch() != epoch || ready.level() != lastLevel) continue;
+            try {
+                encodeAndPublish(server, ready.level(), ready.chunk(), ready.key());
+            } catch (RuntimeException problem) {
+                finishRequest(ready.level(), ready.key());
+                System.err.println("[SofronPack] Deferred chunk capture: " + problem.getMessage());
+            }
+        }
+    }
     // Prevent duplicate FULL requests while an older snapshot is being
     // generated or compressed. All accesses occur on the server thread.
     private static final Set<Long> IN_FLIGHT = new HashSet<>();
@@ -127,6 +159,7 @@ public final class ExtendedWorldPrefetch {
             finishUnloadEncoding();
             ExtendedVoxelStore.close();
             pending = nearbyPending = 0;
+            READY_CAPTURES.clear();
             lastLevel = null;
             cursor = nearbyCursor = ticks = stageIndex = 0;
             IN_FLIGHT.clear();
@@ -157,6 +190,7 @@ public final class ExtendedWorldPrefetch {
             centerX = centerZ = scanAnchorX = scanAnchorZ = Integer.MIN_VALUE;
             cursor = nearbyCursor = stageIndex = 0;
             pending = nearbyPending = 0;
+            READY_CAPTURES.clear();
             IN_FLIGHT.clear();
             recentlyLoaded.clear();
             edited.clear();
@@ -165,6 +199,9 @@ public final class ExtendedWorldPrefetch {
             captureCost = new SofronChunkWorkBudget(250_000);
         }
 
+        captureTickStart = System.nanoTime();
+        capturesThisTick = 0;
+        drainReadyCaptures(server);
         int cx = player.chunkPosition().x(), cz = player.chunkPosition().z();
         ExtendedTerrainPreview.move(level, cx, cz);
         if (cx != centerX || cz != centerZ) {
@@ -232,10 +269,14 @@ public final class ExtendedWorldPrefetch {
             int x = scanAnchorX + dx, z = scanAnchorZ + dz;
             long key = pack(x, z);
             if (ExtendedVoxelStore.has(x, z) || IN_FLIGHT.contains(key)) continue;
+            var loaded = level.getChunkSource().getChunkNow(x, z);
+            if (loaded != null && !canCapture()) {
+                cursor--; // Resume this already-loaded chunk next tick.
+                break;
+            }
             IN_FLIGHT.add(key);
             pending++;
             submitted++;
-            var loaded = level.getChunkSource().getChunkNow(x, z);
             if (loaded != null) {
                 try {
                     encodeAndPublish(server, level, loaded, key);
@@ -262,7 +303,7 @@ public final class ExtendedWorldPrefetch {
                     try {
                         if (requestEpoch != epoch || error != null || result == null) return;
                         result.ifSuccess(chunk -> {
-                            encodeAndPublish(server, level, chunk, key);
+                            READY_CAPTURES.addLast(new ReadyCapture(level, chunk, key, requestEpoch));
                             queued[0] = true;
                         });
                     } finally {
@@ -308,7 +349,7 @@ public final class ExtendedWorldPrefetch {
                                       int cx, int cz, int normal, int budget) {
         int size = normal * 2 + 1;
         int total = size * size;
-        for (int i = 0; i < budget && nearbyPending < 4; i++) {
+        for (int i = 0; i < budget && nearbyPending < 4 && canCapture(); i++) {
             int x, z;
             if (!edited.isEmpty()) {
                 long changed = edited.removeFirst();
@@ -361,6 +402,7 @@ public final class ExtendedWorldPrefetch {
     /** Timing only; keep all block/biome reads on the owning server thread. */
     private static java.util.function.Supplier<ExtendedVoxelStore.VoxelChunk> captureTimed(
             ServerLevel level, net.minecraft.world.level.chunk.ChunkAccess chunk) {
+        capturesThisTick++;
         long start = System.nanoTime();
         try {
             return ExtendedVoxelStore.captureSections(level, chunk);
