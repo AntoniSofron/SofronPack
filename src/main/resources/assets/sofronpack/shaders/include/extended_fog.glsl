@@ -11,6 +11,29 @@ float sofronFogSegment(float distanceChunks, float startChunks, float endChunks,
     return mix(low, high, t);
 }
 
+// Classic fog from the supplied resource pack: both starts are already
+// divided by 3 on the CPU. Modern Sodium's built-in fog uses a linear fade;
+// the classic pack uses smoothstep instead. This helper affects only the
+// non-Extended-World Sodium terrain path.
+float sofronClassicSmoothFog(float distance, float start, float end) {
+    if (distance <= start) return 0.0;
+    if (distance >= end) return 1.0;
+    return smoothstep(start, end, distance);
+}
+
+vec4 sofronClassicSodiumFog(vec4 color, vec2 distances, vec4 fogColor,
+                            vec2 environmental, vec2 renderDistance,
+                            float fadeFactor) {
+#ifdef USE_FOG
+    float env = sofronClassicSmoothFog(distances.y, environmental.x, environmental.y);
+    float renderFog = sofronClassicSmoothFog(distances.x, renderDistance.x, renderDistance.y);
+    float fog = max(1.0 - fadeFactor, max(env, renderFog));
+    return vec4(mix(color.rgb, fogColor.rgb, fog * fogColor.a), color.a);
+#else
+    return color;
+#endif
+}
+
 // 2048 blocks = clear; 1024 blocks = maximal storm/cave influence.
 float sofronFogStrength(float environmentalEndBlocks) {
     return clamp((2048.0 - environmentalEndBlocks) / 1024.0, 0.0, 1.0);

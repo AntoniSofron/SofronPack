@@ -13,13 +13,15 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import pl.sofron.extended.ExtendedWorldConfig;
+import pl.sofron.atmosphere.ClassicFogProfile;
 import pl.sofron.extended.ExtendedLodFog;
 import pl.sofron.atmosphere.AtmospherePresets;
 
 /**
- * Shared 128-chunk profile for native Sodium chunks and distant LOD.
- * The fog uniforms encode the same weather/cave and altitude inputs for both
- * shaders, without extra per-draw GPU allocations.
+ * The modern 128-chunk fog remains the authority whenever Extended World
+ * renders Overworld terrain in integrated singleplayer. Otherwise, replace
+ * vanilla's fog start with the classic-fog source pack's start/3 behaviour.
+ * Both paths share one mixin at RETURN, before Sodium snapshots FogData.
  */
 @Mixin(FogRenderer.class)
 public abstract class ExtendedWorldFogMixin {
@@ -30,13 +32,22 @@ public abstract class ExtendedWorldFogMixin {
     private void sofron$extendTerrainFog(Camera camera, int renderDistanceInChunks,
             DeltaTracker deltaTracker, float darkenWorldAmount, ClientLevel level,
             CallbackInfoReturnable<FogData> cir) {
-        if (!ExtendedWorldConfig.get().enabled || level == null
-                || net.minecraft.client.Minecraft.getInstance().getSingleplayerServer() == null
-                || !level.dimension().equals(Level.OVERWORLD)
-                || camera.getFluidInCamera() != FogType.NONE) return;
-
         FogData fog = cir.getReturnValue();
         if (fog == null) return;
+
+        // The uploaded classic-fog pack reduces BOTH starts to one third,
+        // leaving the fog end and color unchanged. Apply this after the
+        // atmosphere's biome/weather/cave rules, but never to the extended
+        // 128-chunk fog where these fields encode our volumetric parameters.
+        boolean extendedWorld = ExtendedWorldConfig.get().enabled && level != null
+                && net.minecraft.client.Minecraft.getInstance().getSingleplayerServer() != null
+                && level.dimension().equals(Level.OVERWORLD)
+                && camera.getFluidInCamera() == FogType.NONE;
+        if (!extendedWorld) {
+            fog.environmentalStart = ClassicFogProfile.start(fog.environmentalStart);
+            fog.renderDistanceStart = ClassicFogProfile.start(fog.renderDistanceStart);
+            return;
+        }
 
         // Minecraft's normal terrain disappears completely at the selected
         // render distance, leaving an unnatural fog wall in front of LODs.

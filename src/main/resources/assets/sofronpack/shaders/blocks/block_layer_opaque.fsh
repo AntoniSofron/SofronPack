@@ -117,7 +117,11 @@ vec4 calculateFinalColor(vec4 color) {
                 spl_SurfaceCameraPos, u_EnvironmentFog.x, u_EnvironmentFog.y));
         return vec4(mix(color.rgb, fogColor.rgb, fog), color.a);
     }
-    return _linearFog(color, v_FragDistance, fogColor, u_EnvironmentFog, u_RenderFog, factor);
+    // Compatibility adaptation of the supplied Classic Fog resource pack:
+    // /3 starts come from FogData; use its smoothstep instead of Sodium's
+    // modern linear interpolation. Keep material fadeFactor and fog alpha.
+    return sofronClassicSodiumFog(color, v_FragDistance, fogColor,
+                                 u_EnvironmentFog, u_RenderFog, factor);
 }
 vec4 sampleNearest(sampler2D source, vec2 uv, vec2 pixelSize, vec2 du, vec2 dv, vec2 texelScreenSize) {
     // Convert our UV back up to texel coordinates and find out how far over we are from the center of each pixel
