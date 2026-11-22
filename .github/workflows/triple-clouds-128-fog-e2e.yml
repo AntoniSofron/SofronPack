@@ -1,7 +1,7 @@
 name: Triple clouds and 128-chunk fog — in-world smoke
 on:
   push:
-    branches: ['fix/extended-128-clouds-triple', 'fix/lod-fog-clouds-night-20261121', 'fix/lod-progressive-fog-cloud-gradient', 'fix/shared-four-stage-fog-v0138', 'fix/streamed-lod-v0139', 'fix/distance-dependent-volume-lod-1-2-4', 'fix/gpu-memory-oom-v0147', 'fix/gpu-efficient-unrestricted-v0148', 'feature/near-leaf-models-vanilla-far-lod-20261121']
+    branches: ['fix/extended-128-clouds-triple', 'fix/lod-fog-clouds-night-20261121', 'fix/lod-progressive-fog-cloud-gradient', 'fix/shared-four-stage-fog-v0138', 'fix/streamed-lod-v0139', 'fix/distance-dependent-volume-lod-1-2-4', 'feature/near-leaf-models-vanilla-far-lod-20261121']
     paths:
       - 'src/**'
       - '.github/workflows/triple-clouds-128-fog-e2e.yml'
@@ -58,16 +58,8 @@ jobs:
             echo 'One or more near-leaf models or textures were rejected'
             exit 1
           fi
-          if ! grep -q 'Shared LOD GPU transform active; normal render 32 chunks, distant render 128 chunks' triple-clouds-128-fog.log; then
-            echo 'Expected shared GPU transform or user-selected 32-chunk native distance missing'
-            exit 1
-          fi
           if ! grep -q 'Textured Extended World GPU draw issued' triple-clouds-128-fog.log; then
             echo 'The 128-chunk, fogged GPU render hook was not reached while in the world'
-            exit 1
-          fi
-          if grep -q '\[SofronPack\] GPU saver: normal view' triple-clouds-128-fog.log; then
-            echo 'Old forced 20-chunk render cap is still active'
             exit 1
           fi
           grep -Fq 'Sodium terrain fog range confirmed at 2048 blocks' triple-clouds-128-fog.log

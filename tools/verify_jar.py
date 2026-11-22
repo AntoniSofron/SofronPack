@@ -33,7 +33,6 @@ with zipfile.ZipFile(jar) as z:
     assert "pl/sofron/extended/ExtendedWorldStorage.class" not in files
     for class_name in (
         "pl/sofron/extended/ExtendedWorldConfig.class",
-        "pl/sofron/extended/ExtendedLodVertexSpace.class",
         "pl/sofron/extended/ExtendedWorldPrefetch.class",
         "pl/sofron/extended/ExtendedVoxelStore.class",
         "pl/sofron/extended/ExtendedVoxelMesher.class",
@@ -112,8 +111,7 @@ with zipfile.ZipFile(jar) as z:
     assert b"FogRenderDistanceStart" in extended_shader
     assert b"linear_fog_value" in extended_shader
     assert b"sofronVolumeFog" in extended_shader
-    assert b"no per-tile readiness" in extended_shader.lower()
-    assert b"readyMask" not in extended_shader
+    assert b"horizontalChunks < FogRenderDistanceStart / 16.0" in extended_shader
     shared_shader = z.read("assets/sofronpack/shaders/include/extended_fog.glsl")
     assert b"sofronExtendedFog" in shared_shader
     assert b"float a = 16.0" in shared_shader
@@ -124,27 +122,6 @@ with zipfile.ZipFile(jar) as z:
     assert "pl/sofron/extended/ExtendedLodStages.class" in files
     assert "int pass = band * 2" in pathlib.Path(
         "src/main/java/pl/sofron/extended/client/ExtendedWorldLodRenderer.java").read_text()
-    renderer_gpu_source = pathlib.Path(
-        "src/main/java/pl/sofron/extended/client/ExtendedWorldLodRenderer.java").read_text()
-    vertex_space_source = pathlib.Path(
-        "src/main/java/pl/sofron/extended/ExtendedLodVertexSpace.java").read_text()
-    assert "REBASE_DISTANCE_BLOCKS = 8192L" in vertex_space_source
-    assert "vertices.putFloat(p, vertices.getFloat(p) + dx)" in vertex_space_source
-    assert "pl/sofron/extended/ExtendedLodGpuBudget.class" not in files
-    assert "pl/sofron/extended/mixin/ExtendedWorldRenderDistanceMixin.class" not in files
-    assert "ExtendedWorldRenderDistanceMixin" not in json.loads(
-        z.read("sofron-extended-client.mixins.json"))["client"]
-    assert "normalRenderCap" not in pathlib.Path(
-        "src/main/java/pl/sofron/extended/ExtendedWorldConfig.java").read_text()
-    assert renderer_gpu_source.count("writeTransform(") == 1
-    assert "Shared LOD GPU transform active" in renderer_gpu_source
-    assert "ExtendedLodVertexSpace.rebase(mesh.vertices()" in renderer_gpu_source
-    assert "encoder.writeToBuffer(previous.buffer.slice" in renderer_gpu_source
-    assert "reclaimOffscreen()" in renderer_gpu_source
-    assert "makeGpuRoom(" not in renderer_gpu_source
-    assert "MAX_GPU_TILES" not in renderer_gpu_source
-    assert "MAX_DRAWN_TILES" not in renderer_gpu_source
-    assert "for (Map.Entry<Long, GpuTile> entry : ordered)" in renderer_gpu_source
     # Full captured volumes must use distance-dependent 1/2/4-block
     # meshes rather than permanently rendering all distant tiles at 1x1.
     lod_levels = pathlib.Path(
@@ -181,8 +158,7 @@ with zipfile.ZipFile(jar) as z:
     assert b"cylindricalBlocks" in lod_vertex
     lod_renderer = pathlib.Path(
         "src/main/java/pl/sofron/extended/client/ExtendedWorldLodRenderer.java").read_text()
-    assert "renderOriginX - camera.x" in lod_renderer
-    assert "ExtendedLodVertexSpace.rebase(mesh.vertices()" in lod_renderer
+    assert "readyColumns.getOrDefault(key, 0)" in lod_renderer
     assert "AtmospherePresets.distantFogBlend()" not in lod_renderer
     fog_mixin_source = pathlib.Path(
         "src/main/java/pl/sofron/extended/mixin/ExtendedWorldFogMixin.java").read_text()
