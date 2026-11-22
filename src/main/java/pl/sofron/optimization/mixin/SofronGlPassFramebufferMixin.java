@@ -1,8 +1,3 @@
-/*
- * Adapted from ImmediatelyFast 26.3: https://github.com/RaphiMC/ImmediatelyFast
- * Copyright (C) 2023-2026 RK_01/RaphiMC and contributors.
- * Licensed under GNU LGPL v3 or later. See THIRD_PARTY_OPTIMIZATIONS.md.
- */
 package pl.sofron.optimization.mixin;
 
 import com.llamalad7.mixinextras.injector.v2.WrapWithCondition;

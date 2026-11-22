@@ -1,6 +1,3 @@
-/* SofronPack optimization component. Licensing and contributor notices:
- * LEGAL_NOTICE.md (distributed with this source).
- */
 package pl.sofron.optimization.mixin;
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
@@ -30,10 +27,7 @@ public abstract class SofronGateBehaviorMixin<E extends LivingEntity>
     @Shadow @Final private Set<MemoryModuleType<?>> exitErasedMemories;
     @Shadow private Behavior.Status status;
 
-    /**
-     * @author SofronPack integration (see LEGAL_NOTICE.md)
-     * @reason Remove a stream allocation from the per-entity AI tick hot path.
-     */
+    /** Optimized equivalent operation. */
     @Overwrite
     public final void tickOrStop(ServerLevel level, E entity, long time) {
         boolean running = false;
@@ -46,10 +40,7 @@ public abstract class SofronGateBehaviorMixin<E extends LivingEntity>
         if (!running) doStop(level, entity, time);
     }
 
-    /**
-     * @author SofronPack integration (see LEGAL_NOTICE.md)
-     * @reason Iterate the already-stored tasks instead of constructing a stream.
-     */
+    /** Optimized equivalent operation. */
     @Overwrite
     public final void doStop(ServerLevel level, E entity, long time) {
         status = Behavior.Status.STOPPED;

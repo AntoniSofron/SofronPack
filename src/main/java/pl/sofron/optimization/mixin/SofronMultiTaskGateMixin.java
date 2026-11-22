@@ -1,6 +1,3 @@
-/* SofronPack optimization component. Licensing and contributor notices:
- * LEGAL_NOTICE.md (distributed with this source).
- */
 package pl.sofron.optimization.mixin;
 
 import net.minecraft.server.level.ServerLevel;
