@@ -13,8 +13,6 @@ layout(location = 3) in float sphericalBlocks;
 layout(location = 4) in float cylindricalBlocks;
 
 layout(location = 5) flat in vec4 tileUv;
-layout(location = 6) in vec2 tileXZ;
-layout(location = 7) flat in int readyMask;
 layout(location = 0) out vec4 fragColor;
 
 void main() {
@@ -25,16 +23,9 @@ void main() {
     sampled *= vertexColor;
     if (sampled.a < 0.05) discard;
 
-    // Dynamic per-pixel handoff: an old cached buffer must stop drawing the
-    // instant the camera moves inside 7/8 of the normal render distance.
-    float horizontalChunks = length(fogRelative.xz) / 16.0;
-    ivec2 cell = clamp(ivec2(floor(tileXZ / 16.0)), ivec2(0), ivec2(3));
-    bool normalReady = (readyMask & (1 << (cell.y * 4 + cell.x))) != 0;
-    if (normalReady && FogRenderDistanceEnd >= 2047.5 &&
-            horizontalChunks < FogRenderDistanceStart / 16.0) discard;
-
-    // Keep continuous backing geometry across the overlap. The ordinary
-    // chunk wins the depth test wherever it actually covers the pixel.
+    // CPU suppresses fully ready close tiles. For partially loaded tiles,
+    // native terrain wins the ordinary depth test. No per-tile readiness
+    // uniform is necessary, avoiding thousands of GPU transforms.
 
     // Same four-zone function as the native Sodium terrain shader.
     float fog = FogRenderDistanceEnd >= 2047.5

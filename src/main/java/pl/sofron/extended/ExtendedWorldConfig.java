@@ -20,12 +20,6 @@ public final class ExtendedWorldConfig {
 
     public volatile boolean enabled = false;
 
-    /**
-     * Normal Sodium chunks use at most this many chunks while the 128-chunk
-     * distant world is active in the Overworld. The option slider stays put.
-     * Set normalRenderCap=0 in the config JSON to disable the limit.
-     */
-    public volatile int normalRenderCap = ExtendedLodGpuBudget.DEFAULT_NORMAL_RENDER_CAP;
 
     private ExtendedWorldConfig() {}
 
