@@ -15,6 +15,14 @@ class ExtendedLodGpuBudgetTest {
                 ExtendedLodGpuBudget.MAX_TILE_BYTES));
     }
 
+    @Test void optionalNativeChunkCapDoesNotOverwriteUserPreference() {
+        assertEquals(20, ExtendedLodGpuBudget.effectiveNormalDistance(32, 20));
+        assertEquals(12, ExtendedLodGpuBudget.effectiveNormalDistance(12, 20));
+        assertEquals(32, ExtendedLodGpuBudget.effectiveNormalDistance(32, 0));
+        assertEquals(2, ExtendedLodGpuBudget.effectiveNormalDistance(32, 1));
+        assertEquals(32, ExtendedLodGpuBudget.effectiveNormalDistance(32, 128));
+    }
+
     @Test void memoryAndTransformLimitsAreIndependent() {
         long cap = ExtendedLodGpuBudget.MAX_VERTEX_BYTES;
         assertFalse(ExtendedLodGpuBudget.needsEviction(cap - 96, 96, 1));

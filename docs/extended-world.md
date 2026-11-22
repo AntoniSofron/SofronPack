@@ -250,3 +250,22 @@ cap Minecraft/Sodium's normal chunk memory, other mods, OS/driver memory,
 or the entire native memory footprint. At 32 ordinary render chunks and
 near-exhausted Windows commit/page-file space, lower the vanilla render
 distance or increase available system memory/pagefile if instability remains.
+
+### More aggressive GPU saver (v0.1.47)
+
+Normal render distance 32 together with 128-chunk distant terrain produced
+an out-of-memory crash. While Extended World is enabled in the **Overworld**,
+Sodium's effective normal distance is now capped at **20 chunks** by default,
+without modifying the saved render-distance slider. This keeps around 60%
+fewer square-view source chunks resident at 32→20. To disable the cap, set
+`normalRenderCap` to `0` in
+`config/sofronpack-extended-world.json`. The Nether, End and simulation
+distance are not affected.
+
+Custom LOD vertex buffers are limited to **256 MiB total**, **24 MiB per
+tile**, **128 resident tiles** and **64 drawn LOD tiles per frame**, with
+frustum culling before allocating each tile's dynamic GPU transform. Source
+blocks, 1×1/2×2/4×4 distance levels, LOD radius, four fog bands, cloud
+layers and leaf textures are unchanged. At the memory cap, more distant
+tiles may be deferred to maintain a stable game; maximum coverage and
+graphics performance must be measured on the user's machine.

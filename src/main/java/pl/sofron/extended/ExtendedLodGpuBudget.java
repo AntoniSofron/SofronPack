@@ -9,16 +9,24 @@ package pl.sofron.extended;
  * GiB of allocations and could crash Sodium when it tried to grow its arena.
  */
 public final class ExtendedLodGpuBudget {
-    /** 512 MiB for ALL resident custom LOD vertex buffers combined. */
-    public static final long MAX_VERTEX_BYTES = 512L * 1024 * 1024;
+    /** 256 MiB for ALL resident custom LOD vertex buffers combined. */
+    public static final long MAX_VERTEX_BYTES = 256L * 1024 * 1024;
     /** Never let one pathological volume consume the entire distant cache. */
-    public static final long MAX_TILE_BYTES = 48L * 1024 * 1024;
+    public static final long MAX_TILE_BYTES = 24L * 1024 * 1024;
     /** Bound per-tile dynamic transform allocations, not only VBO bytes. */
-    public static final int MAX_RESIDENT_TILES = 192;
+    public static final int MAX_RESIDENT_TILES = 128;
     /** Other render passes need dynamic transforms as well. */
-    public static final int MAX_DRAWN_TILES = 160;
+    public static final int MAX_DRAWN_TILES = 64;
+
+    public static final int DEFAULT_NORMAL_RENDER_CAP = 20;
 
     private ExtendedLodGpuBudget() {}
+
+    /** Only applied in Extended Overworld; 0 disables the effective cap. */
+    public static int effectiveNormalDistance(int requested, int normalRenderCap) {
+        if (normalRenderCap <= 0) return requested;
+        return Math.min(requested, Math.clamp(normalRenderCap, 2, 32));
+    }
 
     public static long vertexBytesForQuads(int quads) {
         if (quads < 0) throw new IllegalArgumentException("Negative quad count");

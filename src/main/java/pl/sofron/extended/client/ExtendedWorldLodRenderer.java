@@ -250,9 +250,20 @@ public final class ExtendedWorldLodRenderer {
             float low = (float)(mc.level.getMinY() - camera.y);
             float high = low + mc.level.getHeight();
             frustum.set(new Matrix4f(farProjection).mul(matrices.modelView()), false);
-            // Near-first ordering ensures that the bounded transform budget
-            // never spends the entire frame on far tiles behind the player.
-            var ordered = new ArrayList<>(MESHES.entrySet());
+            // Frustum/filter first: never sort or allocate dynamic transforms
+            // for hidden tiles, even when they are cached in GPU memory.
+            var ordered = new ArrayList<Map.Entry<Long, GpuTile>>();
+            for (var entry : MESHES.entrySet()) {
+                long key = entry.getKey();
+                int tx = (int)(key >> 32), tz = (int)(long)key;
+                float px = (float)((long)tx * TILE * 16 - camera.x);
+                float pz = (float)((long)tz * TILE * 16 - camera.z);
+                if (entry.getValue().quads == 0
+                        || tileEntirelyInsideHandoff(tx, tz, cameraCX, cameraCZ, distance)
+                        || !frustum.testAab(px, low, pz,
+                                px + TILE * 16, high, pz + TILE * 16)) continue;
+                ordered.add(entry);
+            }
             ordered.sort(Comparator.comparingLong(entry ->
                     distanceSquared(entry.getKey(), cameraCX, cameraCZ)));
             int drawnTiles = 0;
