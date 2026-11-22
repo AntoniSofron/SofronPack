@@ -40,7 +40,11 @@ public final class ExtendedLodMeshCache {
     private static final int HEADER_BYTES = 4 * 6 + 8 + HASH_BYTES + 4 * 2;
     private static final AtomicBoolean warned = new AtomicBoolean();
 
-    public record Packed(ByteBuffer vertices, int quads) {
+    public record Packed(ByteBuffer vertices, int quads, boolean fromDisk) {
+        public Packed(ByteBuffer vertices, int quads) {
+            this(vertices, quads, false);
+        }
+
         public Packed {
             if (quads < 0 || vertices.remaining() != (long) quads * ExtendedPackedQuads.QUAD_BYTES)
                 throw new IllegalArgumentException("Invalid packed LOD geometry");
@@ -108,7 +112,7 @@ public final class ExtendedLodMeshCache {
                 if ((int) checksum.getValue() != crc) return null;
                 ByteBuffer buffer = ByteBuffer.allocateDirect(rawBytes).order(ByteOrder.nativeOrder());
                 buffer.put(raw).flip();
-                return new Packed(buffer, quads);
+                return new Packed(buffer, quads, true);
             }
         } catch (IOException | IllegalArgumentException problem) {
             warn("read", problem);
