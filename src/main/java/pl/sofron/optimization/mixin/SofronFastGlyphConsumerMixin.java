@@ -27,7 +27,7 @@ public abstract class SofronFastGlyphConsumerMixin {
     private VertexConsumer sofron$cachedConsumer(TextFeatureRenderer renderer, RenderType type) {
         if (sofron$previousRenderType != type) {
             sofron$previousRenderType = type;
-            sofron$previousConsumer = renderer.getVertexBuilder(type);
+            sofron$previousConsumer = ((SofronRenderTypeFeatureRendererInvoker) renderer).sofron$invokeVertexBuilder(type);
         }
         return sofron$previousConsumer;
     }
