@@ -1,0 +1,21 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "pl.sofron.optimization.mixin",
+  "compatibilityLevel": "JAVA_25",
+  "plugin": "pl.sofron.optimization.SofronOptimizationMixinPlugin",
+  "mixins": [
+    "SofronFastElytraMixin"
+  ],
+  "client": [
+    "SofronFastGuiIntersectionMixin",
+    "SofronFastGuiNodeMixin",
+    "SofronFastGlyphConsumerMixin",
+    "SofronGlPassFramebufferMixin",
+    "SofronGlSurfacePresentMixin",
+    "SofronBackgroundFramerateMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
