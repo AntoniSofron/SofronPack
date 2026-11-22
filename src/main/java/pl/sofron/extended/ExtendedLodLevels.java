@@ -18,6 +18,16 @@ public final class ExtendedLodLevels {
         return 1 << ringFor(distanceChunks);
     }
 
+    /**
+     * Opaque vertical SIDE faces use this coarse slab size. All near
+     * geometry (0–48 chunks) stays at EXACT 1-block Y; all top/bottom
+     * faces, fluids, foliage and cutouts retain exact Y even at distance.
+     * Source voxel snapshots are always full-height, 1-block precision.
+     */
+    public static int opaqueSideYSize(int distanceChunks) {
+        return 1 << ringFor(distanceChunks);
+    }
+
     /** First visible mesh: at most 4-block voxels before a later full-detail rebuild. */
     public static int firstPaintVoxelSize(int distanceChunks) {
         return Math.max(4, voxelSize(distanceChunks));

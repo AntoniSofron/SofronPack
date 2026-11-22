@@ -56,6 +56,33 @@ class ExtendedVolumeMeshTest {
                 "Rendering with coarser mips must never change saved 1x1 data");
     }
 
+    @Test void distantOpaqueSideSlabsReduceQuadsButExactNearYAndWaterRemain() {
+        short[] cells = new short[16 * 16 * 16];
+        // Isolated opaque blocks at alternating heights expose six faces.
+        for (int y = 0; y < 16; y += 2) cells[y * 256 + 5 * 16 + 5] = 1;
+        // Sea-level water remains in its own one-block-high side pass.
+        cells[3 * 256 + 7 * 16 + 7] = 2;
+        var chunks = new ExtendedVoxelStore.VoxelChunk[36];
+        chunks[7] = ExtendedVoxelStore.encode(0, 0, 60, 16, 0, 0, 0,
+                new String[]{"minecraft:air", "minecraft:stone", "minecraft:water[level=0]"}, cells);
+        var material = new ExtendedVoxelMesher.MaterialUV(0, 0, 1, 1, 0xffffff, false);
+        var mesher = new ExtendedVolumeMesh();
+        int[] levels = new int[36];
+        var exact = mesher.build(chunks, levels, (name, face) -> material);
+        levels[7] = 1;
+        var medium = mesher.build(chunks, levels, (name, face) -> material);
+        levels[7] = 2;
+        var far = mesher.build(chunks, levels, (name, face) -> material);
+        assertTrue(exact.quads() > medium.quads());
+        assertTrue(medium.quads() >= far.quads());
+        assertArrayEquals(cells, chunks[7].unpack());
+        // Near: all top and bottom faces retain their original real Y.
+        boolean exactTop = false;
+        for (int i = 4; i < exact.vertices().limit(); i += ExtendedVoxelMesher.VERTEX_BYTES)
+            if (Math.abs(exact.vertices().getFloat(i) - 61f) < 0.001f) exactTop = true;
+        assertTrue(exactTop);
+    }
+
     @Test void fourBlockMipKeepsAnOccupiedChildOffTheSamplingGrid() {
         short[] cells = new short[4096];
         cells[7 * 256 + 7 * 16 + 7] = 1;

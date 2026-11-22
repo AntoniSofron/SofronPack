@@ -12,6 +12,15 @@ class ExtendedLodLevelsTest {
         }
     }
 
+    @Test void verticalSlabsKeepTheFirst48ChunksExact() {
+        assertEquals(1, ExtendedLodLevels.opaqueSideYSize(0));
+        assertEquals(1, ExtendedLodLevels.opaqueSideYSize(48));
+        assertEquals(2, ExtendedLodLevels.opaqueSideYSize(49));
+        assertEquals(2, ExtendedLodLevels.opaqueSideYSize(96));
+        assertEquals(4, ExtendedLodLevels.opaqueSideYSize(97));
+        assertEquals(4, ExtendedLodLevels.opaqueSideYSize(128));
+    }
+
     @Test void exactBoundariesAndCameraMovement() {
         assertEquals(1, ExtendedLodLevels.voxelSize(48));
         assertEquals(2, ExtendedLodLevels.voxelSize(49));
