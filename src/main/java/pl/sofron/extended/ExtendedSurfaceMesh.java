@@ -1,6 +1,6 @@
 package pl.sofron.extended;
 
-import me.cortex.voxy.client.core.util.ScanMesher2D;
+import pl.sofron.extended.mesh.SofronScanMesher2D;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.LinkedHashMap;
@@ -88,7 +88,7 @@ public final class ExtendedSurfaceMesh {
         }
 
         private void reduce() {
-            // Occupied-child reduction follows Voxy's hierarchical mip selection.
+            // Occupied-child reduction follows SofronPack's hierarchical mip selection.
             // Keep the highest occupied child through all three reduction levels,
             // including the 8x8 farthest ring; never sample an empty corner.
             for (int level = 1; level <= 3; level++) {
@@ -150,7 +150,7 @@ public final class ExtendedSurfaceMesh {
             int ox = cx * 16, oz = cz * 16;
             Columns own = owner(data, ox, oz);
             if (own == null || (missingOnly && own.source != null)) continue;
-            var tops = new ScanMesher2D() {
+            var tops = new SofronScanMesher2D() {
                 @Override protected void emitQuad(int x, int z, int length, int width, long key) {
                     int column = own.column(x * detail, z * detail, detail);
                     String name = own.palette[own.top[column]];

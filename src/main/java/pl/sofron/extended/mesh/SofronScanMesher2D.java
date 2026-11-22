@@ -1,8 +1,8 @@
-// Voxy by Cortex. Integrated with permission; standalone benchmarks omitted.
-package me.cortex.voxy.client.core.util;
+// SofronPack: compact scanline meshing. Legal notices in LEGAL_NOTICE.md.
+package pl.sofron.extended.mesh;
 
 
-public abstract class ScanMesher2D {
+public abstract class SofronScanMesher2D {
 
     private static final int MAX_SIZE = 16;
 
