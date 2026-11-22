@@ -1,0 +1,86 @@
+name: Optimization dual-backend world smoke
+on:
+  push:
+    branches: ['optimization/**', 'feature/**']
+    paths:
+      - 'src/**'
+      - 'gradle.properties'
+      - 'build.gradle'
+      - '.github/workflows/optimization-vulkan-smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  graphics-world:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        backend: [opengl, vulkan]
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.5.0'
+      - name: Install Mesa graphics drivers and virtual display
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq xvfb mesa-vulkan-drivers vulkan-tools libvulkan1 libgl1-mesa-dri
+          vulkaninfo --summary > vulkan-device.txt 2>&1 || true
+          head -n 70 vulkan-device.txt || true
+          mkdir -p run/mods run/saves run/config
+          cp libs/sodium-fabric-0.9.2+mc26.3.jar run/mods/
+          python3 scripts/wild_rice_smoke.py
+          cp -a run/sofronpack-wild-rice-smoke run/saves/SofronVulkanSmoke
+          printf '{"enabled":true}\n' > run/config/sofronpack-extended-world.json
+          printf 'preferredGraphicsBackend:"${{ matrix.backend }}"\nrenderDistance:6\nsimulationDistance:4\n' >> run/options.txt
+      - name: Boot real world with ${{ matrix.backend }} explicitly selected
+        run: |
+          set +e
+          timeout -s TERM 180s xvfb-run -a -s "-screen 0 1280x960x24 +extension GLX" \
+             env LIBGL_ALWAYS_SOFTWARE=1 MESA_GL_VERSION_OVERRIDE=4.6 \
+             gradle --no-daemon --console=plain runClient \
+             --args='--graphicsBackend ${{ matrix.backend }} --quickPlaySingleplayer SofronVulkanSmoke' \
+             > gpu-client.log 2>&1
+          exit_code=$?
+          set -e
+          echo "Game exit status: $exit_code"
+          grep -Ei 'Using graphics backend|Vulkan|SofronPack|Textured Extended World|Mixin|ERROR|Exception' gpu-client.log | tail -n 100 || true
+          if grep -Ei 'Mixin apply failed|InvalidMixinException|Critical injection failure|FATAL EXCEPTION|Crash Report|Extended World draw disabled|Extended World GPU preparation failed' gpu-client.log; then
+            echo 'Graphics backend or Mixin failure'
+            exit 1
+          fi
+          if ! grep -qi 'Using graphics backend ${{ matrix.backend }}' gpu-client.log; then
+            echo 'Requested graphics backend not verified (no silent fallback counted as success)'
+            exit 1
+          fi
+          if ! grep -q '\[SofronPack\] Voxel LOD: restored' gpu-client.log; then
+            echo 'Save not loaded in graphics smoke'
+            exit 1
+          fi
+          if ! grep -q 'Textured Extended World GPU draw issued' gpu-client.log; then
+            echo 'Textured LOD draw was not verified'
+            exit 1
+          fi
+          if [ "$exit_code" != 0 ] && [ "$exit_code" != 124 ]; then
+            echo 'Minecraft exited unexpectedly'
+            exit 1
+          fi
+          echo 'PASS: real-world ${{ matrix.backend }} GPU draw and gameplay startup'
+      - name: Attach graphics backend diagnostic logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sofronpack-${{ matrix.backend }}-optimization-smoke
+          path: |
+            gpu-client.log
+            vulkan-device.txt
+            wild-rice-smoke.log
+          if-no-files-found: ignore
