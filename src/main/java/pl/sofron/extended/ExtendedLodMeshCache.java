@@ -283,7 +283,17 @@ public final class ExtendedLodMeshCache {
                         thread.setDaemon(true);
                         thread.setPriority(Thread.MIN_PRIORITY);
                         return thread;
-                    }, new java.util.concurrent.ThreadPoolExecutor.CallerRunsPolicy());
+                    }, (task, executor) -> {
+                        // Saturated cache I/O must backpressure the LOD
+                        // meshing worker, never spawn concurrent writers
+                        // targeting the same tile's temporary file.
+                        try {
+                            executor.getQueue().put(task);
+                        } catch (InterruptedException interrupted) {
+                            Thread.currentThread().interrupt();
+                            task.run(); // preserve the already-generated cache
+                        }
+                    });
 
     private static final java.util.concurrent.Phaser SAVES_IN_FLIGHT =
             new java.util.concurrent.Phaser(1);
