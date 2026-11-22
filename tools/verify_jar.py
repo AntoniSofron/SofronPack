@@ -40,6 +40,9 @@ with zipfile.ZipFile(jar) as z:
         "META-INF/LICENSE",
     ):
         assert required in files, required
+    assert "META-INF/LICENSE" in files
+    assert "META-INF/THIRD_PARTY_OPTIMIZATIONS.md" not in files
+    assert "licenses/THIRD_PARTY_LGPL_3_0.txt" not in files
     assert "sofron-extended.mixins.json" in mod["mixins"]
     assert "sofron-extended-client.mixins.json" in mod["mixins"]
     far_mixins = json.loads(z.read("sofron-extended-client.mixins.json"))
