@@ -77,6 +77,18 @@ public final class ExtendedVolumeMesh {
             int w = 16 >> level;
             return cells[level][(y * w + ((z & 15) >> level)) * w + ((x & 15) >> level)];
         }
+
+        // Only opaque SIDE walls can be merged vertically at distance.
+        // Water, cutouts, foliage and all UP/DOWN faces stay precisely at
+        // their original block Y, including the 62/63 sea-level boundary.
+        short opaqueSlab(int x, int y, int z, int level, int yStep) {
+            short candidate = 0;
+            for (int dy = 0; dy < yStep && y + dy < top; dy++) {
+                short id = get(x, y + dy, z, level);
+                if (id != 0 && opacity[id] == 2) candidate = id;
+            }
+            return candidate;
+        }
     }
 
     private void reserveQuad() {
@@ -127,50 +139,73 @@ public final class ExtendedVolumeMesh {
             int height = v.top;
             for (int face = 0; face < 6; face++) {
                 int planes = face < 2 ? height : width;
-                int rows = face < 2 ? width : height;
-                var scan = new Plane(v, materials, face, cx * 16, cz * 16, step);
-                for (int slice = 0; slice < planes; slice++) {
-                    scan.slice = face < 2 ? slice : slice * step;
-                    for (int row = 0; row < rows; row++) {
-                        for (int col = 0; col < width; col++) {
-                            int x = (face < 4 ? col : slice) * step;
-                            int y = face < 2 ? slice : row;
-                            int z = (face < 2 ? row : face < 4 ? slice : col) * step;
-                            short id = v.get(x, y, z, level);
-                            if (id == 0 || v.opacity[id] == 0) { scan.putNext(0); continue; }
-                            if (level == 0 && v.shapes[id] != null) {
-                                if (face == 0) emitModel(data, owner, cx, cz, x, y, z, id);
-                                scan.putNext(0);
-                                continue;
-                            }
-                            int nx = x, ny = y, nz = z;
-                            switch (face) {
-                                case 0 -> ny++;
-                                case 1 -> ny--;
-                                case 2 -> nz--;
-                                case 3 -> nz += step;
-                                case 4 -> nx--;
-                                case 5 -> nx += step;
-                            }
-                            int neighbor = owner + (nx >> 4) + (nz >> 4) * (TILE + 2);
-                            Volume other = data[neighbor];
-                            boolean visible = other == null;
-                            if (other != null) {
-                                int adjacent = levels[neighbor];
-                                if (face >= 2 && adjacent < level) {
-                                    int fine = 1 << adjacent;
-                                    for (int t = 0; !visible && t < step; t += fine)
-                                            visible = exposed(v, id, other, other.get(nx + (face < 4 ? t : 0),
-                                                    ny, nz + (face >= 4 ? t : 0), adjacent));
-                                } else {
-                                    visible = exposed(v, id, other, other.get(nx, ny, nz, adjacent));
+                // Nearby chunks remain exact in XYZ. Farther away only
+                // opaque side walls are combined into 2/4-high slabs.
+                // The translucent/cutout pass remains one Y per block.
+                int passes = face >= 2 && level > 0 ? 2 : 1;
+                for (int pass = 0; pass < passes; pass++) {
+                    int yStep = face < 2 || level == 0 || pass == 1 ? 1 : 1 << level;
+                    boolean cutoutPass = face >= 2 && level > 0 && pass == 1;
+                    int rows = face < 2 ? width : (height + yStep - 1) / yStep;
+                    var scan = new Plane(v, materials, face, cx * 16, cz * 16, step, yStep);
+                    for (int slice = 0; slice < planes; slice++) {
+                        scan.slice = face < 2 ? slice : slice * step;
+                        for (int row = 0; row < rows; row++) {
+                            for (int col = 0; col < width; col++) {
+                                int x = (face < 4 ? col : slice) * step;
+                                int y = face < 2 ? slice : row * yStep;
+                                int z = (face < 2 ? row : face < 4 ? slice : col) * step;
+                                short id = yStep > 1 ? v.opaqueSlab(x, y, z, level, yStep)
+                                        : v.get(x, y, z, level);
+                                if (id == 0 || v.opacity[id] == 0
+                                        || (cutoutPass && v.opacity[id] != 1)
+                                        || (!cutoutPass && passes > 1 && yStep == 1
+                                            && v.opacity[id] != 2)) {
+                                    scan.putNext(0);
+                                    continue;
                                 }
+                                if (level == 0 && v.shapes[id] != null) {
+                                    if (face == 0) emitModel(data, owner, cx, cz, x, y, z, id);
+                                    scan.putNext(0);
+                                    continue;
+                                }
+                                int nx = x, ny = y, nz = z;
+                                switch (face) {
+                                    case 0 -> ny++;
+                                    case 1 -> ny--;
+                                    case 2 -> nz--;
+                                    case 3 -> nz += step;
+                                    case 4 -> nx--;
+                                    case 5 -> nx += step;
+                                }
+                                int neighbor = owner + (nx >> 4) + (nz >> 4) * (TILE + 2);
+                                Volume other = data[neighbor];
+                                boolean visible = other == null;
+                                if (other != null) {
+                                    int adjacent = levels[neighbor];
+                                    if (face >= 2 && adjacent < level) {
+                                        int fine = 1 << adjacent;
+                                        for (int t = 0; !visible && t < step; t += fine) {
+                                            int sx = nx + (face < 4 ? t : 0);
+                                            int sz = nz + (face >= 4 ? t : 0);
+                                            short neighborId = yStep > 1
+                                                    ? other.opaqueSlab(sx, ny, sz, adjacent, yStep)
+                                                    : other.get(sx, ny, sz, adjacent);
+                                            visible = exposed(v, id, other, neighborId);
+                                        }
+                                    } else {
+                                        short neighborId = yStep > 1
+                                                ? other.opaqueSlab(nx, ny, nz, adjacent, yStep)
+                                                : other.get(nx, ny, nz, adjacent);
+                                        visible = exposed(v, id, other, neighborId);
+                                    }
+                                }
+                                scan.putNext(visible ? id : 0);
                             }
-                            scan.putNext(visible ? id : 0);
+                            scan.endRow();
                         }
-                        scan.endRow();
+                        scan.finish();
                     }
-                    scan.finish();
                 }
             }
             int size = staging.position() - start;
@@ -222,12 +257,13 @@ public final class ExtendedVolumeMesh {
     private final class Plane extends ScanMesher2D {
         final Volume v;
         final MaterialResolver materials;
-        final int face, ox, oz, step;
+        final int face, ox, oz, step, yStep;
         int slice;
 
-        Plane(Volume v, MaterialResolver materials, int face, int ox, int oz, int step) {
+        Plane(Volume v, MaterialResolver materials, int face, int ox, int oz,
+              int step, int yStep) {
             this.v = v; this.materials = materials; this.face = face;
-            this.ox = ox; this.oz = oz; this.step = step;
+            this.ox = ox; this.oz = oz; this.step = step; this.yStep = yStep;
         }
 
         @Override protected void emitQuad(int col, int row, int width, int height, long key) {
@@ -241,7 +277,9 @@ public final class ExtendedVolumeMesh {
             int plane = slice + (face == 0 ? 1 : face == 3 || face == 5 ? step : 0);
             for (int corner = 0; corner < 4; corner++) {
                 int a = (col + 1 - (corner < 2 ? width : 0)) * step;
-                int b = (row + 1 - (corner == 0 || corner == 3 ? height : 0)) * (face < 2 ? step : 1);
+                int b = (row + 1 - (corner == 0 || corner == 3 ? height : 0))
+                        * (face < 2 ? step : yStep);
+                if (face >= 2) b = Math.min(v.top, b);
                 staging.putFloat(ox + (face < 4 ? a : plane))
                         .putFloat(v.source.minY() + (face < 2 ? plane : b) - (face == 0 ? ExtendedSurfaceMesh.surfaceInset(name) : 0f))
                         .putFloat(oz + (face < 2 ? b : face < 4 ? plane : a))

@@ -37,6 +37,7 @@ import pl.sofron.extended.ExtendedLodLevels;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 import pl.sofron.extended.ExtendedVoxelMesher;
+import pl.sofron.extended.ExtendedPackedQuads;
 import pl.sofron.extended.ExtendedVoxelStore;
 import com.mojang.renderpearl.api.textures.GpuSampler;
 import com.mojang.renderpearl.api.textures.FilterMode;
@@ -46,9 +47,10 @@ import com.mojang.renderpearl.api.textures.FilterMode;
  * tiles. The renderer is a client component of SofronPack itself: it does not
  * discover, link to, or load Voxy.
  *
- * Only 16x16-chunk tiles receive GPU buffers. Each changed source chunk
- * invalidates its tile. The normal render distance remains under Sodium's
- * control; all meshing/uploads have a hard per-frame budget.
+ * Four-by-four-chunk tiles share paginated GPU buffers, storing one packed
+ * 48-byte instance for each quad. Only changed source chunks invalidate
+ * geometry; native render distance remains under Sodium's own control.
+ * Meshing/uploads still use small time budgets, never a visibility cap.
  */
 public final class ExtendedWorldLodRenderer {
     private static final int TILE = ExtendedVoxelMesher.TILE_CHUNKS;
@@ -64,9 +66,8 @@ public final class ExtendedWorldLodRenderer {
     private record Pending(long detail, CompletableFuture<ExtendedVoxelMesher.Mesh> result) {}
     private static final Map<Long, Pending> pending = new HashMap<>();
     private static final long FRAME_MESH_BUDGET_NS = 5_000_000L;
-    // A 128-chunk radius can require many more visible tiles than 64.
-    // Evicting after only 384 tiles caused distant regions to vanish.
-    private static final int MAX_GPU_TILES = 3_600;
+    // No artificial 20-chunk normal view cap or 128/256 MiB GPU quotas:
+    // dense geometry is halved and pooled, not hidden when a cap is hit.
     private static final ExtendedVoxelAtlas ATLAS = new ExtendedVoxelAtlas();
     private static final int MAX_QUADS = ExtendedVoxelMesher.MAX_QUADS;
     private static final Map<Long, GpuTile> MESHES = new HashMap<>();
@@ -83,6 +84,7 @@ public final class ExtendedWorldLodRenderer {
     private static final FrustumIntersection frustum = new FrustumIntersection();
 
     private static GpuDevice device;
+    private static ExtendedGpuGeometryArena geometryArena;
     private static GpuBuffer quadIndices;
     private static GpuBuffer longProjection;
     private static final ByteBuffer PROJECTION_STAGING = ByteBuffer.allocateDirect(64).order(ByteOrder.nativeOrder());
@@ -95,8 +97,9 @@ public final class ExtendedWorldLodRenderer {
     private static boolean loggedFirstUpload;
     private static boolean loggedFirstDraw;
 
-    private record GpuTile(GpuBuffer buffer, int quads, long detail) implements AutoCloseable {
-        @Override public void close() { buffer.close(); }
+    private record GpuTile(ExtendedGpuGeometryArena.Region region, int quads, long detail)
+            implements AutoCloseable {
+        @Override public void close() { region.close(); }
     }
 
     private ExtendedWorldLodRenderer() {}
@@ -211,7 +214,7 @@ public final class ExtendedWorldLodRenderer {
                 DIRTY.remove(key);
                 scheduleTile(tx, tz, cx, cz);
                 rebuilt++;
-                trimGpuCache(cx, cz);
+                // The shared arena reuses freed space; no fixed tile eviction.
                 if (System.nanoTime() >= meshDeadline) break;
             }
         } catch (RuntimeException | LinkageError problem) {
@@ -266,12 +269,12 @@ public final class ExtendedWorldLodRenderer {
                                 (float)((long)tz * TILE * 16 - camera.z)),
                         identityTexture);
                 pass.setUniform("DynamicTransforms", transform);
-                int bytesPerQuad = 4 * ExtendedVoxelMesher.VERTEX_BYTES;
-                for (int first = 0; first < tile.quads; first += MAX_QUADS) {
-                    int count = Math.min(MAX_QUADS, tile.quads - first);
-                    pass.setVertexBuffer(0, tile.buffer.slice((long)first * bytesPerQuad, (long)count * bytesPerQuad));
-                    pass.drawIndexed(count * 6, 1, 0, 0, 0);
-                }
+                // One packed quad = one GPU instance. Six shared indices
+                // emit the four reconstructed corners in the vertex shader.
+                // Each tile uses just ONE draw, even for >32,768 quads.
+                pass.setVertexBuffer(0, tile.region.slice(
+                        tile.quads * ExtendedPackedQuads.QUAD_BYTES));
+                pass.drawIndexed(6, tile.quads, 0, 0, 0);
                 if (!loggedFirstDraw) {
                     loggedFirstDraw = true;
                     System.out.println("[SofronPack] Textured Extended World GPU draw issued: "
@@ -457,10 +460,27 @@ public final class ExtendedWorldLodRenderer {
                 if (previous != null) previous.close();
                 continue;
             }
-            var buffer = device.createBuffer(() -> "SofronPack Extended World tile",
-                    GpuBuffer.USAGE_VERTEX | GpuBuffer.USAGE_COPY_DST, mesh.vertices());
-            GpuTile previous = MESHES.put(key, new GpuTile(buffer, mesh.quads(), job.detail));
-            if (previous != null) previous.close();
+            // Pack the old builder's 96-byte quads down to 48 bytes on CPU.
+            // Existing meshers remain untouched; resource-pack geometry,
+            // real Y coordinates, fluids and biome tints all stay intact.
+            ByteBuffer packed = ExtendedPackedQuads.pack(mesh.vertices());
+            if (geometryArena == null) geometryArena = new ExtendedGpuGeometryArena(device);
+            GpuTile previous = MESHES.get(key);
+            ExtendedGpuGeometryArena.Region region;
+            if (previous != null && previous.region.size() >= packed.remaining()) {
+                // In-place upload into the same shared GPU allocation.
+                region = previous.region;
+            } else {
+                // Retire an undersized old allocation BEFORE asking the
+                // driver for a replacement, so no double-VRAM spike.
+                if (previous != null) {
+                    MESHES.remove(key);
+                    previous.close();
+                }
+                region = geometryArena.allocate(packed.remaining());
+            }
+            region.upload(packed);
+            MESHES.put(key, new GpuTile(region, mesh.quads(), job.detail));
             if (job.detail != detailAt(tx, tz, cx, cz)) markDirty(key);
             if (!loggedFirstUpload) {
                 loggedFirstUpload = true;
@@ -472,13 +492,10 @@ public final class ExtendedWorldLodRenderer {
 
     private static void ensureIndices() {
         if (quadIndices != null) return;
-        ByteBuffer buffer = ByteBuffer.allocateDirect(MAX_QUADS * 6 * Integer.BYTES)
+        ByteBuffer buffer = ByteBuffer.allocateDirect(6 * Integer.BYTES)
                 .order(ByteOrder.nativeOrder());
-        for (int q = 0; q < MAX_QUADS; q++) {
-            int v = q * 4;
-            buffer.putInt(v).putInt(v + 1).putInt(v + 2)
-                    .putInt(v + 2).putInt(v + 3).putInt(v);
-        }
+        buffer.putInt(0).putInt(1).putInt(2)
+                .putInt(2).putInt(3).putInt(0);
         buffer.flip();
         quadIndices = device.createBuffer(() -> "SofronPack distant-world quad indices",
                 GpuBuffer.USAGE_INDEX | GpuBuffer.USAGE_COPY_DST, buffer);
@@ -510,29 +527,6 @@ public final class ExtendedWorldLodRenderer {
         return length < 128 || (dx * lookX + dz * lookZ) >= -length * .2;
     }
 
-    private static void trimGpuCache(int cx, int cz) {
-        if (MESHES.size() <= MAX_GPU_TILES) return;
-        Long worst = null;
-        long worstDistance = -1;
-        for (long key : MESHES.keySet()) {
-            long tx = (int)(key >> 32), tz = (int)(long)key;
-            long dx = tx * TILE + TILE / 2 - cx;
-            long dz = tz * TILE + TILE / 2 - cz;
-            long distance = dx * dx + dz * dz;
-            if (distance > worstDistance) { worstDistance = distance; worst = key; }
-        }
-        if (worst != null) {
-            GpuTile evicted = MESHES.remove(worst);
-            if (evicted != null) {
-                evicted.close();
-                // Do not permanently lose already generated chunks when the
-                // GPU cache reaches its bound. Schedule a fresh mesh if the
-                // camera later turns back toward this tile.
-                markDirty(worst);
-            }
-        }
-    }
-
     private static void clearMeshes() {
         for (Pending job : pending.values()) job.result.cancel(false);
         pending.clear();
@@ -541,6 +535,8 @@ public final class ExtendedWorldLodRenderer {
         volumes = new ExtendedVolumeMesh();
         for (GpuTile tile : MESHES.values()) tile.close();
         MESHES.clear();
+        if (geometryArena != null) geometryArena.close();
+        geometryArena = null;
         DIRTY.clear();
         candidates.clear();
         queued.clear();

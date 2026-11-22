@@ -33,6 +33,9 @@ with zipfile.ZipFile(jar) as z:
     assert "pl/sofron/extended/ExtendedWorldStorage.class" not in files
     for class_name in (
         "pl/sofron/extended/ExtendedWorldConfig.class",
+        "pl/sofron/extended/ExtendedPackedQuads.class",
+        "pl/sofron/extended/client/ExtendedGpuGeometryArena.class",
+        "pl/sofron/extended/client/ExtendedArenaRanges.class",
         "pl/sofron/extended/ExtendedWorldPrefetch.class",
         "pl/sofron/extended/ExtendedVoxelStore.class",
         "pl/sofron/extended/ExtendedVoxelMesher.class",
@@ -122,6 +125,26 @@ with zipfile.ZipFile(jar) as z:
     assert "pl/sofron/extended/ExtendedLodStages.class" in files
     assert "int pass = band * 2" in pathlib.Path(
         "src/main/java/pl/sofron/extended/client/ExtendedWorldLodRenderer.java").read_text()
+    # Actual packed quad data is a GPU instance (48B vs 96B legacy).
+    packed = pathlib.Path(
+        "src/main/java/pl/sofron/extended/ExtendedPackedQuads.java").read_text()
+    pipeline = pathlib.Path(
+        "src/main/java/pl/sofron/extended/client/ExtendedVoxelPipeline.java").read_text()
+    renderer = pathlib.Path(
+        "src/main/java/pl/sofron/extended/client/ExtendedWorldLodRenderer.java").read_text()
+    assert "QUAD_BYTES = 48" in packed
+    assert "VertexFormat.builder(1)" in pipeline
+    assert "GpuFormat.RGBA32_UINT" in pipeline
+    assert "ExtendedPackedQuads.pack(mesh.vertices())" in renderer
+    assert "pass.drawIndexed(6, tile.quads, 0, 0, 0)" in renderer
+    assert "new ExtendedGpuGeometryArena(device)" in renderer
+    assert "trimGpuCache(" not in renderer
+    assert "MAX_GPU_TILES" not in renderer
+    assert "pl/sofron/extended/client/ExtendedArenaRanges.class" in files
+    vertex_shader = z.read("assets/minecraft/shaders/core/sofronpack/extended_voxel.vsh")
+    assert b"in uvec4 PackedA" in vertex_shader
+    assert b"gl_VertexIndex" in vertex_shader
+    assert b"coordinate(corner * 3" in vertex_shader
     # Full captured volumes must use distance-dependent 1/2/4-block
     # meshes rather than permanently rendering all distant tiles at 1x1.
     lod_levels = pathlib.Path(
