@@ -216,3 +216,56 @@ surface merging. It does not guarantee a proportional FPS improvement:
 cache decoding, Y detail, chunk generation and GPU driver overhead can
 still dominate. Benchmark first paint, GPU vertices, frame times, and
 memory across the three distance rings on actual hardware.
+
+## v0.1.47 — prevent native graphics out-of-memory crashes
+
+An actual Windows 11 crash report from an RTX 5070 (12 GiB) with Sodium,
+32-chunk vanilla view distance and many populated distant LOD tiles showed:
+
+- the Sodium driver arena failed to allocate a new ~324 MiB buffer;
+- native GL reported `GL_OUT_OF_MEMORY`;
+- Minecraft's per-frame dynamic transform buffer capacity repeatedly doubled
+  from 2 to 1024, while custom LOD tiles kept accumulating;
+- v0.1.46 had a **3,600-tile** GPU limit but no byte limit. A single visible
+  tile logged 133,944 quads (~12.3 MiB of vertex payload) and 3,600 such tiles
+  would require tens of GiB — before Sodium, textures and uniform buffers.
+
+v0.1.47 keeps the exact stored source data, 1×1/2×2/4×4 distance mips,
+four-stage fog, and all three cloud layers. It introduces an independent,
+conservative **512 MiB vertex-byte budget** for the LOD renderer, a
+48 MiB per-tile maximum, 192 resident buffers and at most 160 drawn LOD
+tiles per frame. The mesh admission policy checks bytes **before**
+requesting any new GPU buffer; it evicts more distant tiles first, refuses
+expensive distant tiles when only nearer tiles remain, and never marks an
+evicted tile immediately dirty. When the player approaches, those tiles
+are rediscovered and generated on demand. All GPU removals update byte
+accounting and release the GPU buffers. Replacements retain the old tile
+until successful upload.
+
+The result trades full simultaneous 128-chunk LOD coverage for a bounded
+share of GPU memory on constrained systems. Excessively complex tiles
+are skipped rather than causing a driver crash; the surrounding world and
+cached source voxel generation still remain available. This does **not**
+cap Minecraft/Sodium's normal chunk memory, other mods, OS/driver memory,
+or the entire native memory footprint. At 32 ordinary render chunks and
+near-exhausted Windows commit/page-file space, lower the vanilla render
+distance or increase available system memory/pagefile if instability remains.
+
+### More aggressive GPU saver (v0.1.47)
+
+Normal render distance 32 together with 128-chunk distant terrain produced
+an out-of-memory crash. While Extended World is enabled in the **Overworld**,
+Sodium's effective normal distance is now capped at **20 chunks** by default,
+without modifying the saved render-distance slider. This keeps around 60%
+fewer square-view source chunks resident at 32→20. To disable the cap, set
+`normalRenderCap` to `0` in
+`config/sofronpack-extended-world.json`. The Nether, End and simulation
+distance are not affected.
+
+Custom LOD vertex buffers are limited to **256 MiB total**, **24 MiB per
+tile**, **128 resident tiles** and **64 drawn LOD tiles per frame**, with
+frustum culling before allocating each tile's dynamic GPU transform. Source
+blocks, 1×1/2×2/4×4 distance levels, LOD radius, four fog bands, cloud
+layers and leaf textures are unchanged. At the memory cap, more distant
+tiles may be deferred to maintain a stable game; maximum coverage and
+graphics performance must be measured on the user's machine.

@@ -33,6 +33,7 @@ with zipfile.ZipFile(jar) as z:
     assert "pl/sofron/extended/ExtendedWorldStorage.class" not in files
     for class_name in (
         "pl/sofron/extended/ExtendedWorldConfig.class",
+        "pl/sofron/extended/ExtendedLodGpuBudget.class",
         "pl/sofron/extended/ExtendedWorldPrefetch.class",
         "pl/sofron/extended/ExtendedVoxelStore.class",
         "pl/sofron/extended/ExtendedVoxelMesher.class",
@@ -122,6 +123,24 @@ with zipfile.ZipFile(jar) as z:
     assert "pl/sofron/extended/ExtendedLodStages.class" in files
     assert "int pass = band * 2" in pathlib.Path(
         "src/main/java/pl/sofron/extended/client/ExtendedWorldLodRenderer.java").read_text()
+    renderer_gpu_source = pathlib.Path(
+        "src/main/java/pl/sofron/extended/client/ExtendedWorldLodRenderer.java").read_text()
+    budget_source = pathlib.Path(
+        "src/main/java/pl/sofron/extended/ExtendedLodGpuBudget.java").read_text()
+    assert "256L * 1024 * 1024" in budget_source
+    assert "MAX_RESIDENT_TILES = 128" in budget_source
+    assert "MAX_DRAWN_TILES = 64" in budget_source
+    assert "makeGpuRoom(key, requestedBytes, cx, cz)" in renderer_gpu_source
+    assert "gpuVertexBytes += requestedBytes" in renderer_gpu_source
+    assert "accountAndClose(previous)" in renderer_gpu_source
+    assert "MAX_GPU_TILES = 3_600" not in renderer_gpu_source
+    assert "pl/sofron/extended/mixin/ExtendedWorldRenderDistanceMixin.class" in files
+    assert "ExtendedWorldRenderDistanceMixin" in json.loads(
+        z.read("sofron-extended-client.mixins.json"))["client"]
+    assert "normalRenderCap" in pathlib.Path(
+        "src/main/java/pl/sofron/extended/ExtendedWorldConfig.java").read_text()
+    assert "for (Map.Entry<Long, GpuTile> entry : ordered)" in renderer_gpu_source
+
     # Full captured volumes must use distance-dependent 1/2/4-block
     # meshes rather than permanently rendering all distant tiles at 1x1.
     lod_levels = pathlib.Path(
