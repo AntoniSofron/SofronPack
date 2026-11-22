@@ -25,6 +25,20 @@ with zipfile.ZipFile(jar) as z:
     assert len(mod["entrypoints"]["client"]) == 2
     assert len(mod["mixins"]) == 6
     assert "sofron-optimization.mixins.json" in mod["mixins"]
+    for integrated in (
+        "pl/sofron/optimization/memory/SofronVoxelPalettePool.class",
+        "pl/sofron/optimization/scheduler/SofronChunkWorkBudget.class",
+    ):
+        assert integrated in files, integrated
+    capture_code = pathlib.Path(
+        "src/main/java/pl/sofron/extended/ExtendedWorldPrefetch.java"
+    ).read_text(encoding="utf-8")
+    assert "SofronChunkWorkBudget" in capture_code
+    assert "captureTimed(level, chunk)" in capture_code
+    palette_code = pathlib.Path(
+        "src/main/java/pl/sofron/extended/ExtendedVoxelStore.java"
+    ).read_text(encoding="utf-8")
+    assert "SofronVoxelPalettePool.canonicalize" in palette_code
     optimized = json.loads(z.read("sofron-optimization.mixins.json"))
     assert "plugin" not in optimized
     for required in (

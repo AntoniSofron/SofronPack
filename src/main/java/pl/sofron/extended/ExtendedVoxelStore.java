@@ -39,7 +39,12 @@ public final class ExtendedVoxelStore {
                     || palette.length > 32767 || deflated.length > MAX_RECORD) {
                 throw new IllegalArgumentException("Invalid voxel snapshot dimensions");
             }
+            // SofronPack immutable value pooling: large numbers
+            // of snapshots reuse the same block-state identifiers. Only the
+            // String references are shared, never mutable palette arrays.
             palette = palette.clone();
+            for (int i = 0; i < palette.length; i++)
+                palette[i] = pl.sofron.optimization.memory.SofronVoxelPalettePool.canonicalize(palette[i]);
             deflated = deflated.clone();
         }
 

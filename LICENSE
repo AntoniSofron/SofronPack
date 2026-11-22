@@ -180,6 +180,36 @@ that those external implementations have been incorporated.
 - **TerraBlender 26.3** (`terrablender`): LGPLv3 Source: https://github.com/Glitchfiend/TerraBlender
 - **SofronPackGen v0.1 (wyłączony)** (`legacy`): Kod użytkownika — pominięty zgodnie z wyraźnym poleceniem. Source: https://github.com/AntoniSofron/SofronPackGen
 
+## Additional SofronPack CPU scheduling and memory improvements (v0.1.55)
+
+The following improvements were reconciled from the two earlier feature branches
+with the established SofronPack implementation and its single-file legal
+notice policy. Their original authors are recognized here; the Java classes
+have SofronPack-owned names, without changing upstream ownership or licenses.
+
+- **ModernFix** (embeddedt and ModernFix contributors):
+  source archive ModernFix-1.20.zip (original 1.20.1/Forge sources).
+  The reusable weak interning technique for immutable data values was
+  adapted into `pl.sofron.optimization.memory.SofronVoxelPalettePool`;
+  `ExtendedVoxelStore.VoxelChunk` now canonicalizes immutable block-state
+  palette strings while retaining separate arrays per chunk. No incompatible
+  1.20.1 worldgen mixin or Forge-only classloader code was included.
+  Public source: https://github.com/embeddedt/ModernFix
+
+- **Async 0.2.6+alpha-26.3** (AxalotL, Alchemy, Bliss, FurryMileon,
+  Grider and jediminer543): the source archive Async-26.3.zip informed
+  the per-task exponential moving-average cost estimator now published
+  as `pl.sofron.optimization.scheduler.SofronChunkWorkBudget`. Its
+  work budget is integrated into `ExtendedWorldPrefetch` for near-chunk
+  snapshot capture and distant-chunk request scheduling. Reads of active
+  Minecraft world/biome/entity state remain on the owning server thread;
+  its experimental parallel entity tick/AI lock rewrites are not incorporated.
+  This design is renderer-backend independent.
+
+The supplied source archives and reported author permissions do not remove
+any independent public-distribution obligations. Check the exact applicable
+rights for the relevant versions before redistributing modified source.
+
 ## Full third-party license text
 
 The following is the unmodified combined GNU Lesser General Public License
