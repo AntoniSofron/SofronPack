@@ -142,7 +142,10 @@ public final class ExtendedWorldLodRenderer {
                 if (outsideHorizon(tx, tz, cx, cz) || tileEntirelyInsideHandoff(tx, tz, cx, cz, distance)) continue;
                 GpuTile current = MESHES.get(key);
                 long wantedDetail = detailAt(tx, tz, cx, cz);
-                boolean detailChanged = current != null && current.detail() != -2 && current.detail() != wantedDetail;
+                // Fully generated chunks are NOT exempt from LOD changes.
+                // Even an all-real tile must be re-meshed when the camera
+                // crosses the 48/96-chunk resolution boundaries.
+                boolean detailChanged = current != null && current.detail() != wantedDetail;
                 if ((current == null || first || detailChanged) && hasChunkData(tx, tz)) {
                     markDirty(key);
                 }
@@ -386,8 +389,9 @@ public final class ExtendedWorldLodRenderer {
     private static long detailAt(int tx, int tz, int cx, int cz) {
         long levels = 0;
         for (int z = 0; z < TILE; z++) for (int x = 0; x < TILE; x++) {
-            int radius = Math.max(Math.abs(tx * TILE + x - cx), Math.abs(tz * TILE + z - cz));
-            levels |= (long)ExtendedLodLevels.ringFor(radius) << (2 * (z * TILE + x));
+            int ring = ExtendedLodLevels.ringForChunk(
+                    tx * TILE + x, tz * TILE + z, cx, cz);
+            levels |= (long)ring << (2 * (z * TILE + x));
         }
         return levels;
     }
@@ -398,12 +402,17 @@ public final class ExtendedWorldLodRenderer {
         boolean preview = !MESHES.containsKey(key);
 
         var chunks = new ExtendedVoxelStore.VoxelChunk[(TILE + 2) * (TILE + 2)];
+        // The old code left this array at all zeros, so fully generated
+        // chunks ALWAYS rendered at 1x1 independent of camera distance.
+        // Populate every source chunk (including 1-chunk borders), so
+        // mixed-resolution seams can query the true neighbour resolution.
         int[] levels = new int[chunks.length];
         var predictions = new ExtendedTerrainPreview.Tile[chunks.length];
         int real = 0;
         int i = 0;
         for (int z = -1; z <= TILE; z++) for (int x = -1; x <= TILE; x++) {
             int chunkX = tx * TILE + x, chunkZ = tz * TILE + z;
+            levels[i] = ExtendedLodLevels.ringForChunk(chunkX, chunkZ, cx, cz);
             chunks[i] = ExtendedVoxelStore.get(chunkX, chunkZ);
             if (chunks[i] == null) predictions[i] = ExtendedTerrainPreview.get(chunkX, chunkZ);
             else if (x >= 0 && z >= 0 && x < TILE && z < TILE) real++;
@@ -429,7 +438,9 @@ public final class ExtendedWorldLodRenderer {
             combined.put(exact.vertices()).put(remaining.vertices()).flip();
             return new ExtendedVoxelMesher.Mesh(combined, exact.quads() + remaining.quads());
         }, WORKER);
-        pending.put(key, new Pending(captured == TILE * TILE ? -2 : detail, task));
+        // Keep the actual per-chunk detail map even for completely generated
+        // tiles. The previous -2 sentinel permanently locked them at 1x1.
+        pending.put(key, new Pending(detail, task));
     }
 
     private static void finishMeshes(int minX, int maxX, int minZ, int maxZ, int cx, int cz) {
@@ -453,7 +464,7 @@ public final class ExtendedWorldLodRenderer {
                     GpuBuffer.USAGE_VERTEX | GpuBuffer.USAGE_COPY_DST, mesh.vertices());
             GpuTile previous = MESHES.put(key, new GpuTile(buffer, mesh.quads(), job.detail));
             if (previous != null) previous.close();
-            if (job.detail != -2 && job.detail != detailAt(tx, tz, cx, cz)) markDirty(key);
+            if (job.detail != detailAt(tx, tz, cx, cz)) markDirty(key);
             if (!loggedFirstUpload) {
                 loggedFirstUpload = true;
                 System.out.println("[SofronPack] Textured Extended World LOD GPU tile uploaded: "

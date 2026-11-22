@@ -29,6 +29,33 @@ class ExtendedVolumeMeshTest {
         assertEquals(cells.length / 2 * 6, mesh.quads());
     }
 
+    @Test void capturedExactBlocksCanBeDisplayedWithDifferentMipResolutions() {
+        short[] exact = new short[16 * 16 * 4];
+        for (int z = 0; z < 16; z += 2) {
+            for (int x = 0; x < 16; x += 2) {
+                exact[(2 * 16 + z) * 16 + x] = 1;
+            }
+        }
+        var chunks = new ExtendedVoxelStore.VoxelChunk[36];
+        var stored = ExtendedVoxelStore.encode(0, 0, 0, 4, 0, 0, 0,
+                new String[]{"minecraft:air", "minecraft:stone"}, exact);
+        chunks[7] = stored;
+        var white = new ExtendedVoxelMesher.MaterialUV(0, 0, 1, 1, 0xffffff, false);
+        var mesher = new ExtendedVolumeMesh();
+        int[] levels = new int[36];
+        var full = mesher.build(chunks, levels, (name, face) -> white);
+        levels[7] = 1;
+        var medium = mesher.build(chunks, levels, (name, face) -> white);
+        levels[7] = 2;
+        var far = mesher.build(chunks, levels, (name, face) -> white);
+        assertTrue(full.quads() > medium.quads(),
+                "2x2 distance mip must emit fewer faces than the exact 1x1 mesh");
+        assertTrue(medium.quads() >= far.quads(),
+                "4x4 distance mip must not require more faces than 2x2");
+        assertArrayEquals(exact, stored.unpack(),
+                "Rendering with coarser mips must never change saved 1x1 data");
+    }
+
     @Test void fourBlockMipKeepsAnOccupiedChildOffTheSamplingGrid() {
         short[] cells = new short[4096];
         cells[7 * 256 + 7 * 16 + 7] = 1;
