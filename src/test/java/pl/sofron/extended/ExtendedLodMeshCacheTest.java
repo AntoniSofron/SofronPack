@@ -45,6 +45,28 @@ class ExtendedLodMeshCacheTest {
         assertNotNull(ExtendedLodMeshCache.load(saveFolder, 2, 3, 0L, hash));
     }
 
+    @Test void sourceEditsOrAtlasUvChangesInvalidateTheSameSavedTile() {
+        var sources = new ExtendedVoxelStore.VoxelChunk[36];
+        short[] raw = new short[16 * 16 * 4];
+        raw[0] = 1;
+        sources[7] = ExtendedVoxelStore.encode(0, 0, 0, 4,
+                new String[]{"minecraft:air", "minecraft:stone"}, raw);
+        ExtendedVoxelMesher.MaterialResolver oldAtlas = (name, direction) ->
+                new ExtendedVoxelMesher.MaterialUV(0f, 0f, .5f, .5f, 0xffffff, false);
+        ExtendedVoxelMesher.MaterialResolver changedAtlas = (name, direction) ->
+                new ExtendedVoxelMesher.MaterialUV(.1f, .1f, .7f, .7f, 0xffffff, false);
+        byte[] original = ExtendedLodMeshFingerprint.of(sources, oldAtlas);
+        byte[] same = ExtendedLodMeshFingerprint.of(sources, oldAtlas);
+        assertArrayEquals(original, same, "Cache signatures must be stable between launches");
+        assertFalse(Arrays.equals(original, ExtendedLodMeshFingerprint.of(sources, changedAtlas)),
+                "A changed resource-pack atlas must invalidate saved GPU quads");
+        raw[0] = 0;
+        sources[7] = ExtendedVoxelStore.encode(0, 0, 0, 4,
+                new String[]{"minecraft:air", "minecraft:stone"}, raw);
+        assertFalse(Arrays.equals(original, ExtendedLodMeshFingerprint.of(sources, oldAtlas)),
+                "Changing even one block must invalidate the stored render mesh");
+    }
+
     @Test void truncatedOrCorruptedFileDoesNotCrashOrRenderGarbage() throws Exception {
         byte[] hash = new byte[32];
         ExtendedLodMeshCache.save(saveFolder, 2, 3, 0L, hash, tile(5));
