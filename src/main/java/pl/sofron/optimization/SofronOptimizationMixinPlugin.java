@@ -28,6 +28,8 @@ public final class SofronOptimizationMixinPlugin implements IMixinConfigPlugin {
             return !loader.isModLoaded("lithium");
         if (mixinClassName.contains("SofronBackgroundFramerate"))
             return !loader.isModLoaded("dynamic_fps");
+        if (mixinClassName.contains("SofronOreBitset"))
+            return !loader.isModLoaded("c2me");
         return true;
     }
 
