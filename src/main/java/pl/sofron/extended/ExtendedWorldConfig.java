@@ -20,7 +20,6 @@ public final class ExtendedWorldConfig {
 
     public volatile boolean enabled = false;
 
-
     private ExtendedWorldConfig() {}
 
     public static ExtendedWorldConfig get() { return INSTANCE; }
