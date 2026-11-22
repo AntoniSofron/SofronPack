@@ -40,6 +40,9 @@ class SofronCloudAirflowTest {
         assertEquals(0, SofronCloudAirflow.cloudRow(0));
         assertEquals(1, SofronCloudAirflow.cloudRow(9));
         assertEquals(-1, SofronCloudAirflow.cloudRow(-4));
+        assertEquals(0, SofronCloudAirflow.cloudColumn(0, 256L * 400L, 0, 256));
+        assertEquals(23, SofronCloudAirflow.cloudColumn(0, 0, 1, 256));
+        assertEquals(47, SofronCloudAirflow.cloudColumn(0, 0, 2, 256));
     }
 
     @Test void noOrdinaryWalkOrNoncloudFallIsModified() {

@@ -22,7 +22,8 @@ import net.minecraft.world.phys.Vec3;
  */
 public final class SofronCloudAirflow {
     static final double CELL_BLOCKS = 12.0;
-    static final double CLOUD_DRIFT_BLOCKS_PER_TICK = 0.03;
+    // Use the precise vanilla float constant, not 0.03 as a double.
+    static final double CLOUD_DRIFT_BLOCKS_PER_TICK = 0.030000001f;
     static final double CLOUD_Z_OFFSET = 3.96;
     static final double CLOUD_THICKNESS = 8.0;
     public static final double CLOUD_FLIGHT_FACTOR = 0.50;
@@ -88,31 +89,45 @@ public final class SofronCloudAirflow {
                 / CELL_BLOCKS);
     }
 
+    static int cloudColumn(double worldX, long timeTicks, int layer, int textureWidth) {
+        // Match the vanilla renderer's periodic time wrapping. Without it,
+        // long-running server worlds eventually lose cloud-position precision.
+        long clock = Math.floorMod(timeTicks + CLOUD_TICK_OFFSETS[layer],
+                (long)textureWidth * 400L);
+        return (int)Math.floor((worldX +
+                ((float)clock) * CLOUD_DRIFT_BLOCKS_PER_TICK) / CELL_BLOCKS);
+    }
+
     static int cloudRow(double worldZ) {
         return (int)Math.floor((worldZ + CLOUD_Z_OFFSET) / CELL_BLOCKS);
     }
 
-    public static boolean inCloud(double x, double z, double bottomY,
-                                  double topY, long worldTime) {
+    public static boolean inCloud(AABB bounds, long worldTime) {
         // No texture decode, allocations or cloud-cell lookups at normal
         // gameplay altitudes. Only the eight-block cloud slabs need the mask.
-        if (topY <= CloudBandLayout.LOW
-                || (bottomY >= CloudBandLayout.LOW + CLOUD_THICKNESS
-                    && topY <= CloudBandLayout.MIDDLE)
-                || (bottomY >= CloudBandLayout.MIDDLE + CLOUD_THICKNESS
-                    && topY <= CloudBandLayout.HIGH)
-                || bottomY >= CloudBandLayout.HIGH + CLOUD_THICKNESS)
+        double minY = bounds.minY, maxY = bounds.maxY;
+        if (maxY <= CloudBandLayout.LOW
+                || (minY >= CloudBandLayout.LOW + CLOUD_THICKNESS
+                    && maxY <= CloudBandLayout.MIDDLE)
+                || (minY >= CloudBandLayout.MIDDLE + CLOUD_THICKNESS
+                    && maxY <= CloudBandLayout.HIGH)
+                || minY >= CloudBandLayout.HIGH + CLOUD_THICKNESS)
             return false;
         Mask mask = CloudTexture.MASK;
-        double[] xs = {x, x - 1.0, x + 1.0};
-        double[] zs = {z, z - 1.0, z + 1.0};
-        float[] bands = CloudBandLayout.heights();
-        for (int layer = 0; layer < bands.length; layer++) {
-            if (topY <= bands[layer] || bottomY >= bands[layer] + CLOUD_THICKNESS)
-                continue;
-            for (double testX : xs) for (double testZ : zs)
-                if (mask.at(cloudColumn(testX, worldTime, layer), cloudRow(testZ)))
-                    return true;
+        // Sample the actual entity footprint so a four-block-wide mount can
+        // touch a cloud even if its centre is in a gap.
+        double cx = (bounds.minX + bounds.maxX) * 0.5;
+        double cz = (bounds.minZ + bounds.maxZ) * 0.5;
+        double[] xs = {bounds.minX, cx, bounds.maxX - 0.001};
+        double[] zs = {bounds.minZ, cz, bounds.maxZ - 0.001};
+        for (int layer = 0; layer < CloudBandLayout.BAND_COUNT; layer++) {
+            double y = layer == 0 ? CloudBandLayout.LOW
+                    : layer == 1 ? CloudBandLayout.MIDDLE : CloudBandLayout.HIGH;
+            if (maxY <= y || minY >= y + CLOUD_THICKNESS) continue;
+            for (double testX : xs) for (double testZ : zs) {
+                int cellX = cloudColumn(testX, worldTime, layer, mask.width);
+                if (mask.at(cellX, cloudRow(testZ))) return true;
+            }
         }
         return false;
     }
@@ -152,8 +167,7 @@ public final class SofronCloudAirflow {
         if (!active && !falling) return delta;
         AABB bounds = entity.getBoundingBox();
         double y = (bounds.minY + bounds.maxY) / 2.0;
-        boolean cloud = inCloud(entity.getX(), entity.getZ(),
-                bounds.minY, bounds.maxY, entity.level().getGameTime());
+        boolean cloud = inCloud(bounds, entity.level().getGameTime());
         return transform(delta, y, active, falling, cloud);
     }
 }
