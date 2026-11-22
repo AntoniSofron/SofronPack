@@ -79,9 +79,9 @@ Before public redistribution, the publisher must verify that appropriate permiss
 
 # SofronPack FPS optimization provenance
 
-This document records third-party techniques actually incorporated into the
-SofronPack source tree. Original authorship and licence notices must not be
-removed merely to unify code style.
+This section documents third-party techniques incorporated into the
+SofronPack source tree. Original attributions and their original terms remain
+preserved here despite standardized SofronPack class and package names.
 
 ## Integrated source-derived components
 
@@ -89,8 +89,8 @@ removed merely to unify code style.
   and contributors, [source](https://github.com/RaphiMC/ImmediatelyFast).
   GNU LGPL **3.0 or later**. Adapted GUI spatial list/quadtree, text vertex
   consumer reuse and redundant OpenGL framebuffer-unbind handling.
-  Adapted Java sources retain individual copyright headers in
-  `src/main/java/pl/sofron/optimization/`.
+  Source-specific copyright notices for the adapted Java files are
+  consolidated in the file mapping above.
   The OpenGL optimizations are backend-specific; Vulkan still uses the
   existing RenderPearl path.
 
