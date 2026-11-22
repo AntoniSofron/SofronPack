@@ -28,13 +28,6 @@ removed merely to unify code style.
   Adapted the concept of limiting the render frame rate while Minecraft
   lacks window focus; implemented independently with the 26.3 SDL flag API.
 
-- **C2ME 26.3** — ishland and contributors,
-  [source](https://github.com/RelativityMC/C2ME-fabric).
-  LGPL-3.0-only for the source-derived allocation code. Adapted per-thread
-  reuse of ore generation `BitSet` scratch buffers with a size limit to avoid
-  excessive RAM retention. Chunk worker scheduling and asynchronous NBT
-  storage are not yet merged because they may conflict with SofronPack's
-  existing distant-world prefetch mechanism.
 - **FerriteCore 9.0.0 / Minecraft 26.1** — malte0811 and contributors,
   [source](https://github.com/malte0811/FerriteCore).
   LGPL-3.0-only. Adapted empty `PatchedDataComponentMap` deduplication
@@ -46,10 +39,13 @@ removed merely to unify code style.
 - **EntityCulling:** multithreaded CPU occlusion testing requires a
   separate compatibility pass against Sodium's render hooks and SofronPack
   dynamic lighting. Incorrect culling would hide visible objects.
-- **C2ME asynchronous scheduler, storage and worldgen rewrites:** can race
-  existing SofronPack chunk prefetch, storage and previews. C2ME's optional
-  OpenCL module in the supplied archive specifically declares
-  `All-Rights-Reserved`; it has not been incorporated.
+- **C2ME (entire project, including ore BitSet reuse):** deliberately excluded
+  for now. The chunk scheduler, storage and worldgen rewrites may conflict
+  with SofronPack's existing chunk prefetch, storage and previews. Even the
+  small ore BitSet patch is withheld to keep this release free of C2ME
+  integration until focused compatibility and benchmark evidence exists.
+  C2ME's optional OpenCL module in the supplied archive specifically
+  declares `All-Rights-Reserved`; it has not been incorporated.
 - **FerriteCore blockstate fastmaps and shape deduplication:** need a separate
   26.3 adaptation with controlled memory snapshots and regression tests.
 - **Cloth Config v8 / Minecraft 1.19.x:** configuration-screen dependency,
@@ -71,9 +67,9 @@ measured FPS increase is claimed without controlled game benchmarks.
 
 ## Graphics backend contract
 
-The Lithium-derived gameplay/physics/AI changes, C2ME-derived ore generation
-scratch buffers, and FerriteCore-derived item-component memory optimization
-have no OpenGL calls and run independently of Vulkan/OpenGL. GUI and glyph
+The Lithium-derived gameplay/physics/AI changes and the FerriteCore-derived
+item-component memory optimization have no OpenGL calls and run independently
+of Vulkan/OpenGL. GUI and glyph
 render batching uses Minecraft's common RenderPearl rendering interfaces.
 Only the two ImmediatelyFast-derived framebuffer optimizations directly
 reference OpenGL classes; their mixin targets are OpenGL-only and are never
