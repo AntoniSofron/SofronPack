@@ -66,10 +66,16 @@ public final class SofronCloudAirflow {
                 if (image != null && image.getWidth() > 0 && image.getHeight() > 0) {
                     int width = image.getWidth(), height = image.getHeight();
                     boolean[] mask = new boolean[width * height];
+                    int solid = 0;
                     for (int z = 0; z < height; z++) {
-                        for (int x = 0; x < width; x++)
-                            mask[x + z * width] = (image.getRGB(x, z) >>> 24) >= 10;
+                        for (int x = 0; x < width; x++) {
+                            boolean filled = (image.getRGB(x, z) >>> 24) >= 10;
+                            mask[x + z * width] = filled;
+                            if (filled) solid++;
+                        }
                     }
+                    System.out.println("[SofronPack] Cloud airflow pattern ready: "
+                            + width + "x" + height + ", occupied cells " + solid);
                     return new Mask(width, height, mask);
                 }
             }
