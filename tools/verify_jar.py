@@ -37,7 +37,7 @@ with zipfile.ZipFile(jar) as z:
         "pl/sofron/optimization/mixin/SofronGlSurfacePresentMixin.class",
         "pl/sofron/optimization/mixin/SofronFastElytraMixin.class",
         "pl/sofron/optimization/mixin/SofronBackgroundFramerateMixin.class",
-        "licenses/THIRD_PARTY_LGPL_3_0.txt",
+        "META-INF/LICENSE",
     ):
         assert required in files, required
     assert "sofron-extended.mixins.json" in mod["mixins"]
