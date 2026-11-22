@@ -16,7 +16,8 @@
     "SofronLithiumPistonResolverMixin",
     "SofronLithiumRedstoneDirectionMixin",
     "SofronOreBitsetMixin",
-    "SofronFerriteEmptyDataPatchMixin"
+    "SofronFerriteEmptyDataPatchMixin",
+    "SofronLithiumCachedSeaLevelMixin"
   ],
   "client": [
     "SofronRenderTypeFeatureRendererInvoker",
