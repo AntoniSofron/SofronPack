@@ -29,3 +29,9 @@ processResources {
 }
 apply from: 'gradle/approved-worldgen.gradle'
 tasks.withType(Jar).configureEach { archiveVersion = "v${project.version}" }
+
+// Keep third-party LGPL notices inside the single distributable SofronPack JAR.
+tasks.named('jar', Jar) {
+    from('licenses/THIRD_PARTY_LGPL_3_0.txt') { into 'licenses' }
+    from('THIRD_PARTY_OPTIMIZATIONS.md') { into 'META-INF' }
+}
