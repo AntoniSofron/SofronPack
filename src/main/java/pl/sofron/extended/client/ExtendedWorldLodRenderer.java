@@ -63,6 +63,8 @@ public final class ExtendedWorldLodRenderer {
     private static final int JOBS_PER_FRAME = 12;
     private static final int MAX_PENDING = 16;
     private static final int GPU_UPLOADS_PER_FRAME = 8;
+    // Prevent first-frame GPU spikes when restoring many large forest meshes.
+    private static final int GPU_BYTES_PER_FRAME = 16 * 1024 * 1024;
     private static final ExecutorService WORKER = Executors.newSingleThreadExecutor(job -> {
         Thread thread = new Thread(job, "SofronPack-LOD-Mesh");
         thread.setDaemon(true);
@@ -556,18 +558,22 @@ public final class ExtendedWorldLodRenderer {
 
     private static void finishMeshes(int minX, int maxX, int minZ, int maxZ, int cx, int cz) {
         var jobs = pending.entrySet().iterator();
-        int uploaded = 0;
+        int uploaded = 0, transferredBytes = 0;
         while (jobs.hasNext() && uploaded < GPU_UPLOADS_PER_FRAME) {
             var entry = jobs.next();
             var job = entry.getValue();
             if (!job.result.isDone()) continue;
+            var mesh = job.result.join();
+            int bytes = mesh.vertices().remaining();
+            if (uploaded > 0 && transferredBytes + (long) bytes > GPU_BYTES_PER_FRAME)
+                continue; // Keep the completed job for a following render frame.
             jobs.remove();
             long key = entry.getKey();
             int tx = (int)(key >> 32), tz = (int)key;
             if (tx < minX || tx > maxX || tz < minZ || tz > maxZ) continue;
             if (DIRTY.contains(key)) enqueue(key);
-            var mesh = job.result.join();
             uploaded++;
+            transferredBytes += bytes;
             if (mesh.quads() == 0) {
                 GpuTile previous = MESHES.remove(key);
                 if (previous != null) previous.close();
