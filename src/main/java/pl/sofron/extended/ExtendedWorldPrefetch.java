@@ -58,6 +58,20 @@ public final class ExtendedWorldPrefetch {
     // Prevent duplicate FULL requests while an older snapshot is being
     // generated or compressed. All accesses occur on the server thread.
     private static final Set<Long> IN_FLIGHT = new HashSet<>();
+    // Unload compression must finish before a world archive is closed.
+    private static final Set<CompletableFuture<?>> UNLOAD_TASKS =
+            java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    private static void finishUnloadEncoding() {
+        // The previous synchronous unload path also completed before world
+        // shutdown. This preserves that durability without blocking ticks.
+        while (!UNLOAD_TASKS.isEmpty()) {
+            CompletableFuture<?>[] running =
+                    UNLOAD_TASKS.toArray(CompletableFuture[]::new);
+            CompletableFuture.allOf(running).exceptionally(error -> null).join();
+            UNLOAD_TASKS.removeIf(CompletableFuture::isDone);
+        }
+    }
     private static int centerX = Integer.MIN_VALUE, centerZ = Integer.MIN_VALUE;
     // Anchor of the current staged scan, NOT the most recent player chunk.
     // Continuous flight must eventually restart the local 8-chunk priority.
@@ -87,12 +101,30 @@ public final class ExtendedWorldPrefetch {
             boolean awaitingCapture = recentlyLoaded.remove(key);
             if (!dirty && !awaitingCapture && !IN_FLIGHT.contains(key)
                     && ExtendedVoxelStore.has(chunk.getPos().x(), chunk.getPos().z())) return;
-            ExtendedVoxelStore.put(ExtendedVoxelStore.sample(level, chunk));
+            // A complete compressed snapshot + disk write used to happen
+            // inside the chunk-unload callback on the server thread. Capture
+            // immutable section copies here, then compress and persist on the
+            // bounded encoder workers without blocking the world tick.
+            var captured = ExtendedVoxelStore.captureSections(level, chunk);
             if (IN_FLIGHT.contains(key)) finalOnUnload.add(key);
+            long unloadEpoch = epoch;
+            var task = CompletableFuture.runAsync(() -> {
+                var voxel = captured.get();
+                if (unloadEpoch == epoch && level == lastLevel)
+                    ExtendedVoxelStore.put(voxel);
+            }, ENCODERS);
+            UNLOAD_TASKS.add(task);
+            task.whenComplete((ignored, error) -> {
+                UNLOAD_TASKS.remove(task);
+                if (error != null)
+                    System.err.println("[SofronPack] Background unload snapshot: "
+                            + error.getMessage());
+            });
         });
         ServerTickEvents.END_SERVER_TICK.register(ExtendedWorldPrefetch::tick);
         ServerLifecycleEvents.SERVER_STOPPING.register(server -> {
             ExtendedTerrainPreview.clear();
+            finishUnloadEncoding();
             ExtendedVoxelStore.close();
             pending = nearbyPending = 0;
             lastLevel = null;
@@ -119,6 +151,7 @@ public final class ExtendedWorldPrefetch {
         ServerLevel level = player.level();
 
         if (level != lastLevel) {
+            finishUnloadEncoding();
             ExtendedVoxelStore.open(server.getWorldPath(LevelResource.ROOT), level.dimension().identifier().toString());
             lastLevel = level;
             centerX = centerZ = scanAnchorX = scanAnchorZ = Integer.MIN_VALUE;
