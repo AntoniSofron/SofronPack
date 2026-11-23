@@ -85,7 +85,7 @@ public final class ExtendedGpuGeometryArena implements AutoCloseable {
             liveBytes -= size;
             // Keep one empty page to recycle future tiles, but return all
             // other unused GPU pages immediately to the driver.
-            if (page.allocations == 0 && pages.size() > 1) {
+            if (page.allocations == 0 && (pages.size() > 1 || page.size > align(PAGE_BYTES))) {
                 pages.remove(page);
                 page.close();
             }

@@ -104,6 +104,7 @@ public final class ExtendedWorldLodRenderer {
     private static final Set<Long> queued = new HashSet<>();
     private static float queueLookX, queueLookZ;
     private static int queueX = Integer.MIN_VALUE, queueZ;
+    private static final Matrix4f clipFromWorld = new Matrix4f();
     private static final Matrix4f farProjection = new Matrix4f();
     private static final Matrix4f identityTexture = new Matrix4f();
     private static final FrustumIntersection frustum = new FrustumIntersection();
@@ -384,13 +385,17 @@ public final class ExtendedWorldLodRenderer {
             int distance = Math.max(2, mc.options.getEffectiveRenderDistance());
             float low = (float)(mc.level.getMinY() - camera.y);
             float high = low + mc.level.getHeight();
-            frustum.set(new Matrix4f(farProjection).mul(matrices.modelView()), false);
+            frustum.set(farProjection.mul(matrices.modelView(), clipFromWorld), false);
             for (Map.Entry<Long, GpuTile> entry : MESHES.entrySet()) {
                 long key = entry.getKey();
                 int tx = (int)(key >> 32), tz = (int)(long)key;
                 float x = (float)((long)tx * TILE * 16 - camera.x), z = (float)((long)tz * TILE * 16 - camera.z);
-                if (!frustum.testAab(x, low, z, x + TILE * 16, high, z + TILE * 16)
-                        || tileEntirelyInsideHandoff(tx, tz, cameraCX, cameraCZ, distance)) continue;
+                if (!frustum.testAab(x, low, z, x + TILE * 16, high, z + TILE * 16)) continue;
+                float nearestX = Math.max(0f, Math.max(x, -x - TILE * 16));
+                float nearestZ = Math.max(0f, Math.max(z, -z - TILE * 16));
+                if (nearestX * nearestX + nearestZ * nearestZ >= (FAR * 16) * (FAR * 16)) continue;
+                int readyMask = readyColumns.getOrDefault(entry.getKey(), 0);
+                if (readyMask == 0xffff && insideHandoff(tx, tz, cameraCX, cameraCZ, distance)) continue;
                 GpuTile tile = entry.getValue();
                 if (tile.quads == 0) continue;
                 Matrix4f relative = new Matrix4f(matrices.modelView()).translate(
@@ -400,7 +405,7 @@ public final class ExtendedWorldLodRenderer {
                 var transform = RenderSystem.getDynamicUniforms().writeTransform(
                         // Full material alpha: fog is now calculated
                         // exclusively from the shared Minecraft Fog uniforms.
-                        relative, new Vector4f(1f, 1f, 1f, readyColumns.getOrDefault(key, 0)),
+                        relative, new Vector4f(1f, 1f, 1f, readyMask),
                         new Vector3f(
                                 (float)((long)tx * TILE * 16 - camera.x),
                                 (float)-camera.y,
@@ -498,13 +503,17 @@ public final class ExtendedWorldLodRenderer {
 
     private static boolean tileEntirelyInsideHandoff(int tx, int tz,
                                                        int cx, int cz, int renderDistance) {
+        return readyColumns.getOrDefault(ExtendedVoxelStore.pack(tx, tz), 0) == 0xffff
+                && insideHandoff(tx, tz, cx, cz, renderDistance);
+    }
+
+    private static boolean insideHandoff(int tx, int tz, int cx, int cz, int renderDistance) {
         int left = tx * TILE - cx, right = (tx + 1) * TILE - cx;
         int top = tz * TILE - cz, bottom = (tz + 1) * TILE - cz;
         double maxX = Math.max(Math.abs(left), Math.abs(right));
         double maxZ = Math.max(Math.abs(top), Math.abs(bottom));
-        return readyColumns.getOrDefault(ExtendedVoxelStore.pack(tx, tz), 0) == 0xffff
-                && Math.hypot(maxX, maxZ)
-                < pl.sofron.extended.ExtendedLodHandoff.nearStartChunks(renderDistance);
+        double start = pl.sofron.extended.ExtendedLodHandoff.nearStartChunks(renderDistance);
+        return maxX * maxX + maxZ * maxZ < start * start;
     }
 
     private static void markDirty(long key) {

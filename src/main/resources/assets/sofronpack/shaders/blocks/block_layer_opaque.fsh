@@ -196,6 +196,7 @@ void main() {
     vec3 surfaceDy = dFdy(spl_SurfaceCameraPos);
 #endif
     vec4 color = u_UseRGSS ? sampleRGSS(u_BlockTex, v_TexCoord, u_TexelSize) : sampleNearest(u_BlockTex, v_TexCoord, u_TexelSize);
+    if (u_RenderFog.y >= 2047.5 && sofronHorizonUncovered(spl_SurfaceCameraPos.xz, gl_FragCoord.xy)) discard;
     vec3 surfaceAlbedo = color.rgb * spl_UnlitVertexColor;
     color *= v_Color; // Apply per-vertex color modulator
 

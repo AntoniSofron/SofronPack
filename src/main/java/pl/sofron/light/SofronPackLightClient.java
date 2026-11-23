@@ -3,7 +3,6 @@ package pl.sofron.light;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
-import pl.sofron.light.render.gpu.SodiumGpuLightBridge;
 import net.fabricmc.loader.api.FabricLoader;
 import pl.sofron.light.config.LightConfig;
 import pl.sofron.light.engine.BlockLightRules;

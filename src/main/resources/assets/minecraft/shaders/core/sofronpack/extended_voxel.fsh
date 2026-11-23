@@ -22,6 +22,7 @@ void main() {
             ? textureGrad(Sampler0, tileUv.xy + fract(texCoord0) * tileUv.zw,
                     dFdx(texCoord0) * tileUv.zw, dFdy(texCoord0) * tileUv.zw)
             : texture(Sampler0, texCoord0);
+    if (FogRenderDistanceEnd >= 2047.5 && sofronHorizonUncovered(fogRelative.xz, gl_FragCoord.xy)) discard;
     sampled *= vertexColor;
     if (sampled.a < 0.05) discard;
 

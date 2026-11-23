@@ -4,7 +4,6 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.renderpearl.api.commands.RenderPass;
 import net.caffeinemc.mods.sodium.client.render.viewport.CameraTransform;
 import pl.sofron.light.SofronPackLightClient;
-import pl.sofron.light.render.GpuLightBuffer;
 import pl.sofron.light.runtime.ChunkLightAtlas;
 import net.minecraft.client.Minecraft;
 import pl.sofron.light.emissive.OreMasks;

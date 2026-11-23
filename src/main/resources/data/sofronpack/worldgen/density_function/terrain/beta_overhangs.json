@@ -1,6 +1,6 @@
 {
   "type": "minecraft:mul",
-  "left": 0.17,
+  "left": 0.1802,
   "right": {
     "type": "minecraft:mul",
     "left": "sofronpack:terrain/land_gate",

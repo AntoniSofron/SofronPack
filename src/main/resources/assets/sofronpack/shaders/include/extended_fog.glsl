@@ -100,6 +100,18 @@ float sofronVolumeFog(vec3 relative, float environmentalStart, float environment
                                      environmentalStart, environmentalEnd);
 }
 
+// Screen-stable coverage lets the actual per-pixel sky show through, including
+// the directional sunrise gradient. All terrain passes share the same mask.
+bool sofronHorizonUncovered(vec2 relativeXZ, vec2 pixel) {
+    float distanceSquared = dot(relativeXZ, relativeXZ);
+    const float start = 112.0 * 16.0;
+    const float end = 128.0 * 16.0;
+    if (distanceSquared <= start * start) return false;
+    if (distanceSquared >= end * end) return true;
+    float threshold = fract(52.9829189 * fract(dot(floor(pixel), vec2(0.06711056, 0.00583715))));
+    return smoothstep(start, end, sqrt(distanceSquared)) > threshold;
+}
+
 // Layer the ordinary fog over the volumetric fog rather than replacing it.
 // Compositing via transmittance avoids a hard max() boundary and preserves
 // smooth changes as either layer's opacity varies. Compute distance only once.
