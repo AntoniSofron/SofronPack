@@ -132,7 +132,14 @@ for i in range(1, 6):
 assert swamp['carvers'] == ['minecraft:cave','minecraft:cave_extra_underground','minecraft:canyon']
 assert swamp['temperature'] == 0.8 and swamp['downfall'] == 0.9
 
-assert not any(p.parts[-3:-1] in {('worldgen','structure'), ('worldgen','structure_set')} for p in data)
+village_types = {f'village_{biome}' for biome in ('plains','desert','taiga','savanna','snowy')}
+structure_files = {p for p in data if p.parts[-3:-1] in {('worldgen','structure'), ('worldgen','structure_set')}}
+village_set = ROOT / 'minecraft/worldgen/structure_set/villages.json'
+assert structure_files == {ROOT / f'minecraft/worldgen/structure/{name}.json' for name in village_types} | {village_set}
+for name in village_types:
+    structure = data[ROOT / f'minecraft/worldgen/structure/{name}.json']
+    assert structure['type'] == 'sofronpack:village' and structure['biomes'] == f'#minecraft:has_structure/{name}'
+assert data[village_set]['placement']['frequency'] == 0.2
 assert not any("sofron_pack" in p.parts for p in data), "Legacy namespace prohibited"
 vanilla_sky = {
     'swamp': '#78a7ff',
