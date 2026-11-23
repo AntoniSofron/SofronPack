@@ -33,6 +33,18 @@ public final class VillageStructure extends Structure {
     private VillageStructure(StructureSettings settings) { super(settings); }
     @Override public StructureType<?> type() { return TYPE; }
 
+    private enum Square {
+        FOUNTAIN(9), MARKET(11);
+
+        final int radius;
+        final int roadEdge;
+
+        Square(int radius) {
+            this.radius = radius;
+            this.roadEdge = radius + 3;
+        }
+    }
+
     private record Terrain(GenerationContext c, Map<Long,Integer> heights) {
         Terrain(GenerationContext c) { this(c, new HashMap<>()); }
 
@@ -54,14 +66,15 @@ public final class VillageStructure extends Structure {
             return true;
         }
 
-        boolean routesFit(BlockPos center, Direction out) {
-            BlockPos junction = center.relative(out,50);
+        boolean routesFit(BlockPos center, Direction out, Square square) {
+            int streetEnd = square.roadEdge + 36;
+            BlockPos junction = center.relative(out,streetEnd);
             Direction side = out.getClockWise();
-            return streetFits(center.relative(out,14),out,36)
-                    && streetFits(center.relative(out.getOpposite(),14),out.getOpposite(),36)
+            return streetFits(center.relative(out,square.roadEdge),out,36)
+                    && streetFits(center.relative(out.getOpposite(),square.roadEdge),out.getOpposite(),36)
                     && streetFits(junction,side,12) && streetFits(junction,side.getOpposite(),12)
-                    && Math.abs(height(center.relative(out.getOpposite(),54))
-                            -height(center.relative(out.getOpposite(),50)))<=3;
+                    && Math.abs(height(center.relative(out.getOpposite(),streetEnd+4))
+                            -height(center.relative(out.getOpposite(),streetEnd)))<=3;
         }
     }
 
@@ -77,6 +90,7 @@ public final class VillageStructure extends Structure {
         int cx = c.chunkPos().getMiddleBlockX(), cz = c.chunkPos().getMiddleBlockZ();
         Terrain terrain = new Terrain(c);
         Direction preferred = Direction.from2DDataValue(c.random().nextInt(4));
+        Square square = c.random().nextBoolean() ? Square.MARKET : Square.FOUNTAIN;
         Direction bestAxis = null;
         BlockPos best = null;
         int bestScore = Integer.MAX_VALUE;
@@ -84,7 +98,7 @@ public final class VillageStructure extends Structure {
             int x = cx + dx, z = cz + dz, y = terrain.height(x,z);
             if (y < 60 || y > 200) continue;
             int relief = 0;
-            for (int i : new int[]{-14,0,14}) for (int j : new int[]{-14,0,14}) {
+            for (int i : new int[]{-square.roadEdge,0,square.roadEdge}) for (int j : new int[]{-square.roadEdge,0,square.roadEdge}) {
                 int h = terrain.height(x+i,z+j);
                 if (h < 60 || h > 200) relief = 100;
                 relief = Math.max(relief, Math.abs(h-y));
@@ -94,7 +108,7 @@ public final class VillageStructure extends Structure {
                 BlockPos candidate = new BlockPos(x,y,z);
                 Direction axis = preferred;
                 for (int turn=0; turn<4; turn++, axis=axis.getClockWise()) {
-                    if (terrain.routesFit(candidate,axis)) {
+                    if (terrain.routesFit(candidate,axis,square)) {
                         best = candidate;
                         bestScore = score;
                         bestAxis = axis;
@@ -106,7 +120,7 @@ public final class VillageStructure extends Structure {
         if (best == null || c.random().nextFloat() < (best.getY()-60)/200f) return Optional.empty();
         BlockPos center = best;
         Direction axis = bestAxis;
-        return Optional.of(new GenerationStub(center, pieces -> new Layout(c,pieces,center,terrain).build(axis)));
+        return Optional.of(new GenerationStub(center, pieces -> new Layout(c,pieces,center,terrain).build(axis,square)));
     }
 
     private static Rotation rotation(Direction forward) {
@@ -133,17 +147,19 @@ public final class VillageStructure extends Structure {
             pieces.addPiece(new VillageGround(a,b,material,Direction.NORTH));
         }
 
-        void build(Direction axis) {
-            int r = 11;
+        void build(Direction axis, Square square) {
+            int r = square.radius;
+            int edge = square.roadEdge;
+            int houseOffset = r - 4;
             rect(center.offset(-r,0,-r),center.offset(r,0,r),STONE);
             for (Direction out : List.of(Direction.NORTH,Direction.EAST,Direction.SOUTH,Direction.WEST)) {
                 Direction side = out.getClockWise();
-                rect(center.relative(out,12).relative(side,-11),center.relative(out,14).relative(side,14),PATH);
-                for (int offset : new int[]{-7,7}) {
-                    house(center.relative(out,15).relative(side,offset),out,false,false);
+                rect(center.relative(out,r+1).relative(side,-r),center.relative(out,edge).relative(side,edge),PATH);
+                for (int offset : new int[]{-houseOffset,houseOffset}) {
+                    house(center.relative(out,edge+1).relative(side,offset),out,false,false);
                 }
             }
-            boolean market = c.random().nextBoolean();
+            boolean market = square == Square.MARKET;
             template(FOUNTAIN,
                     center.offset(market ? -10 : -4,0,-4),Rotation.NONE);
             if (market) {
@@ -151,8 +167,8 @@ public final class VillageStructure extends Structure {
                 house(center.offset(1,0,6),Direction.EAST,false,true);
                 well(center.offset(5,0,0));
             }
-            road(axis,c.random().nextInt(4)!=0,false);
-            road(axis.getOpposite(),false,!market);
+            road(axis,edge,c.random().nextInt(4)!=0,false);
+            road(axis.getOpposite(),edge,false,!market);
             buildings.forEach(pieces::addPiece);
         }
 
@@ -195,9 +211,9 @@ public final class VillageStructure extends Structure {
                     entrance.relative(intoLot,3),rot);
         }
 
-        void road(Direction out, boolean junction, boolean endWell) {
+        void road(Direction out, int edge, boolean junction, boolean endWell) {
             Direction side = out.getClockWise();
-            BlockPos start = center.relative(out,14);
+            BlockPos start = center.relative(out,edge);
             int y = center.getY();
             for (int section=0; section<3; section++) {
                 int length = 12;
