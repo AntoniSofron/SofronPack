@@ -1,0 +1,7 @@
+{
+  "biomes": "#minecraft:has_structure/village_taiga",
+  "step": "surface_structures",
+  "spawn_overrides": {},
+  "type": "sofronpack:village",
+  "terrain_adaptation": "none"
+}

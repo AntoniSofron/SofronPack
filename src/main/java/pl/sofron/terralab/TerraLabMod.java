@@ -7,6 +7,7 @@ public final class TerraLabMod implements ModInitializer {
 
     @Override
     public void onInitialize() {
+        VillageStructure.register();
         pl.sofron.atmosphere.SofronCloudAirflow.warmUp();
         pl.sofron.extended.ExtendedWorldPrefetch.register();
         pl.sofron.terralab.soil.SoilBlocks.register();
