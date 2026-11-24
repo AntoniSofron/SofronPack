@@ -255,7 +255,7 @@ public final class ExtendedSurfaceMesh {
     }
 
     // Two 15-bit atlas coordinates in a finite, normal float vertex attribute.
-    static float packUv(float low, float high) {
+    public static float packUv(float low, float high) {
         int bits = Math.round(low * 32767f) | (Math.round(high * 32767f) << 15);
         return Float.intBitsToFloat(bits + 0x00800000);
     }

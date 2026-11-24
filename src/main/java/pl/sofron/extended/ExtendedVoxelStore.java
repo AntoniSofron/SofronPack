@@ -94,6 +94,7 @@ public final class ExtendedVoxelStore {
 
     private static final class Session {
         final Path file;
+        final Path meshDirectory;
         final ConcurrentHashMap<Long, VoxelChunk> chunks = new ConcurrentHashMap<>();
         final ConcurrentLinkedQueue<Long> changed = new ConcurrentLinkedQueue<>();
         DataOutputStream output;
@@ -102,7 +103,11 @@ public final class ExtendedVoxelStore {
         final ConcurrentLinkedQueue<Long> writeOrder = new ConcurrentLinkedQueue<>();
         final java.util.concurrent.atomic.AtomicBoolean writerScheduled =
                 new java.util.concurrent.atomic.AtomicBoolean();
-        Session(Path file) { this.file = file; }
+        Session(Path file) {
+            this.file = file;
+            String name = file.getFileName().toString().replace(".voxel.v4.bin", "");
+            meshDirectory = file.getParent().resolve(name).resolve("lod-mesh-v1");
+        }
 
         void queue(VoxelChunk voxel) {
             long key = pack(voxel.chunkX(), voxel.chunkZ());
@@ -277,9 +282,7 @@ public final class ExtendedVoxelStore {
     /** World-specific directory for persistent packed render meshes. */
     public static Path meshCacheDirectory() {
         Session s = current;
-        if (s == null) return null;
-        String name = s.file.getFileName().toString().replace(".voxel.v4.bin", "");
-        return s.file.getParent().resolve(name).resolve("lod-mesh-v1");
+        return s == null ? null : s.meshDirectory;
     }
 
     public static long generation() { return generation; }
