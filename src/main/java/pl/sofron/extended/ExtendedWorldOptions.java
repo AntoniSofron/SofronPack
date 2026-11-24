@@ -12,10 +12,10 @@ public final class ExtendedWorldOptions {
     public static BooleanOptionBuilder build(ConfigBuilder builder) {
         var option = builder.createBooleanOption(Identifier.parse("sofronpack:extended_world"));
         option.setName(Component.literal("Większy świat (tekstury bloków, 128 chunków)"));
-        option.setTooltip(Component.literal("SofronPack samodzielnie wyświetla i zapisuje wokselowy " +
-                "teren do 128 chunków. Zwykły zasięg renderowania i symulacji " +
-                "pozostaje bez zmian. Generowanie nowego terenu działa stopniowo " +
-                "w trybie jednoosobowym. Nie potrzebujesz dodatkowego moda."));
+        option.setTooltip(Component.literal("SofronPack wyświetla teren do 128 chunków. Daleki nieodwiedzony " +
+                "teren jest przewidywany z seeda bez zapisywania tysięcy chunków. " +
+                "Dokładne woksele są zachowywane w ograniczonym cache. " +
+                "Zwykły zasięg renderowania i symulacji pozostaje bez zmian."));
         option.setBinding(value -> ExtendedWorldConfig.get().setEnabled(value),
                 () -> ExtendedWorldConfig.get().enabled);
         option.setDefaultValue(false);

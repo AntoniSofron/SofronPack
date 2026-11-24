@@ -6,6 +6,15 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ExtendedWorldPrefetchTest {
+    @Test void compactModeLimitsOnlyRealGenerationNotTheVisualHorizon() {
+        assertEquals(10, ExtendedWorldPrefetch.generationRadius(6, false));
+        assertEquals(36, ExtendedWorldPrefetch.generationRadius(32, false));
+        assertEquals(6, ExtendedWorldPrefetch.generationRadius(0, false));
+        assertEquals(128, ExtendedWorldPrefetch.generationRadius(Integer.MAX_VALUE, false));
+        assertEquals(128, ExtendedWorldPrefetch.generationRadius(6, true));
+        assertEquals(128, ExtendedWorldConfig.DISTANT_RADIUS_CHUNKS);
+    }
+
     @Test void oneHundredTwentyEightChunkSquareIsCompleteAndUnique() {
         long[] offsets = ExtendedWorldPrefetch.spiralOffsets(128);
         assertEquals(257 * 257, offsets.length);
