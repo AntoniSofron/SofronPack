@@ -12,7 +12,7 @@
             "type": "minecraft:add",
             "left": {
               "type": "minecraft:add",
-              "left": 0,
+              "left": "sofronpack:terrain/beta_outcrops",
               "right": "sofronpack:terrain/upland_lift"
             },
             "right": "sofronpack:terrain/classic_valleys"
