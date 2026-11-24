@@ -1,5 +1,6 @@
-package pl.sofron.terralab;
+package pl.sofron.terralab.trees;
 
+import pl.sofron.terralab.TerraLabMod;
 import com.mojang.serialization.MapCodec;
 import java.util.List;
 import net.minecraft.core.BlockPos;

@@ -1,4 +1,4 @@
-package pl.sofron.terralab;
+package pl.sofron.terralab.villages;
 
 import com.mojang.serialization.MapCodec;
 import java.util.*;
@@ -14,7 +14,7 @@ import net.minecraft.world.level.levelgen.structure.*;
 import net.minecraft.world.level.levelgen.structure.pieces.StructurePiecesBuilder;
 import net.minecraft.world.level.levelgen.structure.pools.*;
 import net.minecraft.world.level.levelgen.structure.templatesystem.LiquidSettings;
-import static pl.sofron.terralab.VillageGround.Surface.*;
+import static pl.sofron.terralab.villages.VillageGround.Surface.*;
 
 /** Plans an entire settlement from the terrain generator before any chunk places blocks. */
 public final class VillageStructure extends Structure {
@@ -26,7 +26,7 @@ public final class VillageStructure extends Structure {
     private static final ResourceKey<StructureProcessorList> SQUARE_PAVING = ResourceKey.create(
             Registries.PROCESSOR_LIST, Identifier.parse("sofronpack:square_paving"));
 
-    static void register() {
+    public static void register() {
         Registry.register(BuiltInRegistries.STRUCTURE_PIECE, Identifier.parse("sofronpack:village_ground"), VillageGround.TYPE);
         Registry.register(BuiltInRegistries.STRUCTURE_TYPE, Identifier.parse("sofronpack:village"), TYPE);
     }

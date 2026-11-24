@@ -1,5 +1,6 @@
-package pl.sofron.terralab;
+package pl.sofron.terralab.trees;
 
+import pl.sofron.terralab.TerraLabMod;
 import java.util.List;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.rendering.v1.BlockColorRegistry;

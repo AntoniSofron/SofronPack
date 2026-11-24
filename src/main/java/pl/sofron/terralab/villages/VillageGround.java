@@ -1,4 +1,4 @@
-package pl.sofron.terralab;
+package pl.sofron.terralab.villages;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;

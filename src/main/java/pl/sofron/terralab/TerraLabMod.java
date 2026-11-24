@@ -1,6 +1,15 @@
 package pl.sofron.terralab;
 
 import net.fabricmc.api.ModInitializer;
+import pl.sofron.terralab.villages.VillageStructure;
+import pl.sofron.terralab.trees.AcaciaVariants;
+import pl.sofron.terralab.trees.BirchVariants;
+import pl.sofron.terralab.trees.DarkOakVariants;
+import pl.sofron.terralab.trees.GiantSpruceVariants;
+import pl.sofron.terralab.trees.GroundedWillow;
+import pl.sofron.terralab.trees.JungleVariants;
+import pl.sofron.terralab.trees.OakVariants;
+import pl.sofron.terralab.trees.SpruceVariants;
 
 public final class TerraLabMod implements ModInitializer {
     public static final String MOD_ID = "sofronpack";

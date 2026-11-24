@@ -11,7 +11,7 @@
       "pl.sofron.light.SofronPackLight"
     ],
     "client": [
-      "pl.sofron.terralab.BirchColors",
+      "pl.sofron.terralab.trees.BirchColors",
       "pl.sofron.light.SofronPackLightClient"
     ]
   },
