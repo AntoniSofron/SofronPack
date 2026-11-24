@@ -6,7 +6,7 @@ import net.minecraft.world.phys.Vec3;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.ModifyArg;
-import pl.sofron.terralab.soil.RailTravel;
+import pl.sofron.terralab.travel.TravelSpeed;
 
 @Mixin(OldMinecartBehavior.class)
 abstract class RailTravelMixin extends MinecartBehavior {
@@ -15,7 +15,7 @@ abstract class RailTravelMixin extends MinecartBehavior {
     @ModifyArg(method = "moveAlongTrack", at = @At(value = "INVOKE",
             target = "Lnet/minecraft/world/entity/vehicle/minecart/AbstractMinecart;move(Lnet/minecraft/world/entity/MoverType;Lnet/minecraft/world/phys/Vec3;)V"), index = 1)
     private Vec3 sofronpack$railDistance(Vec3 movement) {
-        double factor = RailTravel.distanceMultiplier(minecart);
+        double factor = TravelSpeed.onRails(minecart);
         return factor == 1.0 ? movement : movement.scale(factor);
     }
 }
@@ -28,6 +28,6 @@ abstract class ExperimentalRailTravelMixin extends MinecartBehavior {
     @ModifyExpressionValue(method = "moveAlongTrack", at = @At(value = "INVOKE",
             target = "Lnet/minecraft/world/phys/Vec3;horizontalDistance()D"))
     private double sofronpack$railDistance(double distance) {
-        return distance * RailTravel.distanceMultiplier(minecart);
+        return distance * TravelSpeed.onRails(minecart);
     }
 }

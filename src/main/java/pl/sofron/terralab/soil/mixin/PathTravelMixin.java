@@ -8,7 +8,7 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
-import pl.sofron.terralab.soil.IceTravel;
+import pl.sofron.terralab.travel.TravelSpeed;
 import pl.sofron.terralab.soil.SoilBlocks;
 
 @Mixin(LivingEntity.class)
@@ -42,6 +42,6 @@ abstract class PathTravelMixin {
         if (ground == Blocks.DIRT_PATH || ground == SoilBlocks.slab(Blocks.DIRT_PATH)
                 || ground == SoilBlocks.stairs(Blocks.DIRT_PATH)) return speed * multiplier * altitude;
         if (!(mover instanceof Player)) return speed;
-        return speed * Math.min(2.0F, altitude * IceTravel.multiplier(state, support.getY()));
+        return speed * Math.min(2.0F, altitude * TravelSpeed.onIce(state, support.getY()));
     }
 }

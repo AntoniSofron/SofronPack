@@ -1,5 +1,6 @@
-package pl.sofron.terralab;
+package pl.sofron.terralab.trees;
 
+import pl.sofron.terralab.TerraLabMod;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;

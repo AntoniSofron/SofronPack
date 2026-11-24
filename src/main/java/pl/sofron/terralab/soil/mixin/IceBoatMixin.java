@@ -7,7 +7,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.ModifyArg;
-import pl.sofron.terralab.soil.IceTravel;
+import pl.sofron.terralab.travel.TravelSpeed;
 
 @Mixin(AbstractBoat.class)
 abstract class IceBoatMixin {
@@ -20,7 +20,7 @@ abstract class IceBoatMixin {
         if (status != AbstractBoat.Status.ON_LAND || !(boat.getControllingPassenger() instanceof Player)) return movement;
         var support = boat.getOnPos();
         if (support.getY() < 70) return movement;
-        float factor = IceTravel.multiplier(boat.level().getBlockState(support), support.getY());
+        float factor = TravelSpeed.onIce(boat.level().getBlockState(support), support.getY());
         return factor == 1.0F ? movement : movement.multiply(factor, 1.0, factor);
     }
 }

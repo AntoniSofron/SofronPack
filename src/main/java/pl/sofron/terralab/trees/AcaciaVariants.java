@@ -1,4 +1,4 @@
-package pl.sofron.terralab;
+package pl.sofron.terralab.trees;
 
 import java.util.List;
 import com.mojang.serialization.MapCodec;
