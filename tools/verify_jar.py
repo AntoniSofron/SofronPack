@@ -252,7 +252,7 @@ with zipfile.ZipFile(jar) as z:
     assert b"cylindricalBlocks" in lod_vertex
     lod_renderer = pathlib.Path(
         "src/main/java/pl/sofron/extended/client/ExtendedWorldLodRenderer.java").read_text()
-    assert "readyColumns.getOrDefault(entry.getKey(), 0)" in lod_renderer
+    assert "readyColumns.get(key)" in lod_renderer
     assert "AtmospherePresets.distantFogBlend()" not in lod_renderer
     fog_mixin_source = pathlib.Path(
         "src/main/java/pl/sofron/extended/mixin/ExtendedWorldFogMixin.java").read_text()

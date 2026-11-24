@@ -12,6 +12,9 @@ import java.nio.ByteOrder;
 import java.nio.file.Path;
 import pl.sofron.extended.ExtendedLodMeshCache;
 import pl.sofron.extended.ExtendedLodMeshFingerprint;
+import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
+import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
+import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
 import java.util.HashMap;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -82,7 +85,7 @@ public final class ExtendedWorldLodRenderer {
     // dense geometry is halved and pooled, not hidden when a cap is hit.
     private static final ExtendedVoxelAtlas ATLAS = new ExtendedVoxelAtlas();
     private static final int MAX_QUADS = ExtendedVoxelMesher.MAX_QUADS;
-    private static final Map<Long, GpuTile> MESHES = new HashMap<>();
+    private static final Long2ObjectOpenHashMap<GpuTile> MESHES = new Long2ObjectOpenHashMap<>();
     private static final Set<Long> DIRTY = new HashSet<>();
     // Transient terrain predictions do not have a persistent world fingerprint.
     // If a newer preview arrives, rebuild it rather than replaying an older
@@ -134,7 +137,7 @@ public final class ExtendedWorldLodRenderer {
     private static final ArrayDeque<Long> expiredDirty = new ArrayDeque<>();
     private static final ArrayList<Long> reprioritize = new ArrayList<>();
     private static int reprioritizeCursor;
-    private static final Map<Long, Integer> readyColumns = new HashMap<>();
+    private static final Long2IntOpenHashMap readyColumns = new Long2IntOpenHashMap();
     private static int readyCursor;
     private static boolean failed;
     private static boolean loggedFirstUpload;
@@ -142,7 +145,7 @@ public final class ExtendedWorldLodRenderer {
     private static boolean loggedFirstDiskRestore;
     private static boolean loggedFirstDiskSave;
 
-    private record GpuTile(ExtendedGpuGeometryArena.Region region, int quads, long detail)
+    private record GpuTile(ExtendedGpuGeometryArena.Region region, GpuBufferSlice vertices, int quads, long detail)
             implements AutoCloseable {
         @Override public void close() { region.close(); }
     }
@@ -386,37 +389,32 @@ public final class ExtendedWorldLodRenderer {
             float low = (float)(mc.level.getMinY() - camera.y);
             float high = low + mc.level.getHeight();
             frustum.set(farProjection.mul(matrices.modelView(), clipFromWorld), false);
-            for (Map.Entry<Long, GpuTile> entry : MESHES.entrySet()) {
-                long key = entry.getKey();
+            for (var it = MESHES.long2ObjectEntrySet().fastIterator(); it.hasNext();) {
+                var entry = it.next();
+                long key = entry.getLongKey();
                 int tx = (int)(key >> 32), tz = (int)(long)key;
                 float x = (float)((long)tx * TILE * 16 - camera.x), z = (float)((long)tz * TILE * 16 - camera.z);
                 if (!frustum.testAab(x, low, z, x + TILE * 16, high, z + TILE * 16)) continue;
                 float nearestX = Math.max(0f, Math.max(x, -x - TILE * 16));
                 float nearestZ = Math.max(0f, Math.max(z, -z - TILE * 16));
                 if (nearestX * nearestX + nearestZ * nearestZ >= (FAR * 16) * (FAR * 16)) continue;
-                int readyMask = readyColumns.getOrDefault(entry.getKey(), 0);
+                int readyMask = readyColumns.get(key);
                 if (readyMask == 0xffff && insideHandoff(tx, tz, cameraCX, cameraCZ, distance)) continue;
                 GpuTile tile = entry.getValue();
                 if (tile.quads == 0) continue;
                 Matrix4f relative = new Matrix4f(matrices.modelView()).translate(
-                        (float)((long)tx * TILE * 16 - camera.x),
-                        (float)-camera.y,
-                        (float)((long)tz * TILE * 16 - camera.z));
+                        x, (float)-camera.y, z);
                 var transform = RenderSystem.getDynamicUniforms().writeTransform(
                         // Full material alpha: fog is now calculated
                         // exclusively from the shared Minecraft Fog uniforms.
                         relative, new Vector4f(1f, 1f, 1f, readyMask),
-                        new Vector3f(
-                                (float)((long)tx * TILE * 16 - camera.x),
-                                (float)-camera.y,
-                                (float)((long)tz * TILE * 16 - camera.z)),
+                        new Vector3f(x, (float)-camera.y, z),
                         identityTexture);
                 pass.setUniform("DynamicTransforms", transform);
                 // One packed quad = one GPU instance. Six shared indices
                 // emit the four reconstructed corners in the vertex shader.
                 // Each tile uses just ONE draw, even for >32,768 quads.
-                pass.setVertexBuffer(0, tile.region.slice(
-                        tile.quads * ExtendedPackedQuads.QUAD_BYTES));
+                pass.setVertexBuffer(0, tile.vertices);
                 pass.drawIndexed(6, tile.quads, 0, 0, 0);
                 if (!loggedFirstDraw) {
                     loggedFirstDraw = true;
@@ -439,7 +437,7 @@ public final class ExtendedWorldLodRenderer {
      */
     public static void updateProjection(Matrix4f terrainProjection) {
         if (device == null || MESHES.isEmpty() || failed || !ExtendedWorldConfig.get().enabled) return;
-        Matrix4f projection = new Matrix4f(terrainProjection);
+        Matrix4f projection = clipFromWorld.set(terrainProjection);
         // Leave the overlapping native geometry in front in the shared depth buffer.
         float near = 0.025f, far = FAR * 16f + 512f;
         boolean reversed = DepthStencilState.DEFAULT.depthTest()
@@ -475,7 +473,7 @@ public final class ExtendedWorldLodRenderer {
         int width = Math.floorDiv(cx + near, TILE) - minX + 1;
         int depth = Math.floorDiv(cz + near, TILE) - minZ + 1;
         if (centerX != cx || centerZ != cz || lastRenderDistance != near) {
-            readyColumns.keySet().removeIf(key -> {
+            readyColumns.keySet().removeIf((long key) -> {
                 int x = (int)(key >> 32) - minX, z = (int)(long)key - minZ;
                 return x < 0 || z < 0 || x >= width || z >= depth;
             });
@@ -495,8 +493,9 @@ public final class ExtendedWorldLodRenderer {
                                 chunkX * 16 + 16, surface + 1, chunkZ * 16 + 16)) mask |= 1 << (z * TILE + x);
             }
             long key = ExtendedVoxelStore.pack(tx, tz);
-            Integer old = readyColumns.put(key, mask);
-            if (mask != 0xffff && (old == null || old != mask)
+            int old = readyColumns.getOrDefault(key, -1);
+            if (old != mask) readyColumns.put(key, mask);
+            if (mask != 0xffff && old != mask
                     && !MESHES.containsKey(key) && hasChunkData(tx, tz)) markDirty(key);
         }
     }
@@ -720,7 +719,7 @@ public final class ExtendedWorldLodRenderer {
             // Keep the original buffer view stable until deferred cache I/O
             // finishes, even if the GPU backend consumes the upload view.
             region.upload(packed.duplicate());
-            MESHES.put(key, new GpuTile(region, mesh.quads(), job.detail));
+            MESHES.put(key, new GpuTile(region, region.slice(packed.remaining()), mesh.quads(), job.detail));
             if (mesh.fromDisk()) {
                 // Restore the previously visible terrain first; then, if a
                 // transient terrain preview has changed, reconcile it without
