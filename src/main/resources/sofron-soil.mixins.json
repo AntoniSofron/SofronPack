@@ -5,6 +5,7 @@
   "mixins": [
     "SoilTickAccess",
     "PathTravelMixin",
+    "IceBoatMixin",
     "RailTravelMixin",
     "ExperimentalRailTravelMixin",
     "SpreadingSoilMixin",
