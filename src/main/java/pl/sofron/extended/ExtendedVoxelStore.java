@@ -386,9 +386,12 @@ public final class ExtendedVoxelStore {
             if (!live[i].hasOnlyAir()) sections[i] = live[i].copy();
         int x = chunkX * 16 + 8, z = chunkZ * 16 + 8;
         int y = chunk.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, 8, 8);
-        var biome = chunk.getNoiseBiome(x >> 2, y >> 2, z >> 2).value();
+        var holder = chunk.getNoiseBiome(x >> 2, y >> 2, z >> 2);
+        var biome = holder.value();
         int grass = biome.getGrassColor(x, z), foliage = biome.getFoliageColor(), water = biome.getWaterColor();
-        return () -> encodeSections(chunkX, chunkZ, minY, grass, foliage, water, sections);
+        var palette = holder.unwrapKey().map(key -> pl.sofron.terralab.BiomePalette.get(key.identifier().toString())).orElse(null);
+        int packedFoliage = (foliage & 0xffffff) | (palette == null ? 0 : palette.id() << 24);
+        return () -> encodeSections(chunkX, chunkZ, minY, grass, packedFoliage, water, sections);
     }
 
     private static VoxelChunk encodeSections(int chunkX, int chunkZ, int minimum,

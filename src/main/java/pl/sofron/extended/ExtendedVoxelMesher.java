@@ -211,10 +211,8 @@ public final class ExtendedVoxelMesher {
                                     + x / ExtendedVoxelStore.GRID + 1];
                             // Palette identifiers are stable and namespaced;
                             // avoid allocating a substring for every tinted face.
-                            tint = id.startsWith("minecraft:water") || id.contains("_water")
-                                    ? owner.source.waterTint()
-                                    : id.contains("leaves") || id.contains("vine")
-                                    ? owner.source.foliageTint() : owner.source.grassTint();
+                            tint = ExtendedSurfaceMesh.color(owner.source.grassTint(), owner.source.foliageTint(),
+                                    owner.source.waterTint(), id, tint);
                         }
                         if (++rendered > MAX_QUADS) {
                             data.flip();

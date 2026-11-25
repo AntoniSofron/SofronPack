@@ -61,6 +61,10 @@ public final class AtmospherePresets {
                             ARGB.vector3fFromRGB24(rgb.get(0).getAsInt()),
                             ARGB.vector3fFromRGB24(rgb.get(1).getAsInt())));
                 }
+                pl.sofron.terralab.BiomePalette.forEach((id, p) -> {
+                    if (p.sky() >= 0) COLORS.put(id, new Palette(
+                            ARGB.vector3fFromRGB24(p.fog()), ARGB.vector3fFromRGB24(p.sky())));
+                });
                 for (JsonElement element : presets.getAsJsonArray("fog")) {
                     JsonObject rule = element.getAsJsonObject();
                     String name = rule.get("group").getAsString();
