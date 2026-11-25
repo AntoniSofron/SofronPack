@@ -419,3 +419,16 @@ block-state copies; the lossless voxel codec compresses their air cells.
 A taller dimension does increase transient full-volume allocations and
 section metadata. Existing worlds should be backed up before upgrading;
 compatibility with existing custom dimension datapacks is not guaranteed.
+
+
+## v0.1.75 — remove the old Y320 generator boundary
+
+Natural noise generation now uses the same -64..511 block range as the
+Overworld dimension. The existing mountain gradient is extended to Y512
+at exactly its previous slope (-0.005 per block at the approved setting).
+Its zero crossing, mountain strength, peakHeight target, all biome and
+relief functions, and sea level are unchanged. No higher mountain type
+or extra elevation is introduced. Existing chunks are not regenerated.
+This removes the old hard noise-generation ceiling, not the smooth
+density falloff that defines natural peaks. World generation can require
+more work due to additional sampled vertical space.

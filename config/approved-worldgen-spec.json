@@ -89,7 +89,7 @@
     "vanillaBiomesOnly": true,
     "vanillaStructuresOnly": true,
     "seaLevel": 63,
-    "worldHeight": "320",
+    "worldHeight": "512",
     "performanceProfile": "quality",
     "compatibility": "fabric26.3",
     "villagesTerrainAware": true,

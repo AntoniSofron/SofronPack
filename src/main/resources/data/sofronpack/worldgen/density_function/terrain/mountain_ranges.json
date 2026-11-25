@@ -7,9 +7,9 @@
       "axis": "y",
       "tiling": "clamp_to_edge",
       "from_coordinate": 80,
-      "to_coordinate": 320,
+      "to_coordinate": 512,
       "from_value": -0.04,
-      "to_value": -1.24
+      "to_value": -2.2
     },
     "right": {
       "type": "minecraft:mul",

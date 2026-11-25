@@ -26,7 +26,7 @@ for q in questions:
     else:
         assert q["type"] == "bool" and isinstance(value, bool)
 assert approved["vanillaBiomesOnly"] and approved["vanillaStructuresOnly"]
-assert approved["seaLevel"] == 63 and approved["worldHeight"] == "320"
+assert approved["seaLevel"] == 63 and approved["worldHeight"] == "512"
 
 data = {}
 for path in ROOT.rglob("*.json"):
@@ -58,16 +58,16 @@ for path, obj in data.items():
 
 s = data[ROOT / "minecraft/worldgen/noise_settings/overworld.json"]
 assert s["sea_level"] == 63
-assert s["noise"] == {"min_y": -64, "height": 384}
-# The natural terrain envelope is intentionally unchanged. Only the
-# dimension's buildable space extends upwards; no extra terrain noise.
+assert s["noise"] == {"min_y": -64, "height": 576}
+# Match the generation envelope to the buildable dimension. Mountain
+# density keeps its existing slope, rather than being stretched upward.
 dimension = data[ROOT / "minecraft/dimension_type/overworld.json"]
 assert dimension["min_y"] == -64
 assert dimension["height"] == dimension["logical_height"] == 576
 assert dimension["min_y"] + dimension["height"] == 512
 assert dimension["height"] % 16 == 0
 assert dimension["has_skylight"] and not dimension["has_ceiling"]
-assert s["noise"]["min_y"] + s["noise"]["height"] == 320
+assert s["noise"]["min_y"] + s["noise"]["height"] == dimension["min_y"] + dimension["height"]
 assert s["default_fluid"] == "minecraft:water"
 assert s["material_rule"] == "minecraft:overworld"
 assert s["noise_router"]["final_density"] == "sofronpack:terrain/final_density"
@@ -91,6 +91,9 @@ alt = core["left"]
 assert alt["type"] == "minecraft:add"
 assert alt["left"]["type"] == "minecraft:gradient" and alt["left"]["axis"] == "y"
 assert alt["left"]["from_value"] > alt["left"]["to_value"], "Mountain mass must descend with Y"
+assert alt["left"]["to_coordinate"] == 512
+expected_slope = 0.005 * approved["mountainSteepness"] / 70.0
+assert abs((alt["left"]["from_value"] - alt["left"]["to_value"]) / (alt["left"]["to_coordinate"] - alt["left"]["from_coordinate"]) - expected_slope) < 1e-9
 assert alt["right"]["right"] == "sofronpack:terrain/mountain_strength"
 assert core["right"]["type"] == "minecraft:gradient" and core["right"]["to_coordinate"] <= 64
 for key in ("surface_envelope", "beta_overhangs", "karst_spires", "upland_lift"):
