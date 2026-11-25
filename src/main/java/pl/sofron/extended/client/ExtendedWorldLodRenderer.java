@@ -619,8 +619,13 @@ public final class ExtendedWorldLodRenderer {
         int captured = real;
         long savedDetail = detail;
         var task = CompletableFuture.supplyAsync(() -> {
-            byte[] fingerprint = ExtendedLodMeshFingerprint.of(chunks, materials);
-            if (!refreshedPreview) {
+            // Intermediate tiles change as each of their 16 chunks is captured.
+            // Keep these meshes on the GPU; persist only fully captured tiles.
+            boolean cacheable = meshCache != null && captured == TILE * TILE;
+            boolean restore = !refreshedPreview && (cacheable
+                    || ExtendedLodMeshCache.hasSaved(meshCache, tx, tz, savedDetail));
+            byte[] fingerprint = cacheable || restore ? ExtendedLodMeshFingerprint.of(chunks, materials) : null;
+            if (restore) {
                 var restored = ExtendedLodMeshCache.load(meshCache, tx, tz, savedDetail, fingerprint);
                 if (restored != null) {
                     if (!loggedFirstDiskRestore) {
@@ -657,8 +662,8 @@ public final class ExtendedWorldLodRenderer {
             var ready = new ExtendedLodMeshCache.Packed(packed, result.quads());
             // Render the finished tile immediately; compress and write its
             // persistent cache on a separate bounded low-priority I/O worker.
-            ExtendedLodMeshCache.saveDeferred(meshCache, tx, tz, savedDetail, fingerprint, ready);
-            if (meshCache != null && !loggedFirstDiskSave) {
+            if (cacheable) ExtendedLodMeshCache.saveDeferred(meshCache, tx, tz, savedDetail, fingerprint, ready);
+            if (cacheable && !loggedFirstDiskSave) {
                 loggedFirstDiskSave = true;
                 System.out.println("[SofronPack] Persistent LOD: queued compressed mesh save");
             }

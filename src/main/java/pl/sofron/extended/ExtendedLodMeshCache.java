@@ -131,7 +131,7 @@ public final class ExtendedLodMeshCache {
 
     private static void prune(DirectoryIndex index) throws IOException {
         var files = index.sizes.entrySet().iterator();
-        while (index.bytes > 64L * 1024 * 1024 && files.hasNext()) {
+        while (index.bytes > 32L * 1024 * 1024 && files.hasNext()) {
             var oldest = files.next();
             Files.deleteIfExists(oldest.getKey());
             index.paths.remove(oldest.getKey());

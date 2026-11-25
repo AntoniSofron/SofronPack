@@ -19,8 +19,12 @@ public final class ExtendedVoxelCodec {
         int bits = Math.max(1, 32 - Integer.numberOfLeadingZeros(paletteSize - 1));
         byte[] legacy = new byte[cells.length * 2];
         byte[] packed = new byte[(cells.length * bits + 7) / 8];
+        // Both target arrays are zero-initialized. Air above the surface does
+        // not need conversion to bytes or bit-packing, but remains in the stream.
+        int used = cells.length;
+        while (used > 0 && cells[used - 1] == 0) used--;
         int accumulator = 0, count = 0, pos = 0;
-        for (int i = 0; i < cells.length; i++) {
+        for (int i = 0; i < used; i++) {
             int value = cells[i] & 65535;
             if (value >= paletteSize) throw new IllegalArgumentException("Invalid palette index");
             legacy[i * 2] = (byte)value;
@@ -41,12 +45,14 @@ public final class ExtendedVoxelCodec {
         if (bitstream.length < best.length) best = bitstream;
         ByteArrayOutputStream runs = new ByteArrayOutputStream();
         int height = cells.length / GRID_AREA;
+        int activeHeight = (used + GRID_AREA - 1) / GRID_AREA;
         for (int column = 0; column < GRID_AREA; column++) {
             int y = 0;
             while (y < height) {
                 int value = cells[y * GRID_AREA + column] & 65535;
                 int end = y + 1;
-                while (end < height && cells[end * GRID_AREA + column] == value) end++;
+                while (end < activeHeight && cells[end * GRID_AREA + column] == value) end++;
+                if (end >= activeHeight && value == 0) end = height;
                 varint(runs, end - y);
                 varint(runs, value);
                 y = end;

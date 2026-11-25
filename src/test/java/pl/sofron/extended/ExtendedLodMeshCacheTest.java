@@ -71,7 +71,7 @@ class ExtendedLodMeshCacheTest {
         Path region = Files.createDirectories(saveFolder.resolve("r.0.0"));
         Path oldTile = region.resolve("t.0.0.0.slm");
         try (var file = new java.io.RandomAccessFile(oldTile.toFile(), "rw")) {
-            file.setLength(65L << 20);
+            file.setLength(33L << 20);
         }
         Files.setLastModifiedTime(oldTile, java.nio.file.attribute.FileTime.fromMillis(1000));
         Path unrelated = Files.writeString(region.resolve("notes.slm"), "keep");
