@@ -1441,6 +1441,10 @@
           "Do Y=384 (eksperymentalnie)"
         ],
         [
+          "448",
+          "Do Y=448 (512 bloków wysokości)"
+        ],
+        [
           "512",
           "Do Y=512"
         ]

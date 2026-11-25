@@ -432,3 +432,14 @@ or extra elevation is introduced. Existing chunks are not regenerated.
 This removes the old hard noise-generation ceiling, not the smooth
 density falloff that defines natural peaks. World generation can require
 more work due to additional sampled vertical space.
+
+
+## v0.1.76 — 512-block total Overworld height
+
+Overworld and natural noise generation both use min_y=-64, height=512;
+the exclusive upper bound is Y448 and the highest placeable block is
+Y447. Mountain density retains the same slope, strengths and peak
+targets. Cloud decks remain at Y256/384/512; Nether and End are unchanged.
+Back up saves before upgrading: blocks placed at Y448 or above using
+v0.1.74/75 are outside the new dimension bounds and may become inaccessible
+or be lost on chunk save.

@@ -12,9 +12,9 @@ tasks.register("syncApprovedTerrain") {
             throw new GradleException("Unsupported approved configuration")
         }
         def p = root.parameters
-        if (p.seaLevel != 63 || p.worldHeight != "512"
+        if (p.seaLevel != 63 || p.worldHeight != "448"
                 || p.vanillaBiomesOnly != true || p.vanillaStructuresOnly != true) {
-            throw new GradleException("This implementation requires Vanilla biomes/structures, sea Y63, top Y512")
+            throw new GradleException("This implementation requires Vanilla biomes/structures, sea Y63, top Y448")
         }
         def path = { String key ->
             file("src/main/resources/data/sofronpack/worldgen/density_function/terrain/${key}.json")
