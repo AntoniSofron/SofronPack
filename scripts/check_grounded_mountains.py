@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import json
-import math
 from pathlib import Path
 
 root = Path("src/main/resources/data")
@@ -11,7 +10,11 @@ j = lambda name: load(terrain / (name + ".json"))
 spec = load(Path("config/approved-worldgen-spec.json"))["parameters"]
 settings = load(root / "minecraft/worldgen/noise_settings/overworld.json")
 assert spec["seaLevel"] == settings["sea_level"] == 63
-assert spec["peakHeight"] == 290
+dimension = load(root / "minecraft/dimension_type/overworld.json")
+minimum = dimension["min_y"]
+top = minimum + dimension["height"]
+assert top == int(spec["worldHeight"])
+assert settings["noise"] == {"min_y": minimum, "height": dimension["height"]}
 
 final = j("final_density")
 assert final["type"] == "minecraft:max"
@@ -25,7 +28,7 @@ g = alt["left"]
 amp = alt["right"]
 anchor = mass["right"]
 assert g["type"] == "minecraft:gradient" and g["axis"] == "y"
-assert g["from_coordinate"] == 80 and g["to_coordinate"] == 320
+assert g["from_coordinate"] == 80 and g["to_coordinate"] == top
 assert g["from_value"] > g["to_value"]
 assert amp["type"] == "minecraft:mul"
 assert amp["right"] == "sofronpack:terrain/mountain_strength"
@@ -42,43 +45,63 @@ def mountain(s, y):
     return min(gradient(g, y) + amp["left"] * s, gradient(anchor, y))
 
 strength = j("mountain_strength")["input"]
-assert strength["type"] == "minecraft:min"
-raw, ceiling = strength["left"], strength["right"]
-assert raw["type"] == "minecraft:mul" and raw["left"] == 3.2
-assert ceiling["type"] == "minecraft:add" and ceiling["left"] == 1
-extension = ceiling["right"]
+assert strength["type"] == "minecraft:add"
+assert strength["left"] == "sofronpack:terrain/mountain_shoulder"
+raw = j("mountain_potential")["input"]
+shoulder = j("mountain_shoulder")["input"]
+assert raw["type"] == "minecraft:mul" and raw["left"] > 0
+assert shoulder["type"] == "minecraft:add" and shoulder["left"] == 1
+extension = shoulder["right"]
 assert extension["type"] == "minecraft:mul"
 curve = extension["right"]["spline"]
 assert curve["coordinate"] == "sofronpack:terrain/local_relief_noise"
+transfer = strength["right"]["spline"]
+assert transfer["coordinate"] == {
+    "type": "minecraft:sub",
+    "left": "sofronpack:terrain/mountain_potential",
+    "right": "sofronpack:terrain/mountain_shoulder",
+}
 assert j("local_relief_noise")["input"]["y_scale"] == 0
 
-def crest(noise):
+def spline(curve, x):
     points = curve["points"]
+    if x <= points[0]["location"] or x >= points[-1]["location"]:
+        p = points[0 if x <= points[0]["location"] else -1]
+        return p["value"] + (x - p["location"]) * p["derivative"]
     for a, b in zip(points, points[1:]):
-        if a["location"] <= noise <= b["location"]:
+        if a["location"] <= x <= b["location"]:
             width = b["location"] - a["location"]
-            t = (noise - a["location"]) / width
+            t = (x - a["location"]) / width
             return ((1+2*t)*(1-t)**2*a["value"] + t*(1-t)**2*width*a["derivative"]
                     + t*t*(3-2*t)*b["value"] - t*t*(1-t)*width*b["derivative"])
-    return points[0 if noise < points[0]["location"] else -1]["value"]
+    raise AssertionError("Invalid spline")
+
+# Every stronger input must yield a stronger mountain, rather than a plateau.
+samples = [spline(transfer, i/1000) for i in range(-2000, 4001)]
+assert all(a < b for a, b in zip(samples, samples[1:]))
+assert all(abs(spline(transfer, i/100)-i/100) < 1e-9 for i in range(-200, 1))
 
 tops = set()
 for i in range(-200, 201):
-    detail = crest(i/100)
+    detail = spline(curve, i/100)
     assert 0 <= detail <= 1
-    cap = 1 + extension["left"] * detail
-    for raw_strength in (0, .1, .4, .9, 1, 1.01, 1.1, 1.2, 3.2):
-        s = min(raw_strength, cap)
-        if raw_strength <= 1:
-            assert s == raw_strength
-        ys = [y for y in range(-64, 320) if mountain(s, y) > 1e-6]
+    reference = 1 + extension["left"] * detail
+    previous = -1
+    for raw_strength in (0, .1, .4, .9, 1, 1.01, 1.1, 1.2, 1.5, 2, 2.5, raw["left"]):
+        s = reference + spline(transfer, raw_strength-reference)
+        if raw_strength <= reference:
+            assert abs(s - raw_strength) < 1e-9
+        assert s > previous
+        previous = s
+        ys = [y for y in range(minimum, top) if mountain(s, y) > 1e-6]
         if ys:
             assert ys == list(range(ys[0], ys[-1] + 1)) and ys[0] <= 40
-            assert ys[-1] <= spec["peakHeight"]
-        if raw_strength == 3.2:
+            assert ys[-1] < top-1
+        if raw_strength == raw["left"]:
             tops.add(ys[-1])
-assert min(tops) == 255 and max(tops) == 289 and len(tops) == 35, tops
-assert abs(mountain(1 + extension["left"], 290)) < 1e-6
+assert len(tops) > 1, tops
+assert min(tops) > spec["peakHeight"], tops
+assert max(tops) < top-1, tops
 
 beta = j("beta_overhangs")
 assert beta["right"]["right"]["right"]["left"]["right"]["to_coordinate"] <= 190
@@ -99,4 +122,4 @@ def references(obj):
     return set()
 assert "sofronpack:terrain/mountain_ranges" not in references(relief), "Mountain mass may not be added as an altitude pulse"
 assert "sofronpack:terrain/upland_lift" in references(relief)
-print("PASS: grounded mountain density remains vertically connected; peak target Y290; sea Y63")
+print(f"PASS: grounded mountains remain connected, uncapped peak samples Y{min(tops)}..{max(tops)}, world top Y{top}, sea Y63")
