@@ -59,6 +59,15 @@ for path, obj in data.items():
 s = data[ROOT / "minecraft/worldgen/noise_settings/overworld.json"]
 assert s["sea_level"] == 63
 assert s["noise"] == {"min_y": -64, "height": 384}
+# The natural terrain envelope is intentionally unchanged. Only the
+# dimension's buildable space extends upwards; no extra terrain noise.
+dimension = data[ROOT / "minecraft/dimension_type/overworld.json"]
+assert dimension["min_y"] == -64
+assert dimension["height"] == dimension["logical_height"] == 576
+assert dimension["min_y"] + dimension["height"] == 512
+assert dimension["height"] % 16 == 0
+assert dimension["has_skylight"] and not dimension["has_ceiling"]
+assert s["noise"]["min_y"] + s["noise"]["height"] == 320
 assert s["default_fluid"] == "minecraft:water"
 assert s["material_rule"] == "minecraft:overworld"
 assert s["noise_router"]["final_density"] == "sofronpack:terrain/final_density"

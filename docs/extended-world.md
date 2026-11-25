@@ -403,3 +403,19 @@ voxel capture. The instant low-poly sheet no longer appears; the block
 preview fills progressively instead. Later primitive-map, GPU arena,
 projection, fog, generation radius, and v0.1.71 lossless persistence
 changes are preserved.
+
+
+## v0.1.74 — Overworld build ceiling Y=512
+
+The Overworld dimension type retains min_y=-64 and increases height and
+logical_height from 384 to 576. The exclusive upper bound is Y=512; the
+highest placeable block occupies Y=511. The natural noise settings remain
+min_y=-64, height=384 (exclusive Y=320), preserving terrain generation
+and sea level. Nether and End are unchanged.
+
+The full-height voxel format supports up to 1024 vertical cells, and the
+packed LOD coordinates support Y=511. Empty upper sections do not require
+block-state copies; the lossless voxel codec compresses their air cells.
+A taller dimension does increase transient full-volume allocations and
+section metadata. Existing worlds should be backed up before upgrading;
+compatibility with existing custom dimension datapacks is not guaranteed.
