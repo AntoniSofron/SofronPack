@@ -7,6 +7,10 @@ import java.util.List;
 public final class SofronDebugHudSelection {
     private SofronDebugHudSelection() {}
 
+    public static boolean showDetails(boolean spectator, boolean creative) {
+        return spectator || creative;
+    }
+
     public static List<String> positionOnly(List<String> lines) {
         List<String> selected = new ArrayList<>(3);
         for (String line : lines) {

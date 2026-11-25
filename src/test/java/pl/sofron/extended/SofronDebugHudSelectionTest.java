@@ -5,6 +5,13 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class SofronDebugHudSelectionTest {
+    @Test void detailsAreAvailableInCreativeAndSpectatorOnly() {
+        assertTrue(SofronDebugHudSelection.showDetails(true, false));
+        assertTrue(SofronDebugHudSelection.showDetails(false, true));
+        assertFalse(SofronDebugHudSelection.showDetails(false, false));
+        assertTrue(SofronDebugHudSelection.showDetails(true, true));
+    }
+
     @Test void selectsOnlyHighlightedCoordinatesNotFacingOrDimension() {
         List<String> original = List.of(
                 "XYZ: -1381.076 / 591.15237 / 25.148",

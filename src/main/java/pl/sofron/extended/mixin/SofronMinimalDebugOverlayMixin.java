@@ -20,7 +20,7 @@ import pl.sofron.extended.SofronDebugHudSelection;
 
 /**
  * Replace the entire F3 drawing operation, not the player's saved debug profile:
- * everyone gets precisely the vanilla FPS line, spectators additionally get the
+ * everyone gets precisely the vanilla FPS line, Creative and Spectator additionally get the
  * selected vanilla version/position/hardware information on the right.
  *
  * No TPS, debug help, charts, RAM, renderer diagnostics or additional entries.
@@ -47,7 +47,8 @@ public abstract class SofronMinimalDebugOverlayMixin {
 
         List<String> left = sofron$readEntry(mc, DebugScreenEntries.FPS);
         List<String> right = new ArrayList<>();
-        if (mc.player != null && mc.player.isSpectator()) {
+        if (mc.player != null && SofronDebugHudSelection.showDetails(
+                mc.player.isSpectator(), mc.player.isCreative())) {
             right.addAll(sofron$readEntry(mc, DebugScreenEntries.GAME_VERSION));
             right.add("");
             right.addAll(SofronDebugHudSelection.positionOnly(
