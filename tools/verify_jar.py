@@ -228,6 +228,12 @@ with zipfile.ZipFile(jar) as z:
     assert "new Pending(captured == TILE * TILE ? -2 : detail, task)" not in renderer_source
     assert "current.detail() != detail" in renderer_source
     assert "scanHorizon(meshCache" in renderer_source
+    assert "uploadOverview(" not in renderer_source
+    assert "ExtendedTerrainPreview.hasTiles()" in renderer_source
+    terrain_preview = pathlib.Path(
+        "src/main/java/pl/sofron/extended/ExtendedTerrainPreview.java").read_text()
+    assert "class Overview" not in terrain_preview
+    assert "for (int spacing = 32; spacing >= 8" in terrain_preview
     assert "HORIZON_TILES_PER_FRAME = 128" in renderer_source
     assert "reprioritizeCursor < reprioritize.size()" in renderer_source
     assert "if (job.detail != detailAt(tx, tz, cx, cz)) markDirty(key)" in renderer_source

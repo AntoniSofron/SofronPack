@@ -30,45 +30,6 @@ public final class ExtendedTerrainPreview {
     private ExtendedTerrainPreview() {}
 
     private record Sample(int ground, int material, int grass, int water) {}
-    /** A 128-by-128 chunk overview, sampled every sixteen chunks, on the horizon worker. */
-    public static final class Overview {
-        public static final int SIDE = 32;
-        private static final int STRIDE = 4;
-        private static final int WIDTH = SIDE / STRIDE + 1;
-        public final int tileX, tileZ, sea;
-        private final Sample[] nodes = new Sample[WIDTH * WIDTH];
-
-        private Overview(Session session, int cx, int cz) {
-            tileX = cx - SIDE / 2;
-            tileZ = cz - SIDE / 2;
-            sea = session.generator.getSeaLevel();
-            for (int z = 0; z < WIDTH; z++) for (int x = 0; x < WIDTH; x++)
-                nodes[z * WIDTH + x] = session.sample((tileX + x * STRIDE) * 64, (tileZ + z * STRIDE) * 64);
-        }
-
-        public int height(int x, int z) {
-            int ix = Math.min(x / STRIDE, WIDTH - 2), iz = Math.min(z / STRIDE, WIDTH - 2);
-            int dx = x - ix * STRIDE, dz = z - iz * STRIDE, i = iz * WIDTH + ix;
-            int north = nodes[i].ground * (STRIDE - dx) + nodes[i + 1].ground * dx;
-            int south = nodes[i + WIDTH].ground * (STRIDE - dx) + nodes[i + WIDTH + 1].ground * dx;
-            return Math.floorDiv(north * (STRIDE - dz) + south * dz + 8, 16);
-        }
-
-        private Sample nearest(int x, int z) {
-            return nodes[((z + 2) / STRIDE) * WIDTH + (x + 2) / STRIDE];
-        }
-
-        public int material(int x, int z) { return height(x, z) < sea ? 4 : nearest(x, z).material; }
-        public int tint(int x, int z, int material) {
-            return material == 4 ? nearest(x, z).water : nearest(x, z).grass;
-        }
-    }
-
-    public static Overview overview() {
-        Session session = active;
-        return session == null ? null : session.overview;
-    }
-
     public static final class Tile {
         private final Sample[] samples;
         public final int minimum, sea;
@@ -107,7 +68,6 @@ public final class ExtendedTerrainPreview {
         final ConcurrentLinkedQueue<Long> changes = new ConcurrentLinkedQueue<>();
         final LinkedHashMap<Long, Sample> samples = new LinkedHashMap<>(2048, .75f, true);
         BiomeResolver biomes;
-        volatile Overview overview;
         volatile long center = Long.MIN_VALUE;
         volatile long completedCenter = Long.MIN_VALUE;
         volatile boolean running, failed;
@@ -168,9 +128,6 @@ public final class ExtendedTerrainPreview {
                 do {
                     target = center;
                     int cx = (int)(target >> 32), cz = (int)target;
-                    if (overview == null || Math.abs(cx - overview.tileX - Overview.SIDE / 2) >= Overview.SIDE / 2
-                            || Math.abs(cz - overview.tileZ - Overview.SIDE / 2) >= Overview.SIDE / 2)
-                        overview = new Overview(this, cx, cz);
                     tiles.keySet().removeIf(k -> Math.abs((int)(k >> 32) - cx) > RADIUS + 2
                             || Math.abs((int)(long)k - cz) > RADIUS + 2);
                     for (int spacing = 32; spacing >= 8 && active == this && target == center; spacing /= 2)
@@ -198,6 +155,12 @@ public final class ExtendedTerrainPreview {
             s.running = true;
             WORK.execute(s::generate);
         }
+    }
+
+    /** Allow the renderer to start on a fresh world before any voxel capture. */
+    public static boolean hasTiles() {
+        Session s = active;
+        return s != null && !s.tiles.isEmpty();
     }
 
     public static Tile get(int chunkX, int chunkZ) {

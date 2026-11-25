@@ -84,8 +84,6 @@ public final class ExtendedWorldLodRenderer {
     // No artificial 20-chunk normal view cap or 128/256 MiB GPU quotas:
     // dense geometry is halved and pooled, not hidden when a cap is hit.
     private static final ExtendedVoxelAtlas ATLAS = new ExtendedVoxelAtlas();
-    private static GpuBuffer overviewBuffer;
-    private static ExtendedTerrainPreview.Overview uploadedOverview;
     private static final int MAX_QUADS = ExtendedVoxelMesher.MAX_QUADS;
     private static final Long2ObjectOpenHashMap<GpuTile> MESHES = new Long2ObjectOpenHashMap<>();
     private static final Set<Long> DIRTY = new HashSet<>();
@@ -190,14 +188,13 @@ public final class ExtendedWorldLodRenderer {
         boolean indexReady = indexRevision != Long.MIN_VALUE
                 && indexRevision != lastMeshIndexGeneration;
         if (indexReady) lastMeshIndexGeneration = indexRevision;
-        var overview = ExtendedTerrainPreview.overview();
-        if (overview == null && ExtendedVoxelStore.count() == 0 && !ExtendedLodMeshCache.exists(meshCache)) return;
+        if (!ExtendedTerrainPreview.hasTiles() && ExtendedVoxelStore.count() == 0
+                && !ExtendedLodMeshCache.exists(meshCache)) return;
         if (ATLAS.refreshModels()) {
             clearMeshes();
             centerX = centerZ = Integer.MIN_VALUE;
         }
 
-        if (overview != null && overview != uploadedOverview) uploadOverview(overview);
         int cx = ((int)Math.floor(cameraX)) >> 4;
         int cz = ((int)Math.floor(cameraZ)) >> 4;
         int distance = Math.max(2, mc.options.getEffectiveRenderDistance());
@@ -308,39 +305,6 @@ public final class ExtendedWorldLodRenderer {
             close();
             failed = true;
         }
-    }
-
-    private static void uploadOverview(ExtendedTerrainPreview.Overview overview) {
-        int side = ExtendedTerrainPreview.Overview.SIDE;
-        int stride = ExtendedPackedQuads.QUAD_BYTES;
-        ByteBuffer data = ByteBuffer.allocateDirect(side * side * stride).order(ByteOrder.nativeOrder());
-        for (int z = 0; z < side; z++) for (int x = 0; x < side; x++) {
-            int material = overview.material(x, z);
-            var uv = ATLAS.face(ExtendedTerrainPreview.MATERIALS[material], net.minecraft.core.Direction.UP);
-            if (uv == null) return;
-            for (int corner = 0; corner < 4; corner++) {
-                int dx = corner >= 2 ? 1 : 0, dz = corner == 1 || corner == 2 ? 1 : 0;
-                int h = Math.max(overview.sea, overview.height(x + dx, z + dz));
-                data.putShort((short)(dx * 64 * 32)).putShort((short)(Math.clamp(h, -1024, 1023) * 32))
-                        .putShort((short)(dz * 64 * 32));
-            }
-            int rgb = uv.tint() == -1 ? overview.tint(x, z, material) : uv.tint();
-            data.putFloat(ExtendedSurfaceMesh.packUv(uv.u0(), uv.u1()))
-                    .putFloat(ExtendedSurfaceMesh.packUv(uv.v0(), uv.v1())).putLong(0L);
-            data.putInt((rgb >>> 16 & 255) | (rgb & 0xff00) | ((rgb & 255) << 16)
-                    | ((254 - 3 * uv.emission()) << 24)).putInt(1);
-        }
-        var buffer = device.createBuffer(() -> "SofronPack opening horizon",
-                GpuBuffer.USAGE_VERTEX, data.flip());
-        MESHES.values().removeIf(tile -> tile.region == null);
-        if (overviewBuffer != null) overviewBuffer.close();
-        overviewBuffer = buffer;
-        for (int z = 0; z < side; z++) for (int x = 0; x < side; x++) {
-            long key = ExtendedVoxelStore.pack(overview.tileX + x, overview.tileZ + z);
-            if (!MESHES.containsKey(key)) MESHES.put(key, new GpuTile(null,
-                    buffer.slice((z * side + x) * stride, stride), 1, -1));
-        }
-        uploadedOverview = overview;
     }
 
     private static void beginHorizonScan(int cx, int cz, boolean force) {
@@ -618,8 +582,7 @@ public final class ExtendedWorldLodRenderer {
     private static void scheduleTile(int tx, int tz, int cx, int cz) {
         long key = ExtendedVoxelStore.pack(tx, tz);
         long detail = detailAt(tx, tz, cx, cz);
-        GpuTile resident = MESHES.get(key);
-        boolean preview = resident == null || resident.region == null;
+        boolean preview = !MESHES.containsKey(key);
         // On first re-entry, display the saved preview immediately. After it
         // reaches the GPU, refresh it using any newly sampled live preview.
         // Existing on-screen tiles still update directly as before.
@@ -728,8 +691,6 @@ public final class ExtendedWorldLodRenderer {
             uploaded++;
             transferredBytes += bytes;
             if (mesh.quads() == 0) {
-                GpuTile existing = MESHES.get(key);
-                if (existing != null && existing.region == null && !hasChunkData(tx, tz)) continue;
                 GpuTile previous = MESHES.remove(key);
                 if (previous != null) previous.close();
                 if (!DIRTY.contains(key)) REFRESHED_PREVIEWS.remove(key);
@@ -822,9 +783,6 @@ public final class ExtendedWorldLodRenderer {
         volumes = new ExtendedVolumeMesh();
         for (GpuTile tile : MESHES.values()) tile.close();
         MESHES.clear();
-        if (overviewBuffer != null) overviewBuffer.close();
-        overviewBuffer = null;
-        uploadedOverview = null;
         if (geometryArena != null) geometryArena.close();
         geometryArena = null;
         DIRTY.clear();

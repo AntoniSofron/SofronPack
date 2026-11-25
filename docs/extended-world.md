@@ -387,3 +387,19 @@ volumes, detail rings, and persistent geometry variants are retained.
   Consequently total save size cannot be guaranteed to remain in MB
   for arbitrary terrain or exploration. Compare region files, voxel
   archives and mesh files separately to quantify the actual reduction.
+
+
+## v0.1.72 — restore block-shaped opening terrain
+
+The coarse 48 KiB opening overview (one sloped 64×64 block quad per tile,
+sampled every 256 blocks) is removed. The pre-v0.1.66 progressive
+height-preview path is restored: height samples at 32, 16, then 8 blocks
+(the 8-block pass is local to the first 48 chunks). The regular surface
+mesher displays 4×4 or 8×8 block-shaped previews, followed by full voxel
+geometry using the unchanged distance-dependent LOD rings.
+
+Fresh worlds can display the first predicted tile before the first real
+voxel capture. The instant low-poly sheet no longer appears; the block
+preview fills progressively instead. Later primitive-map, GPU arena,
+projection, fog, generation radius, and v0.1.71 lossless persistence
+changes are preserved.
