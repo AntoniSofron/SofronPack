@@ -249,7 +249,8 @@ public final class ExtendedWorldPrefetch {
         // keeping too many FULL futures inflight can starve nearby rendering.
         // This is a bounded throughput improvement, not a 100x worldgen claim.
         // Throttle hard as soon as server tick duration becomes critical.
-        if (busyServer && ticks % 4 != 0) return;
+        if (!ExtendedWorldConfig.get().pregenerateDistantChunks || pending >= MAX_PENDING
+                || (busyServer && ticks % 4 != 0)) return;
         int submitBudget = busyServer ? 1 : stageIndex == 0 ? 8 : stageIndex == 1 ? 6 : 4;
         if (!busyServer) {
             submitBudget = Math.min(submitBudget, captureCost.budget(8, 3_000_000L));

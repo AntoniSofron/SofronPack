@@ -67,6 +67,24 @@ class ExtendedLodMeshCacheTest {
         assertTrue(ExtendedLodMeshCache.exists(saveFolder));
     }
 
+    @Test void boundsExistingMeshFilesAndKeepsOtherWorldData() throws Exception {
+        Path region = Files.createDirectories(saveFolder.resolve("r.0.0"));
+        Path oldTile = region.resolve("t.0.0.0.slm");
+        try (var file = new java.io.RandomAccessFile(oldTile.toFile(), "rw")) {
+            file.setLength(65L << 20);
+        }
+        Files.setLastModifiedTime(oldTile, java.nio.file.attribute.FileTime.fromMillis(1000));
+        Path unrelated = Files.writeString(region.resolve("notes.slm"), "keep");
+        byte[] hash = new byte[32];
+        ExtendedLodMeshCache.save(saveFolder, 1, 1, 0, hash, tile(2));
+        long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(10);
+        while (ExtendedLodMeshCache.indexGeneration(saveFolder) == Long.MIN_VALUE
+                && System.nanoTime() < deadline) Thread.sleep(10);
+        assertFalse(Files.exists(oldTile));
+        assertEquals("keep", Files.readString(unrelated));
+        assertNotNull(ExtendedLodMeshCache.load(saveFolder, 1, 1, 0, hash));
+    }
+
     @Test void invalidatesOnWorldOrTextureFingerprintChange() {
         byte[] hash = new byte[32];
         ExtendedLodMeshCache.save(saveFolder, 2, 3, 0L, hash, tile(4));

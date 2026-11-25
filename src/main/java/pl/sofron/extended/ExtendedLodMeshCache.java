@@ -12,6 +12,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
+import java.nio.file.LinkOption;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.Arrays;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -36,6 +41,7 @@ import java.util.zip.Inflater;
  * All I/O runs on the existing LOD meshing worker, never on the render thread.
  */
 public final class ExtendedLodMeshCache {
+    private static final java.util.regex.Pattern TILE_NAME = java.util.regex.Pattern.compile("t\\.-?[0-9]+\\.-?[0-9]+\\.[0-9a-f]+\\.slm");
     private static final int MAGIC = 0x534C4D31; // SLM1
     private static final int VERSION = 2;
     private static final int LEGACY_VERSION = 1;
@@ -60,6 +66,9 @@ public final class ExtendedLodMeshCache {
     private static final class DirectoryIndex {
         final Path root;
         final long generation = INDEX_COUNTER.incrementAndGet();
+        // Mutation and pruning run under this index's lock on I/O workers.
+        final LinkedHashMap<Path, Long> sizes = new LinkedHashMap<>();
+        long bytes;
         final Set<Path> paths = ConcurrentHashMap.newKeySet();
         volatile boolean available;
         volatile boolean complete;
@@ -88,18 +97,46 @@ public final class ExtendedLodMeshCache {
     }
 
     private static void scan(DirectoryIndex index) {
-        try {
-            if (!Files.isDirectory(index.root)) return;
-            index.available = true;
-            // World root / r.X.Z / tile.slm. Only metadata is inspected.
-            try (Stream<Path> files = Files.walk(index.root, 2)) {
-                files.filter(path -> path.getFileName().toString().endsWith(".slm"))
-                        .forEach(index.paths::add);
+        synchronized (index) {
+            try {
+                if (!Files.isDirectory(index.root, LinkOption.NOFOLLOW_LINKS)) return;
+                index.available = true;
+                record Entry(Path path, long bytes, long modified) {}
+                var entries = new ArrayList<Entry>();
+                try (Stream<Path> files = Files.walk(index.root, 2)) {
+                    for (var it = files.iterator(); it.hasNext();) {
+                        Path file = it.next();
+                        if (!TILE_NAME.matcher(file.getFileName().toString()).matches()) continue;
+                        var attr = Files.readAttributes(file, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+                        if (attr.isRegularFile()) entries.add(new Entry(file, attr.size(), attr.lastModifiedTime().toMillis()));
+                    }
+                }
+                entries.sort(Comparator.comparingLong(Entry::modified));
+                for (var entry : entries) remember(index, entry.path(), entry.bytes());
+                prune(index);
+            } catch (IOException | java.io.UncheckedIOException error) {
+                warn("index", error);
+            } finally {
+                index.complete = true;
             }
-        } catch (IOException error) {
-            warn("index", error);
-        } finally {
-            index.complete = true;
+        }
+    }
+
+    private static void remember(DirectoryIndex index, Path file, long bytes) {
+        Long old = index.sizes.remove(file);
+        index.bytes += bytes - (old == null ? 0 : old);
+        index.sizes.put(file, bytes);
+        index.paths.add(file);
+    }
+
+    private static void prune(DirectoryIndex index) throws IOException {
+        var files = index.sizes.entrySet().iterator();
+        while (index.bytes > 64L * 1024 * 1024 && files.hasNext()) {
+            var oldest = files.next();
+            Files.deleteIfExists(oldest.getKey());
+            index.paths.remove(oldest.getKey());
+            index.bytes -= oldest.getValue();
+            files.remove();
         }
     }
 
@@ -273,15 +310,18 @@ public final class ExtendedLodMeshCache {
                 output.writeInt((int) compressedSize);
                 output.writeInt((int) checksum.getValue());
             }
-            try {
-                Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE,
-                        StandardCopyOption.REPLACE_EXISTING);
-            } catch (AtomicMoveNotSupportedException unsupported) {
-                Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING);
-            }
             DirectoryIndex found = index(root);
-            found.available = true;
-            found.paths.add(target);
+            synchronized (found) {
+                try {
+                    Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE,
+                            StandardCopyOption.REPLACE_EXISTING);
+                } catch (AtomicMoveNotSupportedException unsupported) {
+                    Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING);
+                }
+                found.available = true;
+                remember(found, target, Files.size(target));
+                prune(found);
+            }
         } catch (IOException problem) {
             warn("write", problem);
         } finally {

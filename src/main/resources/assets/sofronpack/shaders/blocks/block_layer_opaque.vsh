@@ -69,6 +69,11 @@ vec4 bakedLight(int start, vec3 p) {
     ivec3 cell = min(ivec3(p), ivec3(7));
     vec3 t = p - vec3(cell);
     int i = start + 2*((cell.z*9 + cell.y)*9 + cell.x);
+    if (all(equal(p, floor(p)))) {
+        ivec3 node = ivec3(p);
+        vec4 v = bakedNode(start + 2*((node.z*9 + node.y)*9 + node.x));
+        return vec4(v.rgb / max(v.a, 1e-10), v.a);
+    }
     vec4 lo = mix(mix(bakedNode(i), bakedNode(i+2), t.x),
                   mix(bakedNode(i+18), bakedNode(i+20), t.x), t.y);
     i += 162;
@@ -101,8 +106,10 @@ vec4 spl_evalChunkLights(vec3 cameraRelativePos) {
         vec3 lpos=vec3(spl_float(base),spl_float(base+1),spl_float(base+2));
         // Reduce ONLY the visual RGB tint radius; vanilla emission stays untouched.
         float radius=max(spl_float(base+3),0.001);
-        if (dot(p-lpos,p-lpos) >= radius*radius) continue;
-        float distanceFactor=clamp(1.0-distance(p,lpos)/radius,0.0,1.0);
+        vec3 delta = p-lpos;
+        float squaredDistance = dot(delta,delta);
+        if (squaredDistance >= radius*radius) continue;
+        float distanceFactor=clamp(1.0-sqrt(squaredDistance)/radius,0.0,1.0);
         float influence=spl_float(base+7)*pow(distanceFactor,2.8);
         vec3 rgb=max(vec3(0.0),vec3(spl_float(base+4),spl_float(base+5),spl_float(base+6)));
         float peak=max(max(rgb.r,rgb.g),rgb.b);

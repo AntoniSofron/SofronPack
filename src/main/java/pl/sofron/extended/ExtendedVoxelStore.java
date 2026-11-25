@@ -23,7 +23,7 @@ public final class ExtendedVoxelStore {
     public static final int CELL = 1;
     public static final int GRID = 16 / CELL;
     private static final int MAGIC = 0x53465634; // SFV4
-    private static final int VERSION = 5;
+    private static final int VERSION = 6;
     private static final int LEGACY_VERSION = 4;
     private static final int MAX_RECORD = 1_048_576;
     private static volatile Session current;
@@ -81,7 +81,7 @@ public final class ExtendedVoxelStore {
         // No storage cap and no eviction of unique snapshots.
         final Map<Long, Integer> latestRecordSizes = new HashMap<>();
         long archiveBytes = 8L, liveBytes = 8L;
-        boolean legacyArchive;
+        boolean legacyArchive, repackV4;
         final ConcurrentHashMap<Long, VoxelChunk> queuedUpdates = new ConcurrentHashMap<>();
         final ConcurrentLinkedQueue<Long> writeOrder = new ConcurrentLinkedQueue<>();
         final java.util.concurrent.atomic.AtomicBoolean writerScheduled =
@@ -135,10 +135,11 @@ public final class ExtendedVoxelStore {
             try (DataInputStream in = new DataInputStream(new BufferedInputStream(
                     Files.newInputStream(file), 65536))) {
                 int magic = in.readInt(), version = in.readInt();
-                if (magic != MAGIC || (version != VERSION && version != LEGACY_VERSION)) {
+                if (magic != MAGIC || (version < LEGACY_VERSION || version > VERSION)) {
                     throw new IOException("Unsupported voxel cache: " + file);
                 }
-                legacyArchive = version == LEGACY_VERSION;
+                legacyArchive = version < VERSION;
+                repackV4 = version == LEGACY_VERSION;
                 while (true) {
                     int size;
                     try { size = in.readInt(); }
@@ -167,7 +168,7 @@ public final class ExtendedVoxelStore {
                 }
             }
             archiveBytes = lastGood;
-            // The v5 reader accepts both old and new payloads. Upgrade only
+            // The v6 reader accepts both old and new payloads. Upgrade only
             // the header before appending; the old data are never discarded.
             if (legacyArchive) {
                 try (RandomAccessFile header = new RandomAccessFile(file.toFile(), "rw")) {
@@ -234,7 +235,7 @@ public final class ExtendedVoxelStore {
                 // Replace only superseded records. Every unique chunk
                 // survives, irrespective of total archive size. A legacy
                 // archive is also re-encoded losslessly on the archive worker.
-                if (Files.isRegularFile(file) && (legacyArchive || archiveBytes > liveBytes)) {
+                if (Files.isRegularFile(file) && (legacyArchive || archiveBytes - liveBytes > Math.min(8L << 20, liveBytes / 4))) {
                     Path compact = file.resolveSibling(file.getFileName() + ".compact");
                     long written = 8L;
                     try {
@@ -245,7 +246,7 @@ public final class ExtendedVoxelStore {
                             stream.writeInt(VERSION);
                             for (VoxelChunk chunk : chunks.values()) {
                                 VoxelChunk stored = chunk;
-                                if (legacyArchive && ExtendedVoxelCodec.legacy(chunk.deflated())) {
+                                if (repackV4 && ExtendedVoxelCodec.legacy(chunk.deflated())) {
                                     try {
                                         byte[] compressed = ExtendedVoxelCodec.encode(chunk.unpack(), chunk.palette().length);
                                         if (compressed.length < chunk.deflated().length)
@@ -293,7 +294,7 @@ public final class ExtendedVoxelStore {
             generation++;
             System.out.println("[SofronPack] Voxel LOD: restored " + next.chunks.size() + " chunks");
         } catch (IOException exception) {
-            next.close();
+            // load opens the append stream only after a successful recovery.
             System.err.println("[SofronPack] Voxel LOD cache: " + exception.getMessage());
         }
     }
@@ -481,8 +482,17 @@ public final class ExtendedVoxelStore {
             out.writeInt(chunk.grassTint());
             out.writeInt(chunk.foliageTint());
             out.writeInt(chunk.waterTint());
-            out.writeShort(chunk.palette().length);
-            for (String identifier : chunk.palette()) out.writeUTF(identifier);
+            // Adjacent block states often share the namespace, block name and properties.
+            out.writeShort(0x8000 | chunk.palette().length);
+            String previous = "minecraft:";
+            for (String identifier : chunk.palette()) {
+                int limit = Math.min(255, Math.min(previous.length(), identifier.length()));
+                int prefix = 0;
+                while (prefix < limit && previous.charAt(prefix) == identifier.charAt(prefix)) prefix++;
+                out.writeByte(prefix);
+                out.writeUTF(identifier.substring(prefix));
+                previous = identifier;
+            }
             out.writeInt(chunk.deflated().length);
             out.write(chunk.deflated());
             out.flush();
@@ -496,11 +506,20 @@ public final class ExtendedVoxelStore {
             int x = in.readInt(), z = in.readInt(), y = in.readInt();
             int count = in.readUnsignedShort();
             int grassTint = in.readInt(), foliageTint = in.readInt(), waterTint = in.readInt();
-            int paletteSize = in.readUnsignedShort();
+            int flags = in.readUnsignedShort();
+            boolean sharedPrefixes = (flags & 0x8000) != 0;
+            int paletteSize = flags & 0x7fff;
             if (count < 1 || count > 1024 || paletteSize < 1 || paletteSize > 32767)
                 throw new IOException("Invalid cache record");
             String[] palette = new String[paletteSize];
-            for (int i = 0; i < paletteSize; i++) palette[i] = in.readUTF();
+            String previous = "minecraft:";
+            for (int i = 0; i < paletteSize; i++) {
+                int prefix = sharedPrefixes ? in.readUnsignedByte() : 0;
+                if (prefix > previous.length()) throw new IOException("Invalid palette prefix");
+                String suffix = in.readUTF();
+                palette[i] = prefix == 0 ? suffix : previous.substring(0, prefix) + suffix;
+                previous = palette[i];
+            }
             int bytes = in.readInt();
             if (bytes < 0 || bytes > MAX_RECORD || bytes > in.available()) throw new IOException("Invalid compressed length");
             return new VoxelChunk(x, z, y, count, grassTint, foliageTint, waterTint, palette, in.readNBytes(bytes));

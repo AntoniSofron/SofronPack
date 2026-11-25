@@ -19,6 +19,8 @@ public final class ExtendedWorldConfig {
     private static final ExtendedWorldConfig INSTANCE = read();
 
     public volatile boolean enabled = false;
+    // Preview and snapshots of visited chunks work independently of pre-generation.
+    public volatile boolean pregenerateDistantChunks = true;
 
     private ExtendedWorldConfig() {}
 

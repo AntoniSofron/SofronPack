@@ -28,6 +28,7 @@ public final class ChunkLightAtlas {
     // Reuse off-heap staging memory. Repeated reallocations of multi-megabyte
     // direct buffers on every atlas revision trigger expensive native cleanup.
     private ByteBuffer staging;
+    private final float[] bakeScratch = new float[GRID*GRID*GRID*5];
     public record Snapshot(ByteBuffer bytes, int chunkCount, int lightReferences) {}
     public void clear() {
         cached.clear();
@@ -114,7 +115,8 @@ public final class ChunkLightAtlas {
     }
 
     private void bake(IntArrayList out, List<LightSource> lights, int x0, int y0, int z0) {
-        float[] sums = new float[GRID*GRID*GRID*5];
+        float[] sums = bakeScratch;
+        java.util.Arrays.fill(sums, 0f);
         for (LightSource s : lights) {
             double x=s.x()-x0, y=s.y()-y0, z=s.z()-z0, radius=s.radius();
             var c = s.color();
