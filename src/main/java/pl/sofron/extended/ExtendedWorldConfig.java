@@ -19,10 +19,6 @@ public final class ExtendedWorldConfig {
     private static final ExtendedWorldConfig INSTANCE = read();
 
     public volatile boolean enabled = false;
-    // Opt-in legacy decorated pregeneration all the way to 128 chunks.
-    // The default retains the 128-chunk visual horizon without creating
-    // Minecraft region files for the whole distant square.
-    public volatile boolean fullDistantGeneration = false;
 
     private ExtendedWorldConfig() {}
 

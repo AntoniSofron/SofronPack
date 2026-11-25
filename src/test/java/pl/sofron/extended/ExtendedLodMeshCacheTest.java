@@ -20,6 +20,17 @@ class ExtendedLodMeshCacheTest {
         return new ExtendedLodMeshCache.Packed(vertices, quads);
     }
 
+    @Test void bytePlaneShuffleIsLosslessIncludingPartialBatches() {
+        for (int quads : new int[]{1, 17, 1024}) {
+            byte[] bytes = new byte[quads * ExtendedPackedQuads.QUAD_BYTES];
+            new java.util.Random(77).nextBytes(bytes);
+            byte[] shuffled = new byte[bytes.length], restored = new byte[bytes.length];
+            ExtendedLodMeshCache.shuffle(bytes, shuffled, quads);
+            ExtendedLodMeshCache.unshuffle(shuffled, restored, quads);
+            assertArrayEquals(bytes, restored);
+        }
+    }
+
     @Test void persistsAllLevelVariantsAndRestoresExactGpuBytesAcrossInstances() {
         byte[] hash = new byte[32];
         Arrays.fill(hash, (byte) 5);

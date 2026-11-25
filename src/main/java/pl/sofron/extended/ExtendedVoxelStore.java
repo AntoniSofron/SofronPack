@@ -23,9 +23,9 @@ public final class ExtendedVoxelStore {
     public static final int CELL = 1;
     public static final int GRID = 16 / CELL;
     private static final int MAGIC = 0x53465634; // SFV4
-    private static final int VERSION = 4;
+    private static final int VERSION = 5;
+    private static final int LEGACY_VERSION = 4;
     private static final int MAX_RECORD = 1_048_576;
-    public static final long ARCHIVE_LIMIT_BYTES = 64L * 1024 * 1024;
     private static volatile Session current;
     private static volatile long generation;
 
@@ -50,30 +50,7 @@ public final class ExtendedVoxelStore {
         }
 
         public short[] unpack() {
-            int expected = GRID * GRID * yCount * Short.BYTES;
-            byte[] bytes = new byte[expected];
-            Inflater inflater = new Inflater();
-            inflater.setInput(deflated);
-            try {
-                int got = 0;
-                while (got < expected && !inflater.finished()) {
-                    int count = inflater.inflate(bytes, got, expected - got);
-                    if (count == 0) throw new IllegalArgumentException("Incomplete block LOD data");
-                    got += count;
-                }
-                if (got != expected || !inflater.finished()) {
-                    throw new IllegalArgumentException("Corrupted block LOD data");
-                }
-            } catch (DataFormatException ex) {
-                throw new IllegalArgumentException("Corrupted block LOD data", ex);
-            } finally {
-                inflater.end();
-            }
-            short[] decoded = new short[expected / 2];
-            for (int i = 0; i < decoded.length; i++) {
-                decoded[i] = (short) ((bytes[i * 2] & 255) | ((bytes[i * 2 + 1] & 255) << 8));
-            }
-            return decoded;
+            return ExtendedVoxelCodec.decode(deflated, GRID * GRID * yCount, palette.length);
         }
 
         public boolean same(VoxelChunk other) {
@@ -96,22 +73,21 @@ public final class ExtendedVoxelStore {
     private static final class Session {
         final Path file;
         final Path meshDirectory;
-        final long archiveLimit;
-        // Writer-owned, insertion ordered latest records; no duplicate payload arrays.
-        private record Stored(VoxelChunk chunk, int bytes) {}
-        final LinkedHashMap<Long, Stored> stored = new LinkedHashMap<>();
-        long archiveBytes = 8, latestBytes = 8;
         final ConcurrentHashMap<Long, VoxelChunk> chunks = new ConcurrentHashMap<>();
         final ConcurrentLinkedQueue<Long> changed = new ConcurrentLinkedQueue<>();
         DataOutputStream output;
         int unflushed;
+        // These counters are based on actual serialized record lengths.
+        // No storage cap and no eviction of unique snapshots.
+        final Map<Long, Integer> latestRecordSizes = new HashMap<>();
+        long archiveBytes = 8L, liveBytes = 8L;
+        boolean legacyArchive;
         final ConcurrentHashMap<Long, VoxelChunk> queuedUpdates = new ConcurrentHashMap<>();
         final ConcurrentLinkedQueue<Long> writeOrder = new ConcurrentLinkedQueue<>();
         final java.util.concurrent.atomic.AtomicBoolean writerScheduled =
                 new java.util.concurrent.atomic.AtomicBoolean();
-        Session(Path file, long archiveLimit) {
+        Session(Path file) {
             this.file = file;
-            this.archiveLimit = archiveLimit;
             String name = file.getFileName().toString().replace(".voxel.v4.bin", "");
             meshDirectory = file.getParent().resolve(name).resolve("lod-mesh-v1");
         }
@@ -148,16 +124,6 @@ public final class ExtendedVoxelStore {
 
         void load() throws IOException {
             Files.createDirectories(file.getParent());
-            // Old append-only archives can be gigabytes. They are derived
-            // LOD data, never the actual Minecraft region or player data.
-            if (Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS)
-                    && Files.size(file) > archiveLimit) {
-                long removed = Files.size(file);
-                Files.delete(file);
-                System.out.println("[SofronPack] Rebuilding oversized voxel cache ("
-                        + removed + " bytes); Minecraft chunks are untouched");
-            }
-            Files.deleteIfExists(file.resolveSibling(file.getFileName() + ".compact"));
             if (!Files.exists(file)) {
                 try (DataOutputStream header = new DataOutputStream(Files.newOutputStream(file,
                         StandardOpenOption.CREATE_NEW))) {
@@ -168,9 +134,11 @@ public final class ExtendedVoxelStore {
             long lastGood = 8L;
             try (DataInputStream in = new DataInputStream(new BufferedInputStream(
                     Files.newInputStream(file), 65536))) {
-                if (in.readInt() != MAGIC || in.readInt() != VERSION) {
+                int magic = in.readInt(), version = in.readInt();
+                if (magic != MAGIC || (version != VERSION && version != LEGACY_VERSION)) {
                     throw new IOException("Unsupported voxel cache: " + file);
                 }
+                legacyArchive = version == LEGACY_VERSION;
                 while (true) {
                     int size;
                     try { size = in.readInt(); }
@@ -187,8 +155,9 @@ public final class ExtendedVoxelStore {
                     VoxelChunk chunk;
                     try { chunk = readPayload(payload); }
                     catch (IOException | IllegalArgumentException ex) { break; }
-                    chunks.put(pack(chunk.chunkX(), chunk.chunkZ()), chunk);
-                    remember(chunk, 8 + size);
+                    long key = pack(chunk.chunkX(), chunk.chunkZ());
+                    chunks.put(key, chunk);
+                    rememberSize(key, size + 8);
                     lastGood += 8L + size;
                 }
             }
@@ -198,101 +167,43 @@ public final class ExtendedVoxelStore {
                 }
             }
             archiveBytes = lastGood;
+            // The v5 reader accepts both old and new payloads. Upgrade only
+            // the header before appending; the old data are never discarded.
+            if (legacyArchive) {
+                try (RandomAccessFile header = new RandomAccessFile(file.toFile(), "rw")) {
+                    header.seek(4);
+                    header.writeInt(VERSION);
+                    header.getFD().sync();
+                }
+            }
             openAppend();
         }
 
         private void openAppend() throws IOException {
             output = new DataOutputStream(new BufferedOutputStream(
                     Files.newOutputStream(file, StandardOpenOption.APPEND), 65536));
-            unflushed = 0;
         }
 
-        private void remember(VoxelChunk chunk, int bytes) {
-            long key = pack(chunk.chunkX(), chunk.chunkZ());
-            Stored previous = stored.remove(key);
-            if (previous != null) latestBytes -= previous.bytes();
-            stored.put(key, new Stored(chunk, bytes));
-            latestBytes += bytes;
+        private void rememberSize(long key, int size) {
+            Integer previous = latestRecordSizes.put(key, size);
+            liveBytes += size - (previous == null ? 0 : previous);
         }
 
-        private static void writeRecord(DataOutputStream stream, byte[] payload) throws IOException {
+        private static void writeRecord(DataOutputStream stream, byte[] data) throws IOException {
             CRC32 checksum = new CRC32();
-            checksum.update(payload);
-            stream.writeInt(payload.length);
+            checksum.update(data);
+            stream.writeInt(data.length);
             stream.writeInt((int)checksum.getValue());
-            stream.write(payload);
+            stream.write(data);
         }
 
         void add(VoxelChunk chunk) throws IOException {
             byte[] data = payload(chunk);
-            int recordBytes = data.length + 8;
-            if (recordBytes + 8L > archiveLimit) return;
-            remember(chunk, recordBytes);
-            if (archiveBytes + recordBytes > archiveLimit) {
-                // Retain recent unique snapshots, and leave headroom before
-                // the next rotation. All source voxels remain in RAM for
-                // this session; only the rebuildable disk cache is evicted.
-                trimArchive();
-                rewriteArchive();
-                openAppend();
-                return;
-            }
             if (output == null) openAppend();
             writeRecord(output, data);
-            archiveBytes += recordBytes;
+            archiveBytes += data.length + 8L;
+            rememberSize(pack(chunk.chunkX(), chunk.chunkZ()), data.length + 8);
             if (++unflushed >= 256) flush();
-        }
-
-        private void trimArchive() {
-            long target = archiveLimit * 3 / 4;
-            while (latestBytes > target && stored.size() > 1) {
-                var oldest = stored.pollFirstEntry();
-                latestBytes -= oldest.getValue().bytes();
-            }
-        }
-
-        private void rewriteArchive() throws IOException {
-            if (output != null) {
-                output.close();
-                output = null;
-            }
-            Path compact = file.resolveSibling(file.getFileName() + ".compact");
-            try {
-                try (DataOutputStream stream = new DataOutputStream(new BufferedOutputStream(
-                        Files.newOutputStream(compact, StandardOpenOption.CREATE,
-                                StandardOpenOption.TRUNCATE_EXISTING), 65536))) {
-                    stream.writeInt(MAGIC);
-                    stream.writeInt(VERSION);
-                    for (Stored entry : stored.values()) writeRecord(stream, payload(entry.chunk()));
-                }
-                try {
-                    Files.move(compact, file, StandardCopyOption.ATOMIC_MOVE,
-                            StandardCopyOption.REPLACE_EXISTING);
-                } catch (AtomicMoveNotSupportedException unsupported) {
-                    Files.move(compact, file, StandardCopyOption.REPLACE_EXISTING);
-                }
-                archiveBytes = latestBytes;
-                unflushed = 0;
-            } finally {
-                Files.deleteIfExists(compact);
-            }
-        }
-
-        // Only the explicitly named legacy mod mesh cache is disposable.
-        // Never follow symlinks and never touch region/, entities/, or poi/.
-        void removeLegacyMeshCache() {
-            if (!Files.isDirectory(meshDirectory, LinkOption.NOFOLLOW_LINKS)) return;
-            try (var entries = Files.walk(meshDirectory, 2)) {
-                for (Path p : (Iterable<Path>)entries::iterator) {
-                    String name = p.getFileName().toString();
-                    if ((name.endsWith(".slm") || name.endsWith(".slm.tmp"))
-                            && Files.isRegularFile(p, LinkOption.NOFOLLOW_LINKS)) {
-                        Files.deleteIfExists(p);
-                    }
-                }
-            } catch (IOException | UncheckedIOException problem) {
-                System.err.println("[SofronPack] Legacy mesh cleanup: " + problem.getMessage());
-            }
         }
 
         void flush() throws IOException {
@@ -320,11 +231,47 @@ public final class ExtendedVoxelStore {
             try {
                 if (output != null) output.close();
                 output = null;
-                // Compact actual duplicate bytes, not an estimate of 1 KiB
-                // per chunk (complex terrain can be much larger).
-                if (Files.isRegularFile(file) && archiveBytes > latestBytes + 1_048_576L) {
-                    trimArchive();
-                    rewriteArchive();
+                // Replace only superseded records. Every unique chunk
+                // survives, irrespective of total archive size. A legacy
+                // archive is also re-encoded losslessly on the archive worker.
+                if (Files.isRegularFile(file) && (legacyArchive || archiveBytes > liveBytes)) {
+                    Path compact = file.resolveSibling(file.getFileName() + ".compact");
+                    long written = 8L;
+                    try {
+                        try (DataOutputStream stream = new DataOutputStream(new BufferedOutputStream(
+                                Files.newOutputStream(compact, StandardOpenOption.CREATE,
+                                        StandardOpenOption.TRUNCATE_EXISTING), 65536))) {
+                            stream.writeInt(MAGIC);
+                            stream.writeInt(VERSION);
+                            for (VoxelChunk chunk : chunks.values()) {
+                                VoxelChunk stored = chunk;
+                                if (legacyArchive && ExtendedVoxelCodec.legacy(chunk.deflated())) {
+                                    try {
+                                        byte[] compressed = ExtendedVoxelCodec.encode(chunk.unpack(), chunk.palette().length);
+                                        if (compressed.length < chunk.deflated().length)
+                                            stored = new VoxelChunk(chunk.chunkX(), chunk.chunkZ(), chunk.minY(),
+                                                    chunk.yCount(), chunk.grassTint(), chunk.foliageTint(),
+                                                    chunk.waterTint(), chunk.palette(), compressed);
+                                    } catch (IllegalArgumentException badRecord) {
+                                        // Preserve even an unreadable old payload; do not silently delete data.
+                                        System.err.println("[SofronPack] Could not repack legacy voxel: " + badRecord.getMessage());
+                                    }
+                                }
+                                byte[] data = payload(stored);
+                                writeRecord(stream, data);
+                                written += data.length + 8L;
+                            }
+                        }
+                        try {
+                            Files.move(compact, file, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+                        } catch (AtomicMoveNotSupportedException unsupported) {
+                            Files.move(compact, file, StandardCopyOption.REPLACE_EXISTING);
+                        }
+                        System.out.println("[SofronPack] Voxel archive repacked: " + archiveBytes
+                                + " -> " + written + " bytes; " + chunks.size() + " unique chunks retained");
+                    } finally {
+                        Files.deleteIfExists(compact);
+                    }
                 }
             } catch (IOException ex) {
                 System.err.println("[SofronPack] Voxel cache close: " + ex.getMessage());
@@ -333,24 +280,17 @@ public final class ExtendedVoxelStore {
     }
 
     public static synchronized void open(Path save, String dimension) {
-        open(save, dimension, ARCHIVE_LIMIT_BYTES);
-    }
-
-    // Small custom budget enables fast deterministic rollover regression tests.
-    static synchronized void open(Path save, String dimension, long archiveLimit) {
-        if (archiveLimit < 128) throw new IllegalArgumentException("archive limit");
         String name = dimension.replaceAll("[^a-zA-Z0-9_.-]", "_");
         Path path = save.resolve("sofronpack-extended-world")
                 .resolve(name + ".voxel.v4.bin").toAbsolutePath().normalize();
         Session old = current;
         if (old != null && old.file.equals(path)) return;
         close();
-        Session next = new Session(path, archiveLimit);
+        Session next = new Session(path);
         try {
             next.load();
             current = next;
             generation++;
-            WRITE_IO.execute(next::removeLegacyMeshCache);
             System.out.println("[SofronPack] Voxel LOD: restored " + next.chunks.size() + " chunks");
         } catch (IOException exception) {
             next.close();
@@ -375,13 +315,10 @@ public final class ExtendedVoxelStore {
         });
     }
 
-    /**
-     * GPU-ready meshes are derived from retained voxels or seed previews.
-     * Do not persist another copy (and multiple distance variants) in saves.
-     * Returning null disables disk load/save/index in the existing renderer.
-     */
+    /** World-specific directory for persistent packed render meshes. */
     public static Path meshCacheDirectory() {
-        return null;
+        Session s = current;
+        return s == null ? null : s.meshDirectory;
     }
 
     public static long generation() { return generation; }
@@ -530,26 +467,7 @@ public final class ExtendedVoxelStore {
                                     int grassTint, int foliageTint, int waterTint,
                                     String[] palette, short[] raw) {
         if (raw.length != GRID * GRID * yCount) throw new IllegalArgumentException("Voxel volume");
-        byte[] bytes = new byte[raw.length * 2];
-        for (int i = 0; i < raw.length; i++) {
-            bytes[2 * i] = (byte)raw[i];
-            bytes[2 * i + 1] = (byte)(raw[i] >>> 8);
-        }
-        Deflater deflater = new Deflater(Deflater.BEST_SPEED);
-        deflater.setInput(bytes);
-        deflater.finish();
-        byte[] compressed;
-        try (ByteArrayOutputStream output = new ByteArrayOutputStream()) {
-            byte[] buffer = new byte[8192];
-            while (!deflater.finished()) {
-                int n = deflater.deflate(buffer);
-                if (n <= 0) throw new IllegalStateException("Zlib made no progress");
-                output.write(buffer, 0, n);
-            }
-            compressed = output.toByteArray();
-        } catch (IOException impossible) {
-            throw new IllegalStateException(impossible);
-        } finally { deflater.end(); }
+        byte[] compressed = ExtendedVoxelCodec.encode(raw, palette.length);
         return new VoxelChunk(x, z, minY, yCount, grassTint, foliageTint, waterTint, palette, compressed);
     }
 

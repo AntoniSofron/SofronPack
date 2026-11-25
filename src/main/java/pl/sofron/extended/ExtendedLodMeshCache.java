@@ -37,7 +37,9 @@ import java.util.zip.Inflater;
  */
 public final class ExtendedLodMeshCache {
     private static final int MAGIC = 0x534C4D31; // SLM1
-    private static final int VERSION = 1;
+    private static final int VERSION = 2;
+    private static final int LEGACY_VERSION = 1;
+    private static final int SHUFFLE_QUADS = 1024;
     private static final int HASH_BYTES = 32;
     private static final int MAX_PACKED_BYTES = 96 * 1024 * 1024;
     private static final int HEADER_BYTES = 4 * 6 + 8 + HASH_BYTES + 4 * 2;
@@ -149,7 +151,8 @@ public final class ExtendedLodMeshCache {
             if (length < HEADER_BYTES || length > MAX_PACKED_BYTES + HEADER_BYTES) return null;
             try (DataInputStream in = new DataInputStream(
                     new BufferedInputStream(Files.newInputStream(file), 65536))) {
-                if (in.readInt() != MAGIC || in.readInt() != VERSION
+                int magic = in.readInt(), version = in.readInt();
+                if (magic != MAGIC || (version != VERSION && version != LEGACY_VERSION)
                         || in.readInt() != tx || in.readInt() != tz
                         || in.readLong() != detail) return null;
                 if (!Arrays.equals(fingerprint, in.readNBytes(HASH_BYTES))) return null;
@@ -171,12 +174,21 @@ public final class ExtendedLodMeshCache {
                     java.util.zip.InflaterInputStream decoded =
                             new java.util.zip.InflaterInputStream(in, inflater, 65536);
                     int remaining = rawBytes;
+                    byte[] original = version == VERSION ? new byte[SHUFFLE_QUADS * ExtendedPackedQuads.QUAD_BYTES] : null;
                     while (remaining > 0) {
-                        int received = decoded.read(staging, 0, Math.min(remaining, staging.length));
-                        if (received <= 0) return null;
-                        checksum.update(staging, 0, received);
-                        result.put(staging, 0, received);
-                        remaining -= received;
+                        int block = Math.min(remaining, version == VERSION
+                                ? SHUFFLE_QUADS * ExtendedPackedQuads.QUAD_BYTES : staging.length);
+                        int received = decoded.readNBytes(staging, 0, block);
+                        if (received != block) return null;
+                        if (version == VERSION) {
+                            unshuffle(staging, original, block / ExtendedPackedQuads.QUAD_BYTES);
+                            checksum.update(original, 0, block);
+                            result.put(original, 0, block);
+                        } else {
+                            checksum.update(staging, 0, block);
+                            result.put(staging, 0, block);
+                        }
+                        remaining -= block;
                     }
                     if (decoded.read() != -1 || !inflater.finished()
                             || inflater.getRemaining() != 0
@@ -222,8 +234,9 @@ public final class ExtendedLodMeshCache {
                 long dataStart = output.getFilePointer();
 
                 CRC32 checksum = new CRC32();
-                Deflater deflater = new Deflater(Deflater.BEST_SPEED);
-                byte[] input = new byte[65536];
+                Deflater deflater = new Deflater(Deflater.DEFAULT_COMPRESSION);
+                byte[] input = new byte[SHUFFLE_QUADS * ExtendedPackedQuads.QUAD_BYTES];
+                byte[] shuffled = new byte[input.length];
                 try {
                     // Deflater may correctly consume input without producing
                     // bytes yet; let DeflaterOutputStream handle that state
@@ -246,7 +259,8 @@ public final class ExtendedLodMeshCache {
                             int count = Math.min(input.length, vertices.remaining());
                             vertices.get(input, 0, count);
                             checksum.update(input, 0, count);
-                            compressor.write(input, 0, count);
+                            shuffle(input, shuffled, count / ExtendedPackedQuads.QUAD_BYTES);
+                            compressor.write(shuffled, 0, count);
                         }
                     }
                 } finally {
@@ -274,6 +288,20 @@ public final class ExtendedLodMeshCache {
             try { Files.deleteIfExists(temporary); }
             catch (IOException ignored) { }
         }
+    }
+
+    /** Byte-plane transpose exposes repeated UVs, colours, flags and high
+     * coordinate bytes to zlib without changing a single GPU instance bit. */
+    static void shuffle(byte[] input, byte[] output, int quads) {
+        for (int b = 0; b < ExtendedPackedQuads.QUAD_BYTES; b++)
+            for (int q = 0; q < quads; q++)
+                output[b * quads + q] = input[q * ExtendedPackedQuads.QUAD_BYTES + b];
+    }
+
+    static void unshuffle(byte[] input, byte[] output, int quads) {
+        for (int b = 0; b < ExtendedPackedQuads.QUAD_BYTES; b++)
+            for (int q = 0; q < quads; q++)
+                output[q * ExtendedPackedQuads.QUAD_BYTES + b] = input[b * quads + q];
     }
 
     // A small bounded save queue avoids retaining hundreds of large GPU

@@ -238,8 +238,6 @@ public final class ExtendedWorldPrefetch {
         // server we now take two captures per tick (up to 40/second); actual
         // zlib encoding happens on bounded daemon workers.
         int normal = Math.max(2, server.getPlayerList().getViewDistance());
-        int generationRadius = generationRadius(normal, ExtendedWorldConfig.get().fullDistantGeneration);
-        int generationLimit = (2 * generationRadius + 1) * (2 * generationRadius + 1);
         boolean busyServer = server.getAverageTickTimeNanos() > 35_000_000L;
         if (!busyServer || ticks % 5 == 0) {
             int nearLimit = busyServer ? 1 : captureCost.budget(4, 2_000_000L);
@@ -263,7 +261,7 @@ public final class ExtendedWorldPrefetch {
         int ticketLevel = ChunkLevel.byStatus(ChunkStatus.FEATURES);
         // Submit near to far without blocking all later rings on one slow future.
         while (submitted < submitBudget && pending < MAX_PENDING && inspected < 4096) {
-            if (cursor >= generationLimit || stageIndex >= ExtendedLodStages.count()) {
+            if (stageIndex >= ExtendedLodStages.count()) {
                 // All seven bands have been processed. Do not spin through
                 // the 128-chunk world every tick once the cache is complete.
                 if (ticks % 20 != 0) break;
@@ -284,10 +282,6 @@ public final class ExtendedWorldPrefetch {
             inspected++;
             int dx = (int)(offset >> 32), dz = (int)offset;
             int x = scanAnchorX + dx, z = scanAnchorZ + dz;
-            // The scan anchor can lag a moving player by seven chunks.
-            // Never generate beyond the live compact-generation radius.
-            if (!ExtendedWorldConfig.get().fullDistantGeneration
-                    && Math.max(Math.abs((long)x - cx), Math.abs((long)z - cz)) > generationRadius) continue;
             long key = pack(x, z);
             if (ExtendedVoxelStore.has(x, z) || IN_FLIGHT.contains(key)) continue;
             var loaded = level.getChunkSource().getChunkNow(x, z);
@@ -430,11 +424,6 @@ public final class ExtendedWorldPrefetch {
         } finally {
             captureCost.sample(System.nanoTime() - start);
         }
-    }
-
-    /** Real generation radius only; never changes renderer/fog/simulation range. */
-    static int generationRadius(int normal, boolean full) {
-        return full ? RADIUS : (int)Math.min(RADIUS, Math.max(2L, normal) + 4L);
     }
 
     static long pack(int x, int z) { return ExtendedVoxelStore.pack(x, z); }

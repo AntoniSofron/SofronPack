@@ -6,57 +6,26 @@ import java.util.Arrays;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ExtendedVoxelLodTest {
-    @Test void archiveRollsOverWithoutLosingLatestSnapshotOrTouchingWorld(
+    @Test void compactionRetainsEveryUniqueChunkAndReplacesObsoleteRecords(
             @org.junit.jupiter.api.io.TempDir java.nio.file.Path save) throws Exception {
-        var region = save.resolve("region");
-        java.nio.file.Files.createDirectories(region);
-        var realWorld = region.resolve("r.0.0.mca");
-        java.nio.file.Files.writeString(realWorld, "real Minecraft data");
-        var cache = save.resolve("sofronpack-extended-world");
-        var mesh = cache.resolve("minecraft_overworld/lod-mesh-v1/r.0.0/t.0.0.0.slm");
-        java.nio.file.Files.createDirectories(mesh.getParent());
-        java.nio.file.Files.write(mesh, new byte[4096]);
-        long limit = 2048;
-        ExtendedVoxelStore.open(save, "minecraft:overworld", limit);
+        ExtendedVoxelStore.open(save, "minecraft:overworld");
         try {
-            short[] cells = new short[16 * 16];
-            var palette = new String[]{"minecraft:air", "minecraft:stone"};
-            for (int x = 0; x < 150; x++) {
+            short[] cells = new short[256 * 16];
+            String[] palette = {"minecraft:air", "minecraft:stone"};
+            for (int x = 0; x < 300; x++)
+                ExtendedVoxelStore.put(ExtendedVoxelStore.encode(x, 0, 0, 16, palette, cells));
+            for (int x = 0; x < 300; x++) {
                 cells[0] = 1;
-                assertTrue(ExtendedVoxelStore.put(ExtendedVoxelStore.encode(x, 0, 0, 1, palette, cells)));
+                ExtendedVoxelStore.put(ExtendedVoxelStore.encode(x, 0, 0, 16, palette, cells));
             }
-            assertEquals(150, ExtendedVoxelStore.count(), "Disk eviction must not evict live voxels");
-            assertNull(ExtendedVoxelStore.meshCacheDirectory());
-        } finally {
-            ExtendedVoxelStore.close();
-        }
-        var archive = cache.resolve("minecraft_overworld.voxel.v4.bin");
-        assertTrue(java.nio.file.Files.size(archive) <= limit);
-        assertFalse(java.nio.file.Files.exists(mesh));
-        assertEquals("real Minecraft data", java.nio.file.Files.readString(realWorld));
-        ExtendedVoxelStore.open(save, "minecraft:overworld", limit);
+            assertEquals(300, ExtendedVoxelStore.count());
+            assertNotNull(ExtendedVoxelStore.meshCacheDirectory());
+        } finally { ExtendedVoxelStore.close(); }
+        ExtendedVoxelStore.open(save, "minecraft:overworld");
         try {
-            assertNotNull(ExtendedVoxelStore.get(149, 0));
-            assertEquals(1, ExtendedVoxelStore.get(149, 0).unpack()[0]);
-            assertTrue(ExtendedVoxelStore.count() < 150);
-        } finally {
-            ExtendedVoxelStore.close();
-        }
-    }
-
-    @Test void oversizedOldDerivedArchiveIsRebuiltWithoutReadingGigabytes(
-            @org.junit.jupiter.api.io.TempDir java.nio.file.Path save) throws Exception {
-        var folder = save.resolve("sofronpack-extended-world");
-        java.nio.file.Files.createDirectories(folder);
-        var file = folder.resolve("minecraft_overworld.voxel.v4.bin");
-        java.nio.file.Files.write(file, new byte[4096]);
-        ExtendedVoxelStore.open(save, "minecraft:overworld", 2048);
-        try {
-            assertEquals(0, ExtendedVoxelStore.count());
-            assertEquals(8, java.nio.file.Files.size(file));
-        } finally {
-            ExtendedVoxelStore.close();
-        }
+            assertEquals(300, ExtendedVoxelStore.count());
+            for (int x = 0; x < 300; x++) assertEquals(1, ExtendedVoxelStore.get(x, 0).unpack()[0]);
+        } finally { ExtendedVoxelStore.close(); }
     }
 
     @org.junit.jupiter.api.Test
