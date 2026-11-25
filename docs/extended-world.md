@@ -458,3 +458,14 @@ areas without multiplying every mountain's height. The theoretical
 maximum for the current parameters is below Y448. No new mountain
 type or noise field is introduced. Natural terrain remains seed
 dependent; actual peak heights and appearance need in-game verification.
+
+
+## v0.1.78 — restore Y512 build ceiling with uncapped mountain profiles
+
+Overworld and natural noise generation use min_y=-64, height=576.
+The exclusive upper bound is Y512; the highest placeable block is Y511.
+The mountain gradient is extended from Y448 to Y512 at the same slope.
+The v0.1.77 monotone mountain strength transfer, shoulder, potential,
+and all other terrain controls are unchanged. Existing mountain peak
+heights are not intentionally raised. Cloud decks and other dimensions
+are unchanged.
