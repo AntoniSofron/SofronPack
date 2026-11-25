@@ -11,17 +11,17 @@
           "coordinate": {
             "type": "minecraft:noise",
             "noise": "sofronpack:outcrop_patches",
-            "xz_scale": 1,
+            "xz_scale": 1.2247448714,
             "y_scale": 0
           },
           "points": [
             {
-              "location": 0.08,
+              "location": 0.02,
               "value": 0,
               "derivative": 0
             },
             {
-              "location": 0.39,
+              "location": 0.36,
               "value": 1,
               "derivative": 0
             }
