@@ -184,20 +184,21 @@ public final class ExtendedVolumeMesh {
                                 boolean visible = other == null;
                                 if (other != null) {
                                     int adjacent = levels[neighbor];
+                                    int neighborY = ny + v.source.minY() - other.source.minY();
                                     if (face >= 2 && adjacent < level) {
                                         int fine = 1 << adjacent;
                                         for (int t = 0; !visible && t < step; t += fine) {
                                             int sx = nx + (face < 4 ? t : 0);
                                             int sz = nz + (face >= 4 ? t : 0);
                                             short neighborId = yStep > 1
-                                                    ? other.opaqueSlab(sx, ny, sz, adjacent, yStep)
-                                                    : other.get(sx, ny, sz, adjacent);
+                                                    ? other.opaqueSlab(sx, neighborY, sz, adjacent, yStep)
+                                                    : other.get(sx, neighborY, sz, adjacent);
                                             visible = exposed(v, id, other, neighborId);
                                         }
                                     } else {
                                         short neighborId = yStep > 1
-                                                ? other.opaqueSlab(nx, ny, nz, adjacent, yStep)
-                                                : other.get(nx, ny, nz, adjacent);
+                                                ? other.opaqueSlab(nx, neighborY, nz, adjacent, yStep)
+                                                : other.get(nx, neighborY, nz, adjacent);
                                         visible = exposed(v, id, other, neighborId);
                                     }
                                 }
@@ -234,7 +235,7 @@ public final class ExtendedVolumeMesh {
             if (dir != null) {
                 int nx = x + dir.getStepX(), nz = z + dir.getStepZ();
                 Volume next = data[owner + (nx >> 4) + (nz >> 4) * (TILE + 2)];
-                if (next != null && next.opacity[next.get(nx, y + dir.getStepY(), nz, 0)] == 2) continue;
+                if (next != null && next.opacity[next.get(nx, y + dir.getStepY() + v.source.minY() - next.source.minY(), nz, 0)] == 2) continue;
             }
             reserveQuad();
             int rgb = ExtendedSurfaceMesh.color(v.source.grassTint(), v.source.foliageTint(),

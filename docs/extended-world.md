@@ -469,3 +469,20 @@ The v0.1.77 monotone mountain strength transfer, shoulder, potential,
 and all other terrain controls are unchanged. Existing mountain peak
 heights are not intentionally raised. Cloud decks and other dimensions
 are unchanged.
+
+
+## v0.1.79 — deeper Overworld, richer underground
+
+Overworld min_y=-128, height=640, exclusive top Y512. Generation uses
+the same bounds. Vanilla bottom density fade moves down 64 blocks;
+depth gradient retains its original slope; noodle caves extend to -124.
+Vanilla material rules continue to use relative-bottom bedrock and
+deepslate at Y<=0. The Y=-64..16 band tapers at its edges and widens
+3D spaghetti/noodle tubes by sqrt(1.5), 2D spaghetti thickness by 1.5,
+and reduces cheese chamber density by up to 0.055. This is a nominal
+cavity-size target, not a measured 50% increase in all cave volume.
+Underground lava lake placement extends down to -120 with rarity 7
+(formerly 9, starting at 0); actual lava depends on terrain/aquifers.
+Mixed old/new voxel snapshots use absolute Y for neighbor culling.
+Existing chunks are not force-regenerated; back up worlds before use,
+and test a new world to see the full underground generation.

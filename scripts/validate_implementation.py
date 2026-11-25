@@ -58,16 +58,24 @@ for path, obj in data.items():
 
 s = data[ROOT / "minecraft/worldgen/noise_settings/overworld.json"]
 assert s["sea_level"] == 63
-assert s["noise"] == {"min_y": -64, "height": 576}
+assert s["noise"] == {"min_y": -128, "height": 640}
 # Match the generation envelope to the buildable dimension. Mountain
 # density keeps its existing slope, rather than being stretched upward.
 dimension = data[ROOT / "minecraft/dimension_type/overworld.json"]
-assert dimension["min_y"] == -64
-assert dimension["height"] == dimension["logical_height"] == 576
+assert dimension["min_y"] == -128
+assert dimension["height"] == dimension["logical_height"] == 640
 assert dimension["min_y"] + dimension["height"] == 512
 assert dimension["height"] % 16 == 0
 assert dimension["has_skylight"] and not dimension["has_ceiling"]
 assert s["noise"]["min_y"] + s["noise"]["height"] == dimension["min_y"] + dimension["height"]
+assert s["noise"]["min_y"] == dimension["min_y"]
+assert data[ROOT / "minecraft/worldgen/density_function/overworld/depth.json"]["left"]["from_coordinate"] == -128
+cave_band = data[ROOT / "sofronpack/worldgen/density_function/terrain/cave_band.json"]
+assert cave_band["left"]["from_coordinate"] == -64
+assert cave_band["right"]["to_coordinate"] == 16
+lava_lake = data[ROOT / "minecraft/worldgen/placed_feature/lake_lava_underground.json"]
+assert lava_lake["placement"][0]["chance"] == 7
+assert lava_lake["placement"][2]["height"]["min_inclusive"]["absolute"] == -120
 assert s["default_fluid"] == "minecraft:water"
 assert s["material_rule"] == "minecraft:overworld"
 assert s["noise_router"]["final_density"] == "sofronpack:terrain/final_density"
