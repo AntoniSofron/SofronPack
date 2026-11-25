@@ -443,3 +443,18 @@ targets. Cloud decks remain at Y256/384/512; Nether and End are unchanged.
 Back up saves before upgrading: blocks placed at Y448 or above using
 v0.1.74/75 are outside the new dimension bounds and may become inaccessible
 or be lost on chunk save.
+
+
+## v0.1.77 — remove the internal flat mountain-top clamp
+
+The former mountain strength was min(raw, shoulder), saturating broad
+regions at about Y256–290. The approved Y290 target remains a shoulder
+reference, but no longer caps elevation. The replacement is a monotone
+cubic spline of raw minus shoulder, added back to the shoulder. Negative
+inputs have identity transfer; the first 0.4 units smoothly transition
+from unit slope to 0.28, then continue at positive slope 0.28.
+This retains the original low mountain profile and uncaps saturated
+areas without multiplying every mountain's height. The theoretical
+maximum for the current parameters is below Y448. No new mountain
+type or noise field is introduced. Natural terrain remains seed
+dependent; actual peak heights and appearance need in-game verification.

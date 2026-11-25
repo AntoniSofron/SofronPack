@@ -1,0 +1,34 @@
+{
+  "type": "minecraft:cache",
+  "input": {
+    "type": "minecraft:add",
+    "left": 1,
+    "right": {
+      "type": "minecraft:mul",
+      "left": 0.18478260869565216,
+      "right": {
+        "type": "minecraft:spline",
+        "spline": {
+          "coordinate": "sofronpack:terrain/local_relief_noise",
+          "points": [
+            {
+              "location": -1.5,
+              "value": 0,
+              "derivative": 0
+            },
+            {
+              "location": 0,
+              "value": 0.5,
+              "derivative": 0.6
+            },
+            {
+              "location": 1.5,
+              "value": 1,
+              "derivative": 0
+            }
+          ]
+        }
+      }
+    }
+  }
+}

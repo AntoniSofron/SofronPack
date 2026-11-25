@@ -1,49 +1,33 @@
 {
   "type": "minecraft:cache",
   "input": {
-    "type": "minecraft:min",
-    "left": {
-      "type": "minecraft:mul",
-      "left": 3.2,
-      "right": {
-        "type": "minecraft:mul",
-        "left": "sofronpack:terrain/land_gate",
-        "right": {
-          "type": "minecraft:mul",
-          "left": "sofronpack:terrain/mountain_region",
-          "right": "sofronpack:terrain/mountain_profile"
-        }
-      }
-    },
+    "type": "minecraft:add",
+    "left": "sofronpack:terrain/mountain_shoulder",
     "right": {
-      "type": "minecraft:add",
-      "left": 1,
-      "right": {
-        "type": "minecraft:mul",
-        "left": 0.18478260869565216,
-        "right": {
-          "type": "minecraft:spline",
-          "spline": {
-            "coordinate": "sofronpack:terrain/local_relief_noise",
-            "points": [
-              {
-                "location": -1.5,
-                "value": 0,
-                "derivative": 0
-              },
-              {
-                "location": 0,
-                "value": 0.5,
-                "derivative": 0.6
-              },
-              {
-                "location": 1.5,
-                "value": 1,
-                "derivative": 0
-              }
-            ]
+      "type": "minecraft:spline",
+      "spline": {
+        "coordinate": {
+          "type": "minecraft:sub",
+          "left": "sofronpack:terrain/mountain_potential",
+          "right": "sofronpack:terrain/mountain_shoulder"
+        },
+        "points": [
+          {
+            "location": 0,
+            "value": 0,
+            "derivative": 1
+          },
+          {
+            "location": 0.4,
+            "value": 0.256,
+            "derivative": 0.28
+          },
+          {
+            "location": 2.4,
+            "value": 0.816,
+            "derivative": 0.28
           }
-        }
+        ]
       }
     }
   }

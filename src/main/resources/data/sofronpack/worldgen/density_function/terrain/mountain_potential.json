@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:cache",
+  "input": {
+    "type": "minecraft:mul",
+    "left": 3.2,
+    "right": {
+      "type": "minecraft:mul",
+      "left": "sofronpack:terrain/land_gate",
+      "right": {
+        "type": "minecraft:mul",
+        "left": "sofronpack:terrain/mountain_region",
+        "right": "sofronpack:terrain/mountain_profile"
+      }
+    }
+  }
+}

@@ -40,9 +40,13 @@ tasks.register("syncApprovedTerrain") {
             o.left.left.to_value = -0.04 - (o.left.left.to_coordinate - 80.0) * slope
             o.left.right.left = limit(coefficient, 0.04, 2.0)
         }
-        modify("mountain_strength") { o ->
-            o.input.right.right.left = slope * (p.peakHeight - shoulder) / coefficient
-            o.input.left.left = limit(3.2 * p.mountainFrequency / 50.0
+        // The old peakHeight target is now the shoulder reference, not
+        // an absolute ceiling. The strength spline continues above it.
+        modify("mountain_shoulder") { o ->
+            o.input.right.left = slope * (p.peakHeight - shoulder) / coefficient
+        }
+        modify("mountain_potential") { o ->
+            o.input.left = limit(3.2 * p.mountainFrequency / 50.0
                 * (100.0 - p.mountainIsolation) / 65.0, 0.5, 4.6)
         }
         modify("upland_lift") { o ->
@@ -92,7 +96,7 @@ tasks.register("syncApprovedTerrain") {
             o.right.right.left.spline.points[1].value = limit(
                 0.35 * p.oceanTrenches / 50.0, 0, 0.7)
         }
-        println("[Sofron Terra Lab] Regenerated connected mountain core (peak Y${p.peakHeight} target), uplift, valleys, low Beta details, karst, coast and ocean from approved JSON")
+        println("[Sofron Terra Lab] Regenerated connected mountain core (Y${p.peakHeight} shoulder reference, no hard peak clamp), uplift, valleys, low Beta details, karst, coast and ocean from approved JSON")
     }
 }
 

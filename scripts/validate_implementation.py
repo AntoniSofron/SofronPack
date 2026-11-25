@@ -95,6 +95,44 @@ assert alt["left"]["to_coordinate"] == 448
 expected_slope = 0.005 * approved["mountainSteepness"] / 70.0
 assert abs((alt["left"]["from_value"] - alt["left"]["to_value"]) / (alt["left"]["to_coordinate"] - alt["left"]["from_coordinate"]) - expected_slope) < 1e-9
 assert alt["right"]["right"] == "sofronpack:terrain/mountain_strength"
+# No min(raw, ceiling) plateau. A C1 continuous, strictly increasing
+# strength transfer leaves the original low mountains intact.
+strength = data[ROOT / "sofronpack/worldgen/density_function/terrain/mountain_strength.json"]
+potential = data[ROOT / "sofronpack/worldgen/density_function/terrain/mountain_potential.json"]
+shoulder = data[ROOT / "sofronpack/worldgen/density_function/terrain/mountain_shoulder.json"]
+assert strength["type"] == "minecraft:cache"
+transfer = strength["input"]
+assert transfer["type"] == "minecraft:add"
+assert transfer["left"] == "sofronpack:terrain/mountain_shoulder"
+curve = transfer["right"]["spline"]
+assert curve["coordinate"] == {"type": "minecraft:sub", "left": "sofronpack:terrain/mountain_potential", "right": "sofronpack:terrain/mountain_shoulder"}
+pts = curve["points"]
+assert pts[0] == {"location": 0, "value": 0, "derivative": 1}
+assert all(p["derivative"] > 0 for p in pts)
+assert potential["input"]["type"] == "minecraft:mul"
+assert shoulder["input"]["type"] == "minecraft:add"
+def transfer_sample(x):
+    if x <= pts[0]["location"]:
+        p = pts[0]
+        return p["value"] + p["derivative"] * (x - p["location"])
+    if x >= pts[-1]["location"]:
+        p = pts[-1]
+        return p["value"] + p["derivative"] * (x - p["location"])
+    for a, b in zip(pts, pts[1:]):
+        if a["location"] <= x <= b["location"]:
+            width = b["location"] - a["location"]
+            t = (x - a["location"]) / width
+            return ((2*t**3-3*t*t+1)*a["value"] + (t**3-2*t*t+t)*width*a["derivative"]
+                    + (-2*t**3+3*t*t)*b["value"] + (t**3-t*t)*width*b["derivative"])
+samples = [transfer_sample(i / 1000) for i in range(-2000, 4001)]
+assert all(a < b for a, b in zip(samples, samples[1:])), "Mountain strength must not saturate"
+assert all(transfer_sample(i / 100) == i / 100 for i in range(-200, 1))
+# Current approved settings must not produce a second plateau at Y448.
+upper_shoulder = shoulder["input"]["left"] + shoulder["input"]["right"]["left"]
+raw_max = potential["input"]["left"] # land, profile, and region factors <=1 at approved settings
+max_strength = upper_shoulder + transfer_sample(raw_max - upper_shoulder)
+max_peak = alt["left"]["from_coordinate"] + (alt["left"]["from_value"] + alt["right"]["left"] * max_strength) / expected_slope
+assert max_peak < dimension["min_y"] + dimension["height"], max_peak
 assert core["right"]["type"] == "minecraft:gradient" and core["right"]["to_coordinate"] <= 64
 for key in ("surface_envelope", "beta_overhangs", "karst_spires", "upland_lift"):
     assert key in {p.stem for p in data}, key
