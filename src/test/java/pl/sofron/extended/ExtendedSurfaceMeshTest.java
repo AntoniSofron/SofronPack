@@ -6,7 +6,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class ExtendedSurfaceMeshTest {
     @Test void serializedWaterloggedPropertiesKeepTheirBlockTint() {
         assertEquals(2, ExtendedSurfaceMesh.color(1, 2, 3, "minecraft:oak_leaves[waterlogged=false]", -1));
-        assertEquals(2, ExtendedSurfaceMesh.color(1, 2, 3, "minecraft:spruce_leaves[waterlogged=true]", -1));
+        assertEquals(0x619961, ExtendedSurfaceMesh.color(1, 2, 3, "minecraft:spruce_leaves[waterlogged=true]", -1));
         assertEquals(3, ExtendedSurfaceMesh.color(1, 2, 3, "minecraft:water[level=0]", -1));
     }
 
