@@ -486,3 +486,20 @@ Underground lava lake placement extends down to -120 with rarity 7
 Mixed old/new voxel snapshots use absolute Y for neighbor culling.
 Existing chunks are not force-regenerated; back up worlds before use,
 and test a new world to see the full underground generation.
+
+
+## v0.1.80 — rare small lava springs instead of deep lava lakes
+
+Lava springs use the standard single-source spring feature, with ten
+placement attempts per chunk in Y=-120..-65, including formerly frozen
+variants. No spring attempts above -64. The former deep lake expansion
+is reverted; normal underground lake placement starts at Y0 again
+and both surface and underground lake attempts are halved versus vanilla
+(rarity 400 and 18). Local lava aquifer noise is disabled below -64
+and masked by an independent signed noise above it (nominal half of
+eligible local cells, not an exact half of fluid volume).
+A scoped fluid-picker mixin removes the vanilla continuous Y=-54
+lava table in the extended water Overworld, with a dry deep fallback;
+Nether and End are unchanged. Local water tables may differ in deep caves.
+World height, mountains and cave-density changes from v0.1.79 remain.
+Actual spring success and lava occurrence require generated-world tests.

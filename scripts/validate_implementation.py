@@ -74,8 +74,18 @@ cave_band = data[ROOT / "sofronpack/worldgen/density_function/terrain/cave_band.
 assert cave_band["left"]["from_coordinate"] == -64
 assert cave_band["right"]["to_coordinate"] == 16
 lava_lake = data[ROOT / "minecraft/worldgen/placed_feature/lake_lava_underground.json"]
-assert lava_lake["placement"][0]["chance"] == 7
-assert lava_lake["placement"][2]["height"]["min_inclusive"]["absolute"] == -120
+assert lava_lake["placement"][0]["chance"] == 18
+assert lava_lake["placement"][2]["height"]["min_inclusive"]["absolute"] == 0
+assert data[ROOT / "minecraft/worldgen/placed_feature/lake_lava_surface.json"]["placement"][0]["chance"] == 400
+for name in ("spring_lava", "spring_lava_frozen"):
+    spring = data[ROOT / f"minecraft/worldgen/placed_feature/{name}.json"]
+    assert spring["feature"] == "minecraft:spring_lava_overworld"
+    assert spring["placement"][0]["count"] == 10
+    assert spring["placement"][2]["height"]["min_inclusive"]["absolute"] == -120
+    assert spring["placement"][2]["height"]["max_inclusive"]["absolute"] == -65
+lava = s["aquifers"]["lava"]
+assert lava["min_inclusive"] == -64 and lava["when_out_of_range"] == 0
+assert lava["when_in_range"]["when_out_of_range"] == 0
 assert s["default_fluid"] == "minecraft:water"
 assert s["material_rule"] == "minecraft:overworld"
 assert s["noise_router"]["final_density"] == "sofronpack:terrain/final_density"

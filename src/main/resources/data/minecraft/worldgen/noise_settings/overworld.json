@@ -36,10 +36,29 @@
       "y_scale": 0.7142857143
     },
     "lava": {
-      "type": "minecraft:noise",
-      "noise": "minecraft:aquifer_lava",
-      "xz_scale": 1,
-      "y_scale": 1
+      "type": "minecraft:range_choice",
+      "input": "minecraft:y",
+      "min_inclusive": -64,
+      "max_exclusive": 1024,
+      "when_in_range": {
+        "type": "minecraft:range_choice",
+        "input": {
+          "type": "minecraft:noise",
+          "noise": "sofronpack:lava_rarity_mask",
+          "xz_scale": 1,
+          "y_scale": 1
+        },
+        "min_inclusive": 0,
+        "max_exclusive": 1000000,
+        "when_in_range": {
+          "type": "minecraft:noise",
+          "noise": "minecraft:aquifer_lava",
+          "xz_scale": 1,
+          "y_scale": 1
+        },
+        "when_out_of_range": 0
+      },
+      "when_out_of_range": 0
     },
     "surface_level": "minecraft:overworld/chunk_surface_level"
   },
