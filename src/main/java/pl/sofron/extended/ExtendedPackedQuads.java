@@ -26,7 +26,9 @@ public final class ExtendedPackedQuads {
 
     private ExtendedPackedQuads() {}
 
-    public static ByteBuffer pack(ByteBuffer source) {
+    public static ByteBuffer pack(ByteBuffer source) {return pack(source,null);}
+
+    public static ByteBuffer pack(ByteBuffer source,LodRgbLighting lighting) {
         int start = source.position(), length = source.remaining();
         if (length % OLD_QUAD_BYTES != 0)
             throw new IllegalArgumentException("Unaligned legacy quad payload");
@@ -60,7 +62,16 @@ public final class ExtendedPackedQuads {
             int g = source.get(base + 21) & 255;
             int b = source.get(base + 22) & 255;
             output.putInt(r | g << 8 | b << 16 | alpha << 24);
-            output.putInt(repeating ? 1 : 0);
+            int rgb=0;
+            if(lighting!=null){
+                float x=0,y=0,z=0;
+                for(int corner=0;corner<4;corner++){
+                    int p=base+corner*OLD_VERTEX_BYTES;
+                    x+=source.getFloat(p);y+=source.getFloat(p+4);z+=source.getFloat(p+8);
+                }
+                rgb=lighting.packed(x*.25f,y*.25f,z*.25f);
+            }
+            output.putInt(rgb | (repeating ? 1 : 0));
         }
         return output.flip();
     }

@@ -1,0 +1,5 @@
+# Distant static RGB (0.1.100)
+
+Saved voxel columns supply light emitters and conservative opacity masks to the same radial/connectivity atlas on the LOD mesh worker. Neighboring source columns are included according to the configured light radius. The cached mesh fingerprint includes source data and stable rule/settings content. Source changes invalidate nearby tiles. Rules changes rebuild meshes.
+
+A quad samples the lighting lattice at its center and stores 24-bit hue and seven-bit strength in the previously unused bits of its last 32-bit word. The 48-byte instance size, voxel archive, quad count and draw calls remain unchanged. The shader blends the hue with the existing lightmap and uses an approximate block-light level for lit surfaces, preserving self-emitting blocks. Distant skylight still uses the existing approximation (sky level 15); large merged quads use one sample and predicted terrain without captured sources cannot invent light. This is intentionally a lower-resolution approximation, not identical to live per-vertex lighting.

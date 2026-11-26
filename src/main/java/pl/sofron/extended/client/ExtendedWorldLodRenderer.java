@@ -166,6 +166,15 @@ public final class ExtendedWorldLodRenderer {
         }
     }
 
+    private static pl.sofron.extended.LodRgbLighting.Settings lightingSettings;
+    private static pl.sofron.extended.LodRgbLighting.Settings currentLighting(){
+        var cfg=pl.sofron.light.SofronPackLightClient.CONFIG;
+        return new pl.sofron.extended.LodRgbLighting.Settings(
+                cfg!=null&&cfg.dynamicLighting&&cfg.coloredLighting&&cfg.stationaryBlockLighting,
+                cfg==null?10f:(float)cfg.dynamicLightRadius,
+                pl.sofron.light.engine.BlockLightRules.snapshot());
+    }
+
     private static void prepareFrameInternal(double cameraX, double cameraZ) {
         Minecraft mc = Minecraft.getInstance();
         if (!ExtendedWorldConfig.get().enabled || mc.level == null
@@ -190,7 +199,10 @@ public final class ExtendedWorldLodRenderer {
         if (indexReady) lastMeshIndexGeneration = indexRevision;
         if (!ExtendedTerrainPreview.hasTiles() && ExtendedVoxelStore.count() == 0
                 && !ExtendedLodMeshCache.exists(meshCache)) return;
-        if (ATLAS.refreshModels()) {
+        var rgb=currentLighting();
+        boolean changedLighting=!rgb.equals(lightingSettings);
+        lightingSettings=rgb;
+        if (ATLAS.refreshModels() || changedLighting) {
             clearMeshes();
             centerX = centerZ = Integer.MIN_VALUE;
         }
@@ -227,8 +239,8 @@ public final class ExtendedWorldLodRenderer {
             if (changed == null) break;
             int x = (int)(changed >> 32), z = (int)(long)changed;
             int tx = Math.floorDiv(x, TILE), tz = Math.floorDiv(z, TILE);
-            for (int nz = Math.floorDiv(z - 1, TILE); nz <= Math.floorDiv(z + 1, TILE); nz++)
-                for (int nx = Math.floorDiv(x - 1, TILE); nx <= Math.floorDiv(x + 1, TILE); nx++)
+            for (int nz = Math.floorDiv(z - lightingSettings.halo(), TILE); nz <= Math.floorDiv(z + lightingSettings.halo(), TILE); nz++)
+                for (int nx = Math.floorDiv(x - lightingSettings.halo(), TILE); nx <= Math.floorDiv(x + lightingSettings.halo(), TILE); nx++)
                     if (nx >= minTX && nx <= maxTX && nz >= minTZ && nz <= maxTZ)
                         markDirty(ExtendedVoxelStore.pack(nx, nz));
         }
@@ -607,7 +619,15 @@ public final class ExtendedWorldLodRenderer {
             else if (x >= 0 && z >= 0 && x < TILE && z < TILE) real++;
             i++;
         }
-        var materials = ATLAS.snapshot(chunks);
+        var settings=lightingSettings;
+        int halo=settings.halo();
+        var lightingChunks = halo==1?chunks:new ExtendedVoxelStore.VoxelChunk[(TILE+2*halo)*(TILE+2*halo)];
+        if(halo!=1){
+            int at=0;
+            for(int zz=-halo;zz<TILE+halo;zz++)for(int xx=-halo;xx<TILE+halo;xx++)
+                lightingChunks[at++]=ExtendedVoxelStore.get(tx*TILE+xx,tz*TILE+zz);
+        }
+        var materials = ATLAS.snapshot(lightingChunks);
         var surface = surfaces;
         var volume = volumes;
         boolean firstSurface = preview && real > 0 && real < TILE * TILE;
@@ -624,7 +644,7 @@ public final class ExtendedWorldLodRenderer {
             boolean cacheable = meshCache != null && captured == TILE * TILE;
             boolean restore = !refreshedPreview && (cacheable
                     || ExtendedLodMeshCache.hasSaved(meshCache, tx, tz, savedDetail));
-            byte[] fingerprint = cacheable || restore ? ExtendedLodMeshFingerprint.of(chunks, materials) : null;
+            byte[] fingerprint = cacheable || restore ? ExtendedLodMeshFingerprint.of(lightingChunks, materials,settings) : null;
             if (restore) {
                 var restored = ExtendedLodMeshCache.load(meshCache, tx, tz, savedDetail, fingerprint);
                 if (restored != null) {
@@ -658,7 +678,8 @@ public final class ExtendedWorldLodRenderer {
             // Save *the display geometry* as well as its 1x1 source snapshot:
             // all four LOD bands (including mixed-resolution boundaries) can
             // be replayed directly at the next launch without re-meshing.
-            ByteBuffer packed = ExtendedPackedQuads.pack(result.vertices());
+            var lighting=pl.sofron.extended.LodRgbLighting.build(lightingChunks,materials,settings,tx,tz);
+            ByteBuffer packed = ExtendedPackedQuads.pack(result.vertices(),lighting);
             var ready = new ExtendedLodMeshCache.Packed(packed, result.quads());
             // Render the finished tile immediately; compress and write its
             // persistent cache on a separate bounded low-priority I/O worker.

@@ -82,7 +82,20 @@ void main() {
         texCoord0 = vec2(float(uv & 65535u), float(uv >> 16u)) * (1.0 / 65535.0);
         if (material >= 128 && material <= 143) emission = material - 128;
     }
-    vertexColor = vec4(Color.rgb * texelFetch(Sampler2, ivec2(emission, 15), 0).rgb, 1.0);
+    uint light = PackedC.w;
+    float strength=float(light >> 25u)/127.0;
+    vec3 hue=vec3(float((light>>1u)&255u),float((light>>9u)&255u),float((light>>17u)&255u))/255.0;
+    float daylight=1.0-smoothstep(0.38,0.85,texelFetch(Sampler2,ivec2(0,15),0).r);
+    int level=emission;
+    if(strength>0.0 && emission==0){
+        level=int(round(15.0*sqrt(strength)));
+    }
+    vec3 lit=Color.rgb*texelFetch(Sampler2,ivec2(level,15),0).rgb;
+    if(strength>0.0 && emission==0){
+        float redBoost=1.0+0.65*max(0.0,hue.r-max(hue.g,hue.b));
+        lit=mix(lit,min(vec3(1.0),lit*hue*redBoost),min(strength*daylight,0.92));
+    }
+    vertexColor=vec4(lit,1.0);
 
     // ModelOffset is the exact camera-relative origin of this LOD tile.
     // Fog calculations retain the original 16/32/64/128-chunk bands.

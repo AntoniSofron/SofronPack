@@ -64,6 +64,7 @@ public final class BlockLightRules {
     public static boolean hasEmissionOverrides() { return emissionOverrides; }
     private static volatile long revision;
     public static long revision() { return revision; }
+    public static Map<String,Rule> snapshot(){return rules;}
     public static int ruleCount() { return rules.size(); }
     private static volatile long lastCheck = 0;
     private BlockLightRules() {}

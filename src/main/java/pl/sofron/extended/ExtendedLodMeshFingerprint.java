@@ -21,6 +21,11 @@ public final class ExtendedLodMeshFingerprint {
 
     public static byte[] of(ExtendedVoxelStore.VoxelChunk[] sources,
                             ExtendedVoxelMesher.MaterialResolver materials) {
+        return of(sources,materials,null);
+    }
+
+    public static byte[] of(ExtendedVoxelStore.VoxelChunk[] sources,
+                            ExtendedVoxelMesher.MaterialResolver materials,LodRgbLighting.Settings lighting) {
         MessageDigest hash;
         try {
             hash = MessageDigest.getInstance("SHA-256");
@@ -28,7 +33,8 @@ public final class ExtendedLodMeshFingerprint {
             throw new IllegalStateException(impossible);
         }
         // Bump this format salt whenever mesh algorithms change.
-        string(hash, "SofronPack-mesh-v1:volume6:surface6:packed48:snow8:gaps");
+        string(hash, "SofronPack-mesh-v1:volume6:surface6:packed48:snow8:gaps:rgb1");
+        if(lighting!=null)string(hash,lighting.fingerprint());
         TreeSet<String> used = new TreeSet<>();
         for (var chunk : sources) {
             if (chunk == null) {
