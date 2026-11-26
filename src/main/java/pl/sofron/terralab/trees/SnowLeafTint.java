@@ -8,16 +8,22 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.core.registries.BuiltInRegistries;
 
 public final class SnowLeafTint {
+    private static final ThreadLocal<BlockPos.MutableBlockPos> CURSOR = ThreadLocal.withInitial(BlockPos.MutableBlockPos::new);
+    private static final java.util.Set<net.minecraft.world.level.block.Block> ELIGIBLE = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+    static {
+        for (var block : BuiltInRegistries.BLOCK) {
+            if (block instanceof LeavesBlock && SnowLeafGradient.eligible(BuiltInRegistries.BLOCK.getKey(block).toString())) ELIGIBLE.add(block);
+        }
+    }
     private SnowLeafTint() {}
     public static boolean eligible(BlockState state) {
-        return state.getBlock() instanceof LeavesBlock && SnowLeafGradient.eligible(
-                BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString());
+        return ELIGIBLE.contains(state.getBlock());
     }
     public static boolean snow(BlockState state) {
         return state.is(Blocks.SNOW) || state.is(Blocks.SNOW_BLOCK);
     }
     public static int color(int base, BlockAndTintGetter level, BlockPos pos) {
-        BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
+        BlockPos.MutableBlockPos cursor = CURSOR.get();
         for (int i = 1; i <= SnowLeafGradient.DEPTH; i++) {
             cursor.set(pos.getX(), pos.getY() + i, pos.getZ());
             BlockState above = level.getBlockState(cursor);

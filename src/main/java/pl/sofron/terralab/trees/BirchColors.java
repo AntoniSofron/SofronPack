@@ -55,8 +55,8 @@ public final class BirchColors implements ClientModInitializer {
             register(leaf, BlockTintSources.foliage().color(leaf.defaultBlockState()),
                     (biome, x, z) -> biome.getFoliageColor());
         }
-        // Pale oak has a fixed, already-colored vanilla texture. Keep its normal tint.
-        register(Blocks.PALE_OAK_LEAVES, 0xFFFFFFFF, (biome, x, z) -> 0xFFFFFF);
+        // Pale oak texture is normalized so the fixed tint reproduces its original color.
+        register(Blocks.PALE_OAK_LEAVES, 0xFFA0A69C, (biome, x, z) -> 0xA0A69C);
         register(Blocks.OAK_LEAVES, BlockTintSources.foliage().color(Blocks.OAK_LEAVES.defaultBlockState()),
                 (biome, x, z) -> {
                     var p = palette(biome);
