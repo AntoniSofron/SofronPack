@@ -15,7 +15,7 @@ public record BiomePalette(int id, int sky, int fog, int water, int grass, int f
     private static final Map<String, BiomePalette> BIOMES = new HashMap<>();
     // IDs in the CSV are persistent. Old snapshots have 0 or 255 in the high byte.
     private static final BiomePalette[] BY_ID = new BiomePalette[256];
-    public static final int DEFAULT_BIRCH = 0x80A755, DEFAULT_SPRUCE = 0x619961, DEFAULT_PINE = 0x72AA44;
+    public static final int DEFAULT_BIRCH = 0x80A755, DEFAULT_SPRUCE = 0x619961, DEFAULT_PINE = 0x72AA44, DEFAULT_FIR = 0x4E9E35;
 
     static {
         var resource = BiomePalette.class.getResourceAsStream("/assets/sofronpack/atmosphere/biome_colors.csv");
@@ -40,14 +40,22 @@ public record BiomePalette(int id, int sky, int fog, int water, int grass, int f
     }
 
     public int pine() {
-        int red = pineChannel(16);
-        int green = pineChannel(8);
-        return (red << 16) | (green << 8) | pineChannel(0);
+        return coniferColor(DEFAULT_PINE);
     }
 
-    private int pineChannel(int shift) {
+    public int fir() {
+        return coniferColor(DEFAULT_FIR);
+    }
+
+    private int coniferColor(int base) {
+        int red = shiftedChannel(base, 16);
+        int green = shiftedChannel(base, 8);
+        return (red << 16) | (green << 8) | shiftedChannel(base, 0);
+    }
+
+    private int shiftedChannel(int base, int shift) {
         int delta = ((spruce >>> shift) & 255) - ((DEFAULT_SPRUCE >>> shift) & 255);
-        return Math.clamp(((DEFAULT_PINE >>> shift) & 255) + delta, 0, 255);
+        return Math.clamp(((base >>> shift) & 255) + delta, 0, 255);
     }
 
     private static int rgb(String value) {

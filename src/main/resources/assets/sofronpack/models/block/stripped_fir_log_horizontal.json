@@ -1,7 +1,7 @@
 {
   "parent": "minecraft:block/stripped_spruce_log_horizontal",
   "textures": {
-    "side": "minecraft:block/stripped_spruce_log",
-    "end": "minecraft:block/stripped_spruce_log_top"
+    "side": "sofronpack:block/stripped_fir_log",
+    "end": "sofronpack:block/stripped_fir_log_top"
   }
 }
