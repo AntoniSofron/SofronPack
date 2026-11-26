@@ -21,7 +21,8 @@ public record OreMasks(Map<TextureAtlasSprite, TextureAtlasSprite> pairs, Set<Te
         Collections.synchronizedSet(Collections.newSetFromMap(new WeakHashMap<>()));
 
     public static boolean isLeafDetail(String path) {
-        return path.endsWith("_leaves_bottom") || path.endsWith("_leaves_top");
+        return path.endsWith("_leaves_bottom") || path.endsWith("_leaves_top")
+                || path.endsWith("_leaves_bottom_neutral") || path.endsWith("_leaves_top_neutral");
     }
 
     public static void markLeafAlias(SpriteContents contents) {
