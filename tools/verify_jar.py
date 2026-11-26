@@ -414,9 +414,14 @@ with zipfile.ZipFile(jar) as z:
         namespace = "sofronpack" if "poplar" in foliage_type else "minecraft"
         model = json.loads(z.read(f"assets/{namespace}/models/block/{name}.json"))
         assert model["parent"] == "sofronpack:block/near_leaves_template"
-        assert model["textures"]["all"] == f"minecraft:block/{name}"
-        assert model["textures"]["top"] == f"sofronpack:block/{name}_top"
-        assert model["textures"]["bottom"] == f"sofronpack:block/{name}_bottom"
+        if foliage_type == "pale_oak":
+            for key, suffix in (("all", "_neutral"), ("top", "_top_neutral"), ("bottom", "_bottom_neutral")):
+                assert model["textures"][key] == f"sofronpack:block/{name}{suffix}"
+                assert f"assets/sofronpack/textures/block/{name}{suffix}.png" in files
+        else:
+            assert model["textures"]["all"] == f"minecraft:block/{name}"
+            assert model["textures"]["top"] == f"sofronpack:block/{name}_top"
+            assert model["textures"]["bottom"] == f"sofronpack:block/{name}_bottom"
     flower = json.loads(z.read("assets/minecraft/models/block/flowering_azalea_leaves.json"))
     assert flower["textures"]["top"] == "sofronpack:block/azalea_leaves_top"
     assert flower["textures"]["bottom"] == "sofronpack:block/azalea_leaves_bottom"
