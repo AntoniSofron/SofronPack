@@ -17,7 +17,8 @@ public final class ChunkLightAtlas {
     private static final int GRID = 9;
     private static final ByteBuffer EMPTY_BYTES = ByteBuffer.allocateDirect(4).order(ByteOrder.nativeOrder()).asReadOnlyBuffer();
     private static final int MAX_WORDS = 16 * 1024 * 1024;
-    private record Column(List<LightSource> lights, int[] words) {}
+    private record Column(List<LightSource> lights, List<StationaryOcclusion.Column> geometry, int[] words) {}
+    private final StationaryReach reach = new StationaryReach();
     // Placed light centers sit on half-block coordinates. For each configured radius
     // there are only a finite number of distinct squared distances to a grid node.
     private final Map<Float, float[]> falloffs = new java.util.LinkedHashMap<>(16, 0.75f, true) {
@@ -60,9 +61,11 @@ public final class ChunkLightAtlas {
             long key = ((long)cx << 32) | (cz & 0xffffffffL);
             List<LightSource> lights = index.affecting(cx,cz);
             if (lights.isEmpty()) { cached.remove(key); continue; }
+            var geometry=index.geometry();
+            var neighborhood=geometry.known()?geometry.neighborhood(cx,cz,index.geometryReach()):List.<StationaryOcclusion.Column>of();
             Column column = cached.get(key);
-            if (column == null || !column.lights.equals(lights)) {
-                column = new Column(lights, encode(lights,cx*16,cz*16));
+            if (column == null || !column.lights.equals(lights) || !column.geometry.equals(neighborhood)) {
+                column = new Column(lights, neighborhood, encode(lights,cx*16,cz*16,geometry));
                 cached.put(key,column);
             }
             columns[z*width+x] = column;
@@ -94,7 +97,7 @@ public final class ChunkLightAtlas {
         return new Snapshot(staging.asReadOnlyBuffer().order(ByteOrder.nativeOrder()),cells,references);
     }
 
-    private int[] encode(List<LightSource> lights, int x0, int z0) {
+    private int[] encode(List<LightSource> lights, int x0, int z0, StationaryOcclusion geometry) {
         var sections = new TreeMap<Integer,List<LightSource>>();
         for (LightSource light : lights) {
             int low = (int)Math.floor((light.y()-light.radius())/16);
@@ -109,9 +112,9 @@ public final class ChunkLightAtlas {
         sections.forEach((section, local) -> {
             out.set(2+section-low,out.size());
             int y0 = section*16;
-            if (local.size() > 12 && local.stream().allMatch(s -> s.radius() >= 2)) {
+            if (geometry.known() || (local.size() > 12 && local.stream().allMatch(s -> s.radius() >= 2))) {
                 out.add(-1);
-                bake(out,local,x0,y0,z0);
+                bake(out,local,x0,y0,z0,geometry);
             } else {
                 out.add(local.size());
                 for (LightSource s : local) {
@@ -123,7 +126,7 @@ public final class ChunkLightAtlas {
         return out.toIntArray();
     }
 
-    private void bake(IntArrayList out, List<LightSource> lights, int x0, int y0, int z0) {
+    private void bake(IntArrayList out, List<LightSource> lights, int x0, int y0, int z0, StationaryOcclusion geometry) {
         float[] sums = bakeScratch;
         java.util.Arrays.fill(sums, 0f);
         // Group by exact hue; sum every source's original radial energy and
@@ -161,7 +164,9 @@ public final class ChunkLightAtlas {
                 groupEnergy[at]+=influence;
             }
             }
+            boolean[] reachable=geometry.known()?reach.sample(entry.getValue(),x0,y0,z0,geometry):null;
             for (int node=0;node<groupWeights.length;node++) {
+                if(reachable!=null&&!reachable[node])continue;
                 float weight=groupWeights[node];
                 if (weight==0f) continue;
                 int at=5*node;

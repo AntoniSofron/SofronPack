@@ -1,0 +1,3 @@
+# Static RGB occlusion (0.1.99)
+
+The existing radial energy calculation is retained. A compact immutable block-opacity mask is captured on the client and shared with the background atlas worker. One multi-source six-neighbor connectivity flood per hue gates the two-block lighting lattice. Opaque blocks stop connectivity, and openings allow the hue to travel around them. Changed geometry invalidates only affected cached columns. This is a conservative approximate model, not exact ray tracing: it uses the largest radius in each hue group for connectivity and interpolation between two-block nodes. Unknown chunks are treated as closed. Existing Minecraft lighting remains the base brightness. No per-frame flood or new shader pass is added.

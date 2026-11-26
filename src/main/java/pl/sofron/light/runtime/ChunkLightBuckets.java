@@ -10,6 +10,9 @@ import java.util.TreeMap;
 import pl.sofron.light.engine.LightSource;
 
 public final class ChunkLightBuckets {
+    private StationaryOcclusion geometry = new StationaryOcclusion();
+    public StationaryOcclusion geometry(){return geometry;}
+    public int geometryReach(){return (int)Math.ceil(maxRadius/16.0)+1;}
     private final Map<Long, List<LightSource>> buckets = new HashMap<>();
     // Store the result for each queried target column, not just its emitters.
     // When a source changes, only its nearby columns need rebuilding.
@@ -30,6 +33,7 @@ public final class ChunkLightBuckets {
     public ChunkLightBuckets snapshot() {
         var copy = new ChunkLightBuckets();
         copy.buckets.putAll(buckets);
+        copy.geometry=geometry.snapshot();
         copy.maxRadius = maxRadius;
         copy.sourceCount = sourceCount;
         return copy;
@@ -37,6 +41,7 @@ public final class ChunkLightBuckets {
 
     public void clear() {
         buckets.clear();
+        geometry.clear();
         affectingCache.clear();
         radii.clear();
         sourceCount = 0;
