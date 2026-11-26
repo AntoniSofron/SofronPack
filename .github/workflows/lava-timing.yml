@@ -35,9 +35,10 @@ jobs:
       - name: Compare builds
         run: |
           cp tools/LavaFrames.java /tmp/
-          for ref in d4b45525a90f0a6a12cda64fcddaab913dc0eca2 8e95db191495505aa837fc7301e65278ac3db1ad; do
+          for ref in d4b45525a90f0a6a12cda64fcddaab913dc0eca2 2c0a13e82273beb34304a6c768f73afe7f235e66; do
             work=/tmp/lake-${ref}
             git worktree add --detach "$work" "$ref"
+            git show 2c0a13e82273beb34304a6c768f73afe7f235e66:src/main/resources/assets/sofronpack/shaders/blocks/block_layer_opaque.vsh > "$work/src/main/resources/assets/sofronpack/shaders/blocks/block_layer_opaque.vsh"
             mkdir -p "$work"/{run/{mods,config,saves},src/main/java/pl/sofron/smoke}
             cp -a run/sofronpack-wild-rice-smoke "$work/run/saves/Lake"
             cp libs/sodium*.jar "$work/run/mods/"
