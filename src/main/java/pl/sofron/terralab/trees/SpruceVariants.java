@@ -28,6 +28,8 @@ public record SpruceVariants(Holder<Feature> original) implements Feature {
             Identifier.fromNamespaceAndPath(TerraLabMod.MOD_ID, "vanilla_pine"));
     private static final ResourceKey<Feature> VANILLA_SPRUCE = ResourceKey.create(Registries.FEATURE,
             Identifier.fromNamespaceAndPath(TerraLabMod.MOD_ID, "vanilla_spruce"));
+    private static final ResourceKey<Feature> NEW_PINE = ResourceKey.create(Registries.FEATURE,
+            Identifier.fromNamespaceAndPath(TerraLabMod.MOD_ID, "pine_tree"));
     private static final BlockPos NARROW_ROOT = new BlockPos(2, 0, 2);
 
     private static final BlockPos WIDE_ROOT = new BlockPos(3, 0, 3);
@@ -39,16 +41,20 @@ public record SpruceVariants(Holder<Feature> original) implements Feature {
     public boolean place(WorldGenLevel level, ChunkGenerator generator, RandomSource random, BlockPos origin) {
         var biome = level.getBiome(origin);
         boolean mixed = biome.is(MIXED_CONIFERS);
-        if (!mixed && !biome.is(TAIGAS)) return original.value().place(level, generator, random, origin);
-
-        boolean pine = biome.is(Biomes.OLD_GROWTH_PINE_TAIGA);
+        boolean pine = biome.is(Biomes.OLD_GROWTH_PINE_TAIGA) || original.is(VANILLA_PINE);
+        if (level instanceof net.minecraft.server.level.ServerLevel)
+            return original.value().place(level, generator, random, origin);
         Feature vanilla = original.value();
         if (mixed) {
             pine = random.nextInt(4) < 3;
             vanilla = level.registryAccess().lookupOrThrow(Registries.FEATURE)
                     .getOrThrow(pine ? VANILLA_PINE : VANILLA_SPRUCE).value();
         }
-        if (random.nextInt(5) >= 3) return vanilla.place(level, generator, random, origin);
+        if (!mixed && !biome.is(TAIGAS) || random.nextInt(5) >= 3) {
+            if (!pine) return vanilla.place(level, generator, random, origin);
+            return level.registryAccess().lookupOrThrow(Registries.FEATURE).getOrThrow(NEW_PINE).value()
+                    .place(level, generator, random, origin);
+        }
         if (!(vanilla instanceof TreeFeature tree)) return false;
         int variant = 1 + random.nextInt(pine ? 3 : 5);
         BlockPos root = variant >= (pine ? 3 : 4) ? WIDE_ROOT : NARROW_ROOT;

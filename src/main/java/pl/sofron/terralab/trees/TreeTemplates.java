@@ -55,12 +55,17 @@ final class TreeTemplates {
         Set<BlockPos> logs = decorate ? new HashSet<>() : Set.of();
         Set<BlockPos> leaves = decorate ? new HashSet<>() : Set.of();
         for (StructureBlockInfo block : wood) {
-            level.setBlock(block.pos(), block.state(), 19);
+            Block target = log == Blocks.SPRUCE_LOG && path.contains("pine_")
+                    ? (block.state().is(Blocks.SPRUCE_WOOD) ? TreeWoodContent.PINE.wood() : TreeWoodContent.PINE.log())
+                    : block.state().getBlock();
+            level.setBlock(block.pos(), target.withPropertiesOf(block.state()), 19);
             if (decorate) logs.add(block.pos());
         }
         for (var block : canopy) {
             if (TreeFeature.validTreePos(level, block.pos())) {
-                level.setBlock(block.pos(), block.state().setValue(BlockStateProperties.PERSISTENT, false), 19);
+                Block target = log == Blocks.SPRUCE_LOG && path.contains("pine_")
+                        ? TreeWoodContent.PINE.leaves() : block.state().getBlock();
+                level.setBlock(block.pos(), target.withPropertiesOf(block.state()).setValue(BlockStateProperties.PERSISTENT, false), 19);
                 if (decorate) leaves.add(block.pos());
             }
         }

@@ -252,7 +252,7 @@ public final class ExtendedSurfaceMesh {
         if (water(name)) return water;
         if (name.contains("leaves")) {
             var palette = pl.sofron.terralab.BiomePalette.fromFoliage(foliage);
-            if (name.startsWith("minecraft:spruce_leaves")) return palette == null ? 0x619961 : palette.spruce();
+            if (name.startsWith("minecraft:spruce_leaves") || name.startsWith("sofronpack:pine_leaves")) return palette == null ? 0x619961 : palette.spruce();
             if (name.startsWith("minecraft:birch_leaves")) return palette == null ? 0x80A755 : palette.birch();
             if (name.startsWith("minecraft:oak_leaves") && palette != null && palette.oak() >= 0) return palette.oak();
             return foliage & 0xffffff;

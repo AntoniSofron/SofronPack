@@ -17,6 +17,7 @@ public final class TerraLabMod implements ModInitializer {
     @Override
     public void onInitialize() {
         BiomePalette.register();
+        pl.sofron.terralab.trees.TreeWoodContent.register();
         VillageStructure.register();
         pl.sofron.atmosphere.SofronCloudAirflow.warmUp();
         pl.sofron.extended.ExtendedWorldPrefetch.register();
