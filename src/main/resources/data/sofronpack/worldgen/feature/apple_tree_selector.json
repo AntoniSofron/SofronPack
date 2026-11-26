@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:random_selector",
+  "default": {
+    "feature": "sofronpack:apple_tree",
+    "placement": []
+  },
+  "features": [
+    {
+      "chance": 0.2,
+      "feature": {
+        "feature": "sofronpack:fancy_apple_tree",
+        "placement": []
+      }
+    }
+  ]
+}

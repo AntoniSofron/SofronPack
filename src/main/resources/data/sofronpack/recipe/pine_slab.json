@@ -1,0 +1,14 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "building",
+  "pattern": [
+    "PPP"
+  ],
+  "key": {
+    "P": "sofronpack:pine_planks"
+  },
+  "result": {
+    "id": "sofronpack:pine_slab",
+    "count": 6
+  }
+}

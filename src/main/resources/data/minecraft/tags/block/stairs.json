@@ -9,6 +9,8 @@
     "sofronpack:podzol_stairs",
     "sofronpack:mud_stairs",
     "sofronpack:clay_stairs",
-    "sofronpack:farmland_stairs"
+    "sofronpack:farmland_stairs",
+    "sofronpack:pine_stairs",
+    "sofronpack:apple_stairs"
   ]
 }

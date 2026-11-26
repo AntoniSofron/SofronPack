@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "building",
+  "pattern": [
+    "LLL",
+    "   ",
+    "LLL"
+  ],
+  "key": {
+    "L": "sofronpack:stripped_apple_log"
+  },
+  "result": {
+    "id": "sofronpack:apple_shelf",
+    "count": 6
+  }
+}

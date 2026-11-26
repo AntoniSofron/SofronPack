@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:block",
+  "pools": [
+    {
+      "rolls": 1,
+      "condition": {
+        "type": "minecraft:survives_explosion"
+      },
+      "entries": [
+        {
+          "type": "minecraft:item",
+          "name": "sofronpack:apple_sign"
+        }
+      ]
+    }
+  ],
+  "random_sequence": "sofronpack:blocks/apple_wall_sign"
+}

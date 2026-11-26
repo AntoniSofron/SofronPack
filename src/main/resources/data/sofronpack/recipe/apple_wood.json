@@ -1,0 +1,15 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "building",
+  "pattern": [
+    "LL",
+    "LL"
+  ],
+  "key": {
+    "L": "sofronpack:apple_log"
+  },
+  "result": {
+    "id": "sofronpack:apple_wood",
+    "count": 3
+  }
+}

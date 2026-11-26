@@ -1,0 +1,15 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    [
+      "sofronpack:apple_log",
+      "sofronpack:apple_wood",
+      "sofronpack:stripped_apple_log",
+      "sofronpack:stripped_apple_wood"
+    ]
+  ],
+  "result": {
+    "id": "sofronpack:apple_planks",
+    "count": 4
+  }
+}

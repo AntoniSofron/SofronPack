@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "building",
+  "pattern": [
+    "C C",
+    "LLL",
+    "LLL"
+  ],
+  "key": {
+    "C": "minecraft:iron_chain",
+    "L": "sofronpack:stripped_apple_log"
+  },
+  "result": {
+    "id": "sofronpack:apple_hanging_sign",
+    "count": 6
+  }
+}

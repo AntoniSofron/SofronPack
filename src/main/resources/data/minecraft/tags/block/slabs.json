@@ -9,6 +9,8 @@
     "sofronpack:podzol_slab",
     "sofronpack:mud_slab",
     "sofronpack:clay_slab",
-    "sofronpack:farmland_slab"
+    "sofronpack:farmland_slab",
+    "sofronpack:pine_slab",
+    "sofronpack:apple_slab"
   ]
 }

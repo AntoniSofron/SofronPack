@@ -1,20 +1,21 @@
 {
   "type": "minecraft:random_selector",
   "default": {
-    "feature": {
-      "type": "sofronpack:oak_variants",
-      "original": "minecraft:oak_bees_005"
-    },
+    "feature": "minecraft:oak_bees_005",
     "placement": []
   },
   "features": [
     {
+      "chance": 0.15,
+      "feature": {
+        "feature": "sofronpack:apple_tree_selector",
+        "placement": []
+      }
+    },
+    {
       "chance": 0.33333334,
       "feature": {
-        "feature": {
-          "type": "sofronpack:oak_variants",
-          "original": "minecraft:fancy_oak_bees_005"
-        },
+        "feature": "minecraft:fancy_oak_bees_005",
         "placement": []
       }
     },

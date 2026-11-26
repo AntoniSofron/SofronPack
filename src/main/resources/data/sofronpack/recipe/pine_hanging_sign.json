@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "building",
+  "pattern": [
+    "C C",
+    "LLL",
+    "LLL"
+  ],
+  "key": {
+    "C": "minecraft:iron_chain",
+    "L": "sofronpack:stripped_pine_log"
+  },
+  "result": {
+    "id": "sofronpack:pine_hanging_sign",
+    "count": 6
+  }
+}
