@@ -35,9 +35,9 @@ public final class BirchColors implements ClientModInitializer {
             var p = palette(biome);
             return p == null ? BiomePalette.DEFAULT_BIRCH : p.birch();
         });
-        register(TreeWoodContent.PINE.leaves(), 0xFF000000 | BiomePalette.DEFAULT_SPRUCE, (biome, x, z) -> {
+        register(TreeWoodContent.PINE.leaves(), 0xFF000000 | BiomePalette.DEFAULT_PINE, (biome, x, z) -> {
             var p = palette(biome);
-            return p == null ? BiomePalette.DEFAULT_SPRUCE : p.spruce();
+            return p == null ? BiomePalette.DEFAULT_PINE : p.pine();
         });
         register(TreeWoodContent.APPLE.leaves(), BlockTintSources.foliage().color(Blocks.OAK_LEAVES.defaultBlockState()),
                 (biome, x, z) -> biome.getFoliageColor());
