@@ -3,7 +3,7 @@
   "below_trunk_provider": "minecraft:soil_beneath_tree",
   "decorators": [],
   "foliage_placer": {
-    "type": "sofronpack:fir_foliage_placer",
+    "type": "minecraft:spruce_foliage_placer",
     "offset": {
       "type": "minecraft:uniform",
       "max_inclusive": 2,

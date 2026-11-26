@@ -2,6 +2,7 @@ package pl.sofron.extended;
 
 import pl.sofron.extended.mesh.SofronScanMesher2D;
 import java.nio.ByteBuffer;
+import pl.sofron.terralab.trees.SnowLeafGradient;
 import java.nio.ByteOrder;
 import java.util.LinkedHashMap;
 import net.minecraft.core.Direction;
@@ -28,6 +29,7 @@ public final class ExtendedSurfaceMesh {
         final short[][] winner = {new short[256], new short[64], new short[16], new short[4]};
         final int[] height = new int[256];
         final short[] top = new short[256], side = new short[256];
+        final byte[] topFrost = new byte[256], sideFrost = new byte[256];
 
         final short[] backing = new short[256];
         final int[] backingHeight = new int[256];
@@ -42,6 +44,7 @@ public final class ExtendedSurfaceMesh {
                 solid[i] = topFace != null && (!topFace.translucent() || water(palette[i]));
             }
             short[] cells = source.unpack();
+            byte[] frost = SnowLeafGradient.voxelSteps(palette, cells);
             for (int column = 0; column < 256; column++) {
                 winner[0][column] = (short) column;
                 height[column] = Integer.MIN_VALUE;
@@ -51,6 +54,10 @@ public final class ExtendedSurfaceMesh {
                     height[column] = source.minY() + y + 1;
                     top[column] = cells[at];
                     side[column] = y > 0 && cells[at - 256] != 0 ? cells[at - 256] : cells[at];
+                    if (frost != null) {
+                        topFrost[column] = frost[at];
+                        sideFrost[column] = frost[y > 0 && cells[at - 256] != 0 ? at - 256 : at];
+                    }
                     if (!solid[cells[at]]) {
                         for (int by = y - 1; by >= 0; by--) {
                             short id = cells[by * 256 + column];
@@ -156,7 +163,7 @@ public final class ExtendedSurfaceMesh {
                     String name = own.palette[own.top[column]];
                     var uv = materials.face(name, Direction.UP);
                     if (uv == null) return;
-                    int tint = color(own.grass, own.foliage, own.water, name, uv.tint());
+                    int tint = SnowLeafGradient.blend(color(own.grass, own.foliage, own.water, name, uv.tint()), own.topFrost[column]);
                     int x0 = ox + (x + 1 - length) * detail, x1 = ox + (x + 1) * detail;
                     int z0 = oz + (z + 1 - width) * detail, z1 = oz + (z + 1) * detail;
                     float u = packUv(uv.u0(), uv.u1()), v = packUv(uv.v0(), uv.v1());
@@ -172,7 +179,7 @@ public final class ExtendedSurfaceMesh {
                 for (int x = ox; x < ox + 16; x += detail) {
                     int column = own.column(x, z, detail);
                     int h = own.height[column];
-                    tops.putNext(h == Integer.MIN_VALUE ? 0 : ((long)h << 16) | own.top[column]);
+                    tops.putNext(h == Integer.MIN_VALUE ? 0 : ((long)h << 20) | ((long)own.topFrost[column] << 16) | own.top[column]);
                     if (h == Integer.MIN_VALUE) continue;
                     if (own.backing[column] != 0)
                         face(own, own.backing[column], x, own.backingHeight[column] - detail,
@@ -228,6 +235,10 @@ public final class ExtendedSurfaceMesh {
         var uv = materials.face(name, DIRECTIONS[face]);
         if (uv == null) return;
         int tint = color(own.grass, own.foliage, own.water, name, uv.tint());
+        if (SnowLeafGradient.eligible(name)) {
+            int column = own.column(x, z, width);
+            tint = SnowLeafGradient.blend(tint, id == own.side[column] ? own.sideFrost[column] : own.topFrost[column]);
+        }
         float inset = surfaceInset(name);
         int start = staging.position();
         ExtendedVoxelMesher.emit(staging, x, y, z, width, height - inset, face, uv, tint);

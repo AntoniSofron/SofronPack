@@ -1,6 +1,7 @@
 package pl.sofron.extended;
 
 import net.minecraft.core.Direction;
+import pl.sofron.terralab.trees.SnowLeafGradient;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.LinkedHashMap;
@@ -86,9 +87,11 @@ public final class ExtendedVoxelMesher {
     private static final class Decoded {
         final ExtendedVoxelStore.VoxelChunk source;
         final short[] cells;
+        final byte[] frost;
         Decoded(ExtendedVoxelStore.VoxelChunk source) {
             this.source = source;
             cells = source.unpack();
+            frost = SnowLeafGradient.voxelSteps(source.palette(), cells);
         }
     }
 
@@ -214,6 +217,9 @@ public final class ExtendedVoxelMesher {
                             tint = ExtendedSurfaceMesh.color(owner.source.grassTint(), owner.source.foliageTint(),
                                     owner.source.waterTint(), id, tint);
                         }
+                        Decoded frostOwner = chunks[(z / ExtendedVoxelStore.GRID + 1) * stride + x / ExtendedVoxelStore.GRID + 1];
+                        if (frostOwner.frost != null) tint = SnowLeafGradient.blend(tint,
+                                frostOwner.frost[(y * 16 + (z & 15)) * 16 + (x & 15)]);
                         if (++rendered > MAX_QUADS) {
                             data.flip();
                             return new Mesh(data.limit(MAX_QUADS * 4 * VERTEX_BYTES).slice().order(ByteOrder.nativeOrder()), MAX_QUADS);

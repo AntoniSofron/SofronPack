@@ -11,7 +11,9 @@
     "ExtendedFogCullingMixin",
     "BiomeZoomSeedAccessor",
     "ClientLodEditMixin",
-    "SofronMinimalDebugOverlayMixin"
+    "SofronMinimalDebugOverlayMixin",
+    "SnowLeafSliceMixin",
+    "SnowLeafRebuildMixin"
   ],
   "injectors": {
     "defaultRequire": 0

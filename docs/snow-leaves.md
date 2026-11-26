@@ -1,0 +1,3 @@
+# Snow-covered foliage (0.1.94)
+
+Snow layers and full snow blocks tint up to eight consecutive leaf blocks directly underneath, from 100% white to 12.5% white in equal steps. Cherry, azalea and flowering azalea, and all poplar colors are excluded and interrupt the column. Air and any other non-leaf block also interrupt the column. Near chunks use the block tint provider; the texture, shading and alpha are preserved. Distant captured voxels compute the same steps before horizontal mip reduction. Surface-only previews can show only their represented surface and canopy side, not the complete column. Old mesh fingerprints are invalidated, not the underlying saved voxel data. No per-tick world scan or additional GPU pass is introduced.

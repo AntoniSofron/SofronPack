@@ -51,6 +51,12 @@ public final class BirchColors implements ClientModInitializer {
             var p = palette(biome);
             return p == null ? BiomePalette.DEFAULT_SPRUCE : p.spruce();
         });
+        for (Block leaf : new Block[]{Blocks.JUNGLE_LEAVES, Blocks.ACACIA_LEAVES, Blocks.DARK_OAK_LEAVES, Blocks.MANGROVE_LEAVES}) {
+            register(leaf, BlockTintSources.foliage().color(leaf.defaultBlockState()),
+                    (biome, x, z) -> biome.getFoliageColor());
+        }
+        // Pale oak has a fixed, already-colored vanilla texture. Keep its normal tint.
+        register(Blocks.PALE_OAK_LEAVES, 0xFFFFFFFF, (biome, x, z) -> 0xFFFFFF);
         register(Blocks.OAK_LEAVES, BlockTintSources.foliage().color(Blocks.OAK_LEAVES.defaultBlockState()),
                 (biome, x, z) -> {
                     var p = palette(biome);
@@ -64,7 +70,7 @@ public final class BirchColors implements ClientModInitializer {
             public int color(BlockState state) { return defaultColor; }
 
             public int colorInWorld(BlockState state, BlockAndTintGetter level, BlockPos pos) {
-                return 0xFF000000 | level.getBlockTint(pos, resolver);
+                return SnowLeafTint.color(0xFF000000 | level.getBlockTint(pos, resolver), level, pos);
             }
         }), block);
     }

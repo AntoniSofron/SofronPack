@@ -1,6 +1,7 @@
 package pl.sofron.extended;
 
 import java.nio.ByteBuffer;
+import pl.sofron.terralab.trees.SnowLeafGradient;
 import java.nio.ByteOrder;
 import java.util.LinkedHashMap;
 import pl.sofron.extended.mesh.SofronScanMesher2D;
@@ -29,12 +30,14 @@ public final class ExtendedVolumeMesh {
         final VoxelChunk source;
         // 1/2/4/8 XZ samples per generated voxel footprint.
         final short[][] cells = new short[4][];
+        final byte[][] frost = new byte[4][];
         final int[] opacity;
         final ExtendedVoxelMesher.ModelFace[][] shapes;
         final int top;
         Volume(VoxelChunk source, MaterialResolver materials) {
             this.source = source;
             cells[0] = source.unpack();
+            frost[0] = SnowLeafGradient.voxelSteps(source.palette(), cells[0]);
             opacity = new int[source.palette().length];
             shapes = new ExtendedVoxelMesher.ModelFace[opacity.length][];
             for (int i = 1; i < opacity.length; i++) {
@@ -53,10 +56,13 @@ public final class ExtendedVolumeMesh {
             int w = 16 >> level, previous = w * 2;
             int height = top;
             short[] small = new short[w * w * height], large = cells[level - 1];
+            byte[] previousFrost = frost[level - 1];
+            byte[] smallFrost = previousFrost == null ? null : new byte[small.length];
             for (int y = 0; y < height; y++) for (int z = 0; z < w; z++) for (int x = 0; x < w; x++) {
                 int base = (y * previous + z * 2) * previous + x * 2;
                 int rank = 0;
                 short representative = 0;
+                byte representativeFrost = 0;
                 // Reduce the horizontal footprint only. Fluid boundaries retain their exact Y.
                 for (int child = 0; child < 4; child++) {
                     int at = base + (child & 1) + (child >> 1) * previous;
@@ -66,17 +72,27 @@ public final class ExtendedVolumeMesh {
                     if (id != 0 && opacity[id] != 0 && score >= rank) {
                         rank = score;
                         representative = id;
+                        if (previousFrost != null) representativeFrost = previousFrost[at];
                     }
                 }
-                small[(y * w + z) * w + x] = representative;
+                int dst = (y * w + z) * w + x;
+                small[dst] = representative;
+                if (smallFrost != null) smallFrost[dst] = representativeFrost;
             }
             cells[level] = small;
+            frost[level] = smallFrost;
         }
 
         short get(int x, int y, int z, int level) {
             if (y < 0 || y >= top) return 0;
             int w = 16 >> level;
             return cells[level][(y * w + ((z & 15) >> level)) * w + ((x & 15) >> level)];
+        }
+
+        int frost(int x, int y, int z, int level) {
+            if (frost[level] == null || y < 0 || y >= top) return 0;
+            int w = 16 >> level;
+            return frost[level][(y * w + ((z & 15) >> level)) * w + ((x & 15) >> level)];
         }
 
         // Only opaque SIDE walls can be merged vertically at distance.
@@ -202,7 +218,7 @@ public final class ExtendedVolumeMesh {
                                         visible = exposed(v, id, other, neighborId);
                                     }
                                 }
-                                scan.putNext(visible ? id : 0);
+                                scan.putNext(visible ? (id & 0xffffL) | ((long)v.frost(x, y, z, level) << 16) : 0);
                             }
                             scan.endRow();
                         }
@@ -240,6 +256,7 @@ public final class ExtendedVolumeMesh {
             reserveQuad();
             int rgb = ExtendedSurfaceMesh.color(v.source.grassTint(), v.source.foliageTint(),
                     v.source.waterTint(), v.source.palette()[id], face.tint());
+            rgb = SnowLeafGradient.blend(rgb, v.frost(x, y, z, 0));
             var p = face.vertices();
             for (int i = 0; i < 20; i += 5) {
                 staging.putFloat(cx * 16 + x + p[i]).putFloat(v.source.minY() + y + p[i+1])
@@ -269,11 +286,12 @@ public final class ExtendedVolumeMesh {
         }
 
         @Override protected void emitQuad(int col, int row, int width, int height, long key) {
-            String name = v.source.palette()[(int)key];
+            String name = v.source.palette()[(int)key & 0xffff];
             var uv = materials.face(name, FACES[face]);
             if (uv == null) return;
             reserveQuad();
             int tint = ExtendedSurfaceMesh.color(v.source.grassTint(), v.source.foliageTint(), v.source.waterTint(), name, uv.tint());
+            tint = SnowLeafGradient.blend(tint, (int)(key >>> 16));
             int shade = SHADE[face];
             float u = ExtendedSurfaceMesh.packUv(uv.u0(), uv.u1()), t = ExtendedSurfaceMesh.packUv(uv.v0(), uv.v1());
             int plane = slice + (face == 0 ? 1 : face == 3 || face == 5 ? step : 0);
