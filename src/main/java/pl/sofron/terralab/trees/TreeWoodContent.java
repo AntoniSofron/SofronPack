@@ -70,6 +70,7 @@ public final class TreeWoodContent {
                 WeightedList.<ResourceKey<Feature>>builder().build(), feature(pine?"pine_tree":"apple_tree"));
         Block sapling = part(n+"_sapling", pine?Blocks.SPRUCE_SAPLING:Blocks.OAK_SAPLING,
                 p -> new SaplingBlock(grower,p), NATURAL, 60, 100);
+        block("potted_"+n+"_sapling", Blocks.POTTED_OAK_SAPLING, p -> new FlowerPotBlock(sapling,p));
         part(n+"_stairs", Blocks.OAK_STAIRS, p -> new StairBlock(planks.defaultBlockState(),p), BUILDING, 5,20);
         part(n+"_slab", Blocks.OAK_SLAB, SlabBlock::new, BUILDING,5,20);
         part(n+"_fence", Blocks.OAK_FENCE, FenceBlock::new, BUILDING,5,20);
@@ -93,6 +94,7 @@ public final class TreeWoodContent {
         return new Family(log,wood,strippedLog,strippedWood,planks,leaves,sapling);
     }
     public static void register() {
+        TreeBoats.register();
         tab("building_blocks", BUILDING);
         tab("natural_blocks", NATURAL);
         tab("functional_blocks", FUNCTIONAL);

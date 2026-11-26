@@ -86,5 +86,15 @@
   "block.sofronpack.apple_sign": "Apple Sign",
   "block.sofronpack.apple_wall_sign": "Apple Wall Sign",
   "block.sofronpack.apple_hanging_sign": "Apple Hanging Sign",
-  "block.sofronpack.apple_wall_hanging_sign": "Apple Wall Hanging Sign"
+  "block.sofronpack.apple_wall_hanging_sign": "Apple Wall Hanging Sign",
+  "block.sofronpack.potted_pine_sapling": "Potted Pine Sapling",
+  "item.sofronpack.pine_boat": "Pine Boat",
+  "entity.sofronpack.pine_boat": "Pine Boat",
+  "item.sofronpack.pine_chest_boat": "Pine Chest Boat",
+  "entity.sofronpack.pine_chest_boat": "Pine Chest Boat",
+  "block.sofronpack.potted_apple_sapling": "Potted Apple Sapling",
+  "item.sofronpack.apple_boat": "Apple Boat",
+  "entity.sofronpack.apple_boat": "Apple Boat",
+  "item.sofronpack.apple_chest_boat": "Apple Chest Boat",
+  "entity.sofronpack.apple_chest_boat": "Apple Chest Boat"
 }

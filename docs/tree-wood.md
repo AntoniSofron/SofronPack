@@ -14,4 +14,4 @@ No swamp or shrub apple trees. No conversion of existing chunks.
 Building blocks, stripped logs, doors, trapdoors, fences, gates, stairs, slabs,
 buttons, pressure plates, shelves, signs and hanging signs are included.
 Complex door/sign/shelf textures initially reuse spruce visuals; logs/planks
-have unique colors. Boats and potted saplings are not included in this patch.
+have unique colors. Both families also include flower-pot saplings, normal and chest boats. Boats initially use spruce/oak models and textures, with independent entities, recipes and drops.

@@ -27,6 +27,7 @@ public final class BirchColors implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
+        TreeBoatRenderers.register();
         BlockColorRegistry.register(List.of(BlockTintSources.grass()),
                 pl.sofron.terralab.soil.SoilBlocks.slab(Blocks.GRASS_BLOCK),
                 pl.sofron.terralab.soil.SoilBlocks.stairs(Blocks.GRASS_BLOCK));

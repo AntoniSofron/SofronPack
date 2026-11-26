@@ -86,5 +86,15 @@
   "block.sofronpack.apple_sign": "Tabliczka jabłoni",
   "block.sofronpack.apple_wall_sign": "Tabliczka ścienna jabłoni",
   "block.sofronpack.apple_hanging_sign": "Wisząca tabliczka jabłoni",
-  "block.sofronpack.apple_wall_hanging_sign": "Wisząca tabliczka ścienna jabłoni"
+  "block.sofronpack.apple_wall_hanging_sign": "Wisząca tabliczka ścienna jabłoni",
+  "block.sofronpack.potted_pine_sapling": "Sadzonka sosny w doniczce",
+  "item.sofronpack.pine_boat": "Łódź sosny",
+  "entity.sofronpack.pine_boat": "Łódź sosny",
+  "item.sofronpack.pine_chest_boat": "Łódź sosny ze skrzynią",
+  "entity.sofronpack.pine_chest_boat": "Łódź sosny ze skrzynią",
+  "block.sofronpack.potted_apple_sapling": "Sadzonka jabłoni w doniczce",
+  "item.sofronpack.apple_boat": "Łódź jabłoni",
+  "entity.sofronpack.apple_boat": "Łódź jabłoni",
+  "item.sofronpack.apple_chest_boat": "Łódź jabłoni ze skrzynią",
+  "entity.sofronpack.apple_chest_boat": "Łódź jabłoni ze skrzynią"
 }

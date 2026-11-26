@@ -535,6 +535,22 @@ with zipfile.ZipFile(jar) as z:
     assert {"type": "minecraft:random_chance", "chance": 0.2} in terms
     assert {"type": "minecraft:match_block", "blocks": "sofronpack:wild_rice_crop", "state": {"age": "7"}} in terms
 
+    assert "pl/sofron/terralab/trees/TreeWoodContent.class" in files
+    assert "pl/sofron/terralab/trees/TreeBoats.class" in files
+    for wood in ("pine", "apple"):
+        for part in ("log", "wood", "planks", "leaves", "sapling", "stairs", "slab", "fence", "fence_gate", "door", "trapdoor", "button", "pressure_plate", "shelf", "sign", "hanging_sign"):
+            name = f"{wood}_{part}"
+            assert f"assets/sofronpack/blockstates/{name}.json" in files
+            assert f"assets/sofronpack/items/{name}.json" in files
+            assert f"data/sofronpack/loot_table/blocks/{name}.json" in files
+        for name in (f"{wood}_boat", f"{wood}_chest_boat"):
+            assert f"assets/sofronpack/items/{name}.json" in files
+            assert f"data/sofronpack/recipe/{name}.json" in files
+        assert f"assets/sofronpack/blockstates/potted_{wood}_sapling.json" in files
+    for wood in ("oak", "dark_oak"):
+        assert b'"minecraft:apple"' not in z.read(f"data/minecraft/loot_table/blocks/{wood}_leaves.json")
+    assert b'"minecraft:apple"' in z.read("data/sofronpack/loot_table/blocks/apple_leaves.json")
+
 
 pathlib.Path("dist").mkdir(exist_ok=True)
 shutil.copy2(jar, pathlib.Path("dist") / jar.name)
