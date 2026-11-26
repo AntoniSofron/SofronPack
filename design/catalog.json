@@ -5,7 +5,7 @@
     {
       "id": "vision",
       "title": "Wizja świata",
-      "subtitle": "Beta + Cascades + realizm",
+      "subtitle": "Beta + realizm",
       "description": "Ostateczny charakter generatora i proporcje stylów."
     },
     {
@@ -29,7 +29,7 @@
     {
       "id": "karst",
       "title": "Kras i iglice skalne",
-      "subtitle": "BOP Jade Cliffs",
+      "subtitle": "Skalne klify krasowe",
       "description": "Smukłe słupy, wieże, grupowanie i naturalne podstawy."
     },
     {
@@ -80,11 +80,7 @@
       "max": 100,
       "step": 1,
       "default": 75,
-      "unit": "%",
-      "refs": [
-        "Cascades",
-        "Moderner Beta"
-      ]
+      "unit": "%"
     },
     {
       "category": "vision",
@@ -96,11 +92,7 @@
       "max": 100,
       "step": 1,
       "default": 68,
-      "unit": "%",
-      "refs": [
-        "Tectonic",
-        "Wythers"
-      ]
+      "unit": "%"
     },
     {
       "category": "vision",
@@ -112,11 +104,7 @@
       "max": 100,
       "step": 1,
       "default": 56,
-      "unit": "%",
-      "refs": [
-        "Cascades",
-        "Terralith"
-      ]
+      "unit": "%"
     },
     {
       "category": "vision",
@@ -135,23 +123,18 @@
         ],
         [
           "scenic",
-          "Cascades — widowiskowo"
+          "Widowiskowo"
         ],
         [
           "realistic",
-          "Tectonic — geologicznie"
+          "Geologicznie"
         ],
         [
           "wild",
           "Dziko i fantasy"
         ]
       ],
-      "default": "balanced",
-      "refs": [
-        "Cascades",
-        "Tectonic",
-        "Moderner Beta"
-      ]
+      "default": "balanced"
     },
     {
       "category": "vision",
@@ -177,11 +160,7 @@
           "Silnie fantastycznie"
         ]
       ],
-      "default": "hybrid",
-      "refs": [
-        "Cascades",
-        "Tectonic"
-      ]
+      "default": "hybrid"
     },
     {
       "category": "continents",
@@ -193,11 +172,7 @@
       "max": 85,
       "step": 1,
       "default": 68,
-      "unit": "%",
-      "refs": [
-        "Continents",
-        "Tectonic"
-      ]
+      "unit": "%"
     },
     {
       "category": "continents",
@@ -209,11 +184,7 @@
       "max": 100,
       "step": 1,
       "default": 68,
-      "unit": "%",
-      "refs": [
-        "Continents",
-        "Tectonic"
-      ]
+      "unit": "%"
     },
     {
       "category": "continents",
@@ -225,11 +196,7 @@
       "max": 100,
       "step": 1,
       "default": 72,
-      "unit": "%",
-      "refs": [
-        "Continents",
-        "Tectonic"
-      ]
+      "unit": "%"
     },
     {
       "category": "continents",
@@ -241,11 +208,7 @@
       "max": 100,
       "step": 1,
       "default": 66,
-      "unit": "%",
-      "refs": [
-        "Tectonic",
-        "Terralith"
-      ]
+      "unit": "%"
     },
     {
       "category": "continents",
@@ -257,10 +220,7 @@
       "max": 100,
       "step": 1,
       "default": 32,
-      "unit": "%",
-      "refs": [
-        "Tectonic"
-      ]
+      "unit": "%"
     },
     {
       "category": "continents",
@@ -272,10 +232,7 @@
       "max": 100,
       "step": 1,
       "default": 62,
-      "unit": "%",
-      "refs": [
-        "Tectonic"
-      ]
+      "unit": "%"
     },
     {
       "category": "continents",
@@ -301,12 +258,7 @@
           "Kilka superkontynentów"
         ]
       ],
-      "default": "hybrid",
-      "refs": [
-        "Continents",
-        "Tectonic",
-        "Terralith"
-      ]
+      "default": "hybrid"
     },
     {
       "category": "mountains",
@@ -318,11 +270,7 @@
       "max": 100,
       "step": 1,
       "default": 43,
-      "unit": "%",
-      "refs": [
-        "Tectonic",
-        "Cascades"
-      ]
+      "unit": "%"
     },
     {
       "category": "mountains",
@@ -334,10 +282,7 @@
       "max": 100,
       "step": 1,
       "default": 74,
-      "unit": "%",
-      "refs": [
-        "Tectonic"
-      ]
+      "unit": "%"
     },
     {
       "category": "mountains",
@@ -349,10 +294,7 @@
       "max": 100,
       "step": 1,
       "default": 37,
-      "unit": "%",
-      "refs": [
-        "Tectonic"
-      ]
+      "unit": "%"
     },
     {
       "category": "mountains",
@@ -364,10 +306,7 @@
       "max": 310,
       "step": 1,
       "default": 255,
-      "unit": "Y",
-      "refs": [
-        "Tectonic"
-      ]
+      "unit": "Y"
     },
     {
       "category": "mountains",
@@ -379,11 +318,7 @@
       "max": 100,
       "step": 1,
       "default": 67,
-      "unit": "%",
-      "refs": [
-        "Cascades",
-        "Tectonic"
-      ]
+      "unit": "%"
     },
     {
       "category": "mountains",
@@ -395,11 +330,7 @@
       "max": 100,
       "step": 1,
       "default": 60,
-      "unit": "%",
-      "refs": [
-        "Tectonic",
-        "Wythers"
-      ]
+      "unit": "%"
     },
     {
       "category": "mountains",
@@ -411,10 +342,7 @@
       "max": 100,
       "step": 1,
       "default": 35,
-      "unit": "%",
-      "refs": [
-        "Cascades"
-      ]
+      "unit": "%"
     },
     {
       "category": "mountains",
@@ -426,10 +354,7 @@
       "max": 100,
       "step": 1,
       "default": 65,
-      "unit": "%",
-      "refs": [
-        "Tectonic"
-      ]
+      "unit": "%"
     },
     {
       "category": "mountains",
@@ -459,11 +384,7 @@
           "Zaokrąglone góry"
         ]
       ],
-      "default": "mixed",
-      "refs": [
-        "Tectonic",
-        "Cascades"
-      ]
+      "default": "mixed"
     },
     {
       "category": "beta",
@@ -475,11 +396,7 @@
       "max": 100,
       "step": 1,
       "default": 54,
-      "unit": "%",
-      "refs": [
-        "Cascades",
-        "Moderner Beta"
-      ]
+      "unit": "%"
     },
     {
       "category": "beta",
@@ -491,10 +408,7 @@
       "max": 100,
       "step": 1,
       "default": 65,
-      "unit": "%",
-      "refs": [
-        "Cascades"
-      ]
+      "unit": "%"
     },
     {
       "category": "beta",
@@ -506,11 +420,7 @@
       "max": 100,
       "step": 1,
       "default": 43,
-      "unit": "%",
-      "refs": [
-        "Cascades",
-        "Moderner Beta"
-      ]
+      "unit": "%"
     },
     {
       "category": "beta",
@@ -522,10 +432,7 @@
       "max": 100,
       "step": 1,
       "default": 12,
-      "unit": "%",
-      "refs": [
-        "Cascades"
-      ]
+      "unit": "%"
     },
     {
       "category": "beta",
@@ -537,11 +444,7 @@
       "max": 100,
       "step": 1,
       "default": 55,
-      "unit": "%",
-      "refs": [
-        "Moderner Beta",
-        "Cascades"
-      ]
+      "unit": "%"
     },
     {
       "category": "beta",
@@ -553,11 +456,7 @@
       "max": 100,
       "step": 1,
       "default": 69,
-      "unit": "%",
-      "refs": [
-        "Tectonic",
-        "Wythers"
-      ]
+      "unit": "%"
     },
     {
       "category": "beta",
@@ -569,11 +468,7 @@
       "max": 100,
       "step": 1,
       "default": 62,
-      "unit": "%",
-      "refs": [
-        "Tectonic",
-        "Wythers"
-      ]
+      "unit": "%"
     },
     {
       "category": "beta",
@@ -585,10 +480,7 @@
       "max": 100,
       "step": 1,
       "default": 30,
-      "unit": "%",
-      "refs": [
-        "Tectonic"
-      ]
+      "unit": "%"
     },
     {
       "category": "beta",
@@ -614,11 +506,7 @@
           "Wszędzie — bardzo dziko"
         ]
       ],
-      "default": "mixed",
-      "refs": [
-        "Cascades",
-        "Tectonic"
-      ]
+      "default": "mixed"
     },
     {
       "category": "karst",
@@ -630,11 +518,7 @@
       "max": 100,
       "step": 1,
       "default": 19,
-      "unit": "%",
-      "refs": [
-        "Biomes O’ Plenty",
-        "Terralith"
-      ]
+      "unit": "%"
     },
     {
       "category": "karst",
@@ -646,10 +530,7 @@
       "max": 100,
       "step": 1,
       "default": 81,
-      "unit": "%",
-      "refs": [
-        "Biomes O’ Plenty"
-      ]
+      "unit": "%"
     },
     {
       "category": "karst",
@@ -661,10 +542,7 @@
       "max": 100,
       "step": 1,
       "default": 78,
-      "unit": "%",
-      "refs": [
-        "Biomes O’ Plenty"
-      ]
+      "unit": "%"
     },
     {
       "category": "karst",
@@ -676,10 +554,7 @@
       "max": 100,
       "step": 1,
       "default": 17,
-      "unit": "%",
-      "refs": [
-        "Biomes O’ Plenty"
-      ]
+      "unit": "%"
     },
     {
       "category": "karst",
@@ -691,10 +566,7 @@
       "max": 100,
       "step": 1,
       "default": 92,
-      "unit": "%",
-      "refs": [
-        "Biomes O’ Plenty"
-      ]
+      "unit": "%"
     },
     {
       "category": "karst",
@@ -706,10 +578,7 @@
       "max": 100,
       "step": 1,
       "default": 48,
-      "unit": "%",
-      "refs": [
-        "Biomes O’ Plenty"
-      ]
+      "unit": "%"
     },
     {
       "category": "karst",
@@ -721,10 +590,7 @@
       "max": 100,
       "step": 1,
       "default": 35,
-      "unit": "%",
-      "refs": [
-        "Biomes O’ Plenty"
-      ]
+      "unit": "%"
     },
     {
       "category": "karst",
@@ -750,11 +616,7 @@
           "Naturalne ostańce skalne"
         ]
       ],
-      "default": "mixed",
-      "refs": [
-        "Biomes O’ Plenty",
-        "Terralith"
-      ]
+      "default": "mixed"
     },
     {
       "category": "karst",
@@ -780,10 +642,7 @@
           "Wszystkie odpowiednie regiony"
         ]
       ],
-      "default": "mixed",
-      "refs": [
-        "Biomes O’ Plenty"
-      ]
+      "default": "mixed"
     },
     {
       "category": "islands",
@@ -795,11 +654,7 @@
       "max": 100,
       "step": 1,
       "default": 57,
-      "unit": "%",
-      "refs": [
-        "Continents",
-        "Terralith"
-      ]
+      "unit": "%"
     },
     {
       "category": "islands",
@@ -811,10 +666,7 @@
       "max": 100,
       "step": 1,
       "default": 63,
-      "unit": "%",
-      "refs": [
-        "Continents"
-      ]
+      "unit": "%"
     },
     {
       "category": "islands",
@@ -826,26 +678,19 @@
       "max": 100,
       "step": 1,
       "default": 80,
-      "unit": "%",
-      "refs": [
-        "Terralith"
-      ]
+      "unit": "%"
     },
     {
       "category": "islands",
       "key": "alphaIslands",
       "label": "Charakter Alpha Islands",
-      "desc": "Fantastyczne wyspy i strome obrzeża, inspirowane Terralith.",
+      "desc": "Fantastyczne wyspy i strome obrzeża.",
       "type": "range",
       "min": 0,
       "max": 100,
       "step": 1,
       "default": 63,
-      "unit": "%",
-      "refs": [
-        "Terralith",
-        "Moderner Beta"
-      ]
+      "unit": "%"
     },
     {
       "category": "islands",
@@ -857,11 +702,7 @@
       "max": 100,
       "step": 1,
       "default": 10,
-      "unit": "%",
-      "refs": [
-        "Terralith",
-        "Cascades"
-      ]
+      "unit": "%"
     },
     {
       "category": "islands",
@@ -873,10 +714,7 @@
       "max": 100,
       "step": 1,
       "default": 54,
-      "unit": "%",
-      "refs": [
-        "Terralith"
-      ]
+      "unit": "%"
     },
     {
       "category": "islands",
@@ -902,11 +740,7 @@
           "Rozsiane wysepki"
         ]
       ],
-      "default": "mixed",
-      "refs": [
-        "Continents",
-        "Terralith"
-      ]
+      "default": "mixed"
     },
     {
       "category": "rivers",
@@ -918,11 +752,7 @@
       "max": 100,
       "step": 1,
       "default": 58,
-      "unit": "%",
-      "refs": [
-        "Cascades",
-        "Wythers"
-      ]
+      "unit": "%"
     },
     {
       "category": "rivers",
@@ -934,11 +764,7 @@
       "max": 100,
       "step": 1,
       "default": 51,
-      "unit": "%",
-      "refs": [
-        "Wythers",
-        "Navigable Rivers"
-      ]
+      "unit": "%"
     },
     {
       "category": "rivers",
@@ -950,11 +776,7 @@
       "max": 100,
       "step": 1,
       "default": 72,
-      "unit": "%",
-      "refs": [
-        "Wythers",
-        "Cascades"
-      ]
+      "unit": "%"
     },
     {
       "category": "rivers",
@@ -966,11 +788,7 @@
       "max": 100,
       "step": 1,
       "default": 85,
-      "unit": "%",
-      "refs": [
-        "Tectonic",
-        "Cascades"
-      ]
+      "unit": "%"
     },
     {
       "category": "rivers",
@@ -982,10 +800,7 @@
       "max": 100,
       "step": 1,
       "default": 61,
-      "unit": "%",
-      "refs": [
-        "Wythers"
-      ]
+      "unit": "%"
     },
     {
       "category": "rivers",
@@ -997,10 +812,7 @@
       "max": 100,
       "step": 1,
       "default": 53,
-      "unit": "%",
-      "refs": [
-        "Cascades"
-      ]
+      "unit": "%"
     },
     {
       "category": "rivers",
@@ -1012,11 +824,7 @@
       "max": 100,
       "step": 1,
       "default": 72,
-      "unit": "%",
-      "refs": [
-        "Cascades",
-        "Wythers"
-      ]
+      "unit": "%"
     },
     {
       "category": "rivers",
@@ -1028,11 +836,7 @@
       "max": 100,
       "step": 1,
       "default": 40,
-      "unit": "%",
-      "refs": [
-        "Tectonic",
-        "Cascades"
-      ]
+      "unit": "%"
     },
     {
       "category": "rivers",
@@ -1044,11 +848,7 @@
       "max": 100,
       "step": 1,
       "default": 70,
-      "unit": "%",
-      "refs": [
-        "Navigable Rivers",
-        "Cascades"
-      ]
+      "unit": "%"
     },
     {
       "category": "rivers",
@@ -1070,11 +870,7 @@
           "Mocno malownicze przebiegi"
         ]
       ],
-      "default": "watershed",
-      "refs": [
-        "Wythers",
-        "Tectonic"
-      ]
+      "default": "watershed"
     },
     {
       "category": "lakes",
@@ -1086,11 +882,7 @@
       "max": 100,
       "step": 1,
       "default": 52,
-      "unit": "%",
-      "refs": [
-        "Tectonic",
-        "Cascades"
-      ]
+      "unit": "%"
     },
     {
       "category": "lakes",
@@ -1102,10 +894,7 @@
       "max": 100,
       "step": 1,
       "default": 58,
-      "unit": "%",
-      "refs": [
-        "Cascades"
-      ]
+      "unit": "%"
     },
     {
       "category": "lakes",
@@ -1117,10 +906,7 @@
       "max": 100,
       "step": 1,
       "default": 63,
-      "unit": "%",
-      "refs": [
-        "Tectonic"
-      ]
+      "unit": "%"
     },
     {
       "category": "lakes",
@@ -1132,11 +918,7 @@
       "max": 100,
       "step": 1,
       "default": 55,
-      "unit": "%",
-      "refs": [
-        "Cascades",
-        "Wythers"
-      ]
+      "unit": "%"
     },
     {
       "category": "lakes",
@@ -1148,10 +930,7 @@
       "max": 100,
       "step": 1,
       "default": 34,
-      "unit": "%",
-      "refs": [
-        "Wythers"
-      ]
+      "unit": "%"
     },
     {
       "category": "lakes",
@@ -1173,10 +952,7 @@
           "Wiele izolowanych jezior"
         ]
       ],
-      "default": "connected",
-      "refs": [
-        "Cascades"
-      ]
+      "default": "connected"
     },
     {
       "category": "caves",
@@ -1188,10 +964,7 @@
       "max": 100,
       "step": 1,
       "default": 53,
-      "unit": "%",
-      "refs": [
-        "Tectonic"
-      ]
+      "unit": "%"
     },
     {
       "category": "caves",
@@ -1203,10 +976,7 @@
       "max": 100,
       "step": 1,
       "default": 60,
-      "unit": "%",
-      "refs": [
-        "Tectonic"
-      ]
+      "unit": "%"
     },
     {
       "category": "caves",
@@ -1218,10 +988,7 @@
       "max": 100,
       "step": 1,
       "default": 62,
-      "unit": "%",
-      "refs": [
-        "Tectonic"
-      ]
+      "unit": "%"
     },
     {
       "category": "caves",
@@ -1233,10 +1000,7 @@
       "max": 100,
       "step": 1,
       "default": 38,
-      "unit": "%",
-      "refs": [
-        "Cascades"
-      ]
+      "unit": "%"
     },
     {
       "category": "caves",
@@ -1248,10 +1012,7 @@
       "max": 100,
       "step": 1,
       "default": 40,
-      "unit": "%",
-      "refs": [
-        "Tectonic"
-      ]
+      "unit": "%"
     },
     {
       "category": "caves",
@@ -1263,10 +1024,7 @@
       "max": 100,
       "step": 1,
       "default": 100,
-      "unit": "%",
-      "refs": [
-        "Tectonic"
-      ]
+      "unit": "%"
     },
     {
       "category": "caves",
@@ -1288,10 +1046,7 @@
           "Rozbudowane korytarze i komory"
         ]
       ],
-      "default": "hybrid",
-      "refs": [
-        "Tectonic"
-      ]
+      "default": "hybrid"
     },
     {
       "category": "surface",
@@ -1303,11 +1058,7 @@
       "max": 100,
       "step": 1,
       "default": 39,
-      "unit": "%",
-      "refs": [
-        "Cascades",
-        "Tectonic"
-      ]
+      "unit": "%"
     },
     {
       "category": "surface",
@@ -1319,10 +1070,7 @@
       "max": 100,
       "step": 1,
       "default": 76,
-      "unit": "%",
-      "refs": [
-        "Wythers"
-      ]
+      "unit": "%"
     },
     {
       "category": "surface",
@@ -1334,10 +1082,7 @@
       "max": 100,
       "step": 1,
       "default": 63,
-      "unit": "%",
-      "refs": [
-        "Cascades"
-      ]
+      "unit": "%"
     },
     {
       "category": "surface",
@@ -1349,10 +1094,7 @@
       "max": 100,
       "step": 1,
       "default": 58,
-      "unit": "%",
-      "refs": [
-        "Terralith"
-      ]
+      "unit": "%"
     },
     {
       "category": "surface",
@@ -1364,10 +1106,7 @@
       "max": 100,
       "step": 1,
       "default": 57,
-      "unit": "%",
-      "refs": [
-        "Moderner Beta"
-      ]
+      "unit": "%"
     },
     {
       "category": "surface",
@@ -1379,11 +1118,7 @@
       "max": 100,
       "step": 1,
       "default": 54,
-      "unit": "%",
-      "refs": [
-        "Wythers",
-        "Continents"
-      ]
+      "unit": "%"
     },
     {
       "category": "surface",
@@ -1391,11 +1126,7 @@
       "label": "Wyłącznie biomy Vanilla",
       "desc": "Blokada nowych biomów — wymaganie projektu.",
       "type": "bool",
-      "default": true,
-      "refs": [
-        "Cascades",
-        "Terralith"
-      ]
+      "default": true
     },
     {
       "category": "engineering",
@@ -1403,11 +1134,7 @@
       "label": "Wyłącznie struktury Vanilla",
       "desc": "Bez struktur i schematów innych modów.",
       "type": "bool",
-      "default": true,
-      "refs": [
-        "Tectonic",
-        "Terralith"
-      ]
+      "default": true
     },
     {
       "category": "engineering",
@@ -1419,11 +1146,7 @@
       "max": 72,
       "step": 1,
       "default": 64,
-      "unit": "Y",
-      "refs": [
-        "Cascades",
-        "Tectonic"
-      ]
+      "unit": "Y"
     },
     {
       "category": "engineering",
@@ -1449,10 +1172,7 @@
           "Do Y=512"
         ]
       ],
-      "default": "320",
-      "refs": [
-        "Tectonic"
-      ]
+      "default": "320"
     },
     {
       "category": "engineering",
@@ -1474,10 +1194,7 @@
           "Szybsza eksploracja"
         ]
       ],
-      "default": "balanced",
-      "refs": [
-        "Tectonic"
-      ]
+      "default": "balanced"
     },
     {
       "category": "engineering",
@@ -1491,10 +1208,7 @@
           "Fabric / Minecraft 26.3"
         ]
       ],
-      "default": "fabric26.3",
-      "refs": [
-        "Tectonic"
-      ]
+      "default": "fabric26.3"
     },
     {
       "category": "engineering",
@@ -1502,10 +1216,7 @@
       "label": "Dostosuj grunt pod struktury Vanilla",
       "desc": "Bez dodawania nowych struktur.",
       "type": "bool",
-      "default": true,
-      "refs": [
-        "Tectonic"
-      ]
+      "default": true
     },
     {
       "category": "engineering",
@@ -1513,122 +1224,15 @@
       "label": "Testy wielu seedów",
       "desc": "Automatyczny test oceanów, biomów i przejść chunków.",
       "type": "bool",
-      "default": true,
-      "refs": [
-        "Tectonic"
-      ]
+      "default": true
     },
     {
       "category": "engineering",
       "key": "lodCompatible",
-      "label": "Odporność na DH/LOD",
+      "label": "Odporność na LOD",
       "desc": "Rzeczywiste bloki i LOD muszą pokazywać tę samą geometrię.",
       "type": "bool",
-      "default": true,
-      "refs": [
-        "Tectonic"
-      ]
-    }
-  ],
-  "audit": [
-    {
-      "name": "Cascades / Hybrid Beta",
-      "id": "cascades",
-      "root": "Hybrid-Beta-master/Cascades",
-      "role": "klif Beta, zwisy, krajobrazy, rzeki żeglowne, skalne plaże",
-      "mechanic": "Stary datapack modyfikuje główne noise_settings Overworld, offset/factor i river_carver; ma własną funkcję floodedness; README deklaruje podziemne rzeki. W ZIP starszy format aquifers_enabled/surface_rule.",
-      "version": "W ZIP starszy schemat 1.20–1.21, a Modrinth ma wydanie 26.3",
-      "source": "https://github.com/Crystalis7/Hybrid-Beta"
-    },
-    {
-      "name": "Tectonic",
-      "id": "tectonic",
-      "root": "tectonic-rewrite-squared",
-      "role": "pasma, kontynenty, oceany, jaskinie i rzeki pod ziemią",
-      "mechanic": "Warstwa konfiguracyjna GlobalTerrain/Continents/Islands/Oceans/Caves, terrain_spline, continent_selector i osobne underground_river/noise/total. Przesłany podgląd używa miejscami starego 1.21 formatu noise_settings.",
-      "version": "W ZIP wariant w trakcie przebudowy; trzeba przenieść pomysł, nie JSON bez zmian",
-      "source": "https://github.com/Apollounknowndev/tectonic"
-    },
-    {
-      "name": "Terralith 2.6.5 (26.3)",
-      "id": "terralith",
-      "root": "Terralith_v2.6.5+26.3",
-      "role": "Alpha Islands, organiczne krainy, spires, jeziora, klify",
-      "mechanic": "26.3 noise_settings zawiera aquifers obiekt, material_rule i spójny noise_router; alpha_islands to zdefiniowane biomy i regiony, nie pojedyncza funkcja generowania wyspy. Ma warstwy pillar/reference oraz biome-specific material.",
-      "version": "ZIP 2.6.5+26.3",
-      "source": "https://modrinth.com/datapack/terralith"
-    },
-    {
-      "name": "Terralith 1.20",
-      "id": "terralith120",
-      "root": "Terralith-1.20",
-      "role": "porównanie ewolucji terenu i starych Alpha Islands",
-      "mechanic": "Stary schemat aquifers_enabled/noise_router z kontynentami; stare definicje alpha_islands; niekompatybilny bez migracji z 26.3.",
-      "version": "Minecraft 1.20",
-      "source": "https://github.com/Stardust-Labs-MC/Terralith"
-    },
-    {
-      "name": "Biomes O’ Plenty 26.3",
-      "id": "bop",
-      "root": "BiomesOPlenty-26.3",
-      "role": "smukłe ostańce skalne i erodowane kolumny (Jade Cliffs)",
-      "mechanic": "ErodedPillarFeature Java: szerokość bazowa 8, wysokość 10–19 + niekiedy 15–29, promień maleje ku wierzchołkowi, dodatkowe nieregularności i wygładzanie; w Jade Cliffs placed_feature rarity_filter chance=3 + OCEAN_FLOOR_WG. Nie korzystamy z nowych biomów ani bloków.",
-      "version": "Źródła 26.3",
-      "source": "https://github.com/Glitchfiend/BiomesOPlenty"
-    },
-    {
-      "name": "Continents",
-      "id": "continents",
-      "root": "Continents-1.20",
-      "role": "rozdzielanie oceanów, kontynentów i wysp",
-      "mechanic": "Ma adjusted_continents, continent_bias, islands oraz układ ring1-ring4 wokół centroidów; odmiana large kontynentów; trzeba opracować własny system kontynentów zgodny z 26.3.",
-      "version": "Minecraft 1.20",
-      "source": "https://modrinth.com/datapack/continents"
-    },
-    {
-      "name": "William Wythers Overhauled Overworld",
-      "id": "wythers",
-      "root": "William Wythers' Overhauled Overworld v2.6.0",
-      "role": "meandry, naturalne brzegi, dopasowanie materiałów, bogata hydrologia",
-      "mechanic": "Oddzielne placed_feature/terrain/carver/river i river_water, przejścia sand/gravel/soil; implementacja bazuje na powiązanym źródle wythers, część to tylko JSON wywołujące funkcje poza paczką.",
-      "version": "2.6.0 (stare overlay 1.20.5–1.21.5)",
-      "source": "https://modrinth.com/datapack/wythers-overhauled-overworld"
-    },
-    {
-      "name": "Navigable Rivers 1.5.0",
-      "id": "navigable",
-      "root": "Navigable Rivers v1.5.0",
-      "role": "rzeki przepływowe i wypełnione wodą",
-      "mechanic": "Minimalny datapack: w praktyce definicje placed_feature/terrain/carver/river oraz river_water we wspólnej przestrzeni wythers. Brak samodzielnego algorytmu hydrologicznego w przesłanych 8 plikach.",
-      "version": "1.5.0 (overlay do 1.21.5)",
-      "source": "https://modrinth.com/datapack/navigable-rivers"
-    },
-    {
-      "name": "Moderner Beta",
-      "id": "modernbeta",
-      "root": "moderner-beta-multiversion",
-      "role": "charakter starego Classic/Infdev/Alpha/Beta",
-      "mechanic": "Osobny generator chunków i klasy starszych algorytmów; fraktalne warstwy ComputeRiver/InitRiver/MixRiver; presety Classic 0.0.14a_08 i Classic 0.30 oraz Beta. Nadaje się do czystej inspiracji wizualnej i analizy matematyki, nie do importowania całego generatora.",
-      "version": "W ZIP wielowersyjny do 26.2 (README); 26.3 niepotwierdzone",
-      "source": "https://github.com/BlueStaggo/Moderner-Beta"
-    },
-    {
-      "name": "TerraBlender 26.3",
-      "id": "terrablender",
-      "root": "TerraBlender-26.3",
-      "role": "integracja biome/region registry",
-      "mechanic": "Biblioteka do dokładania biomów i regionów, nie gotowy generator gór, krasu ani rzek; przy wyłącznie vanillowych biomach niepotrzebna jako wymagane dependency.",
-      "version": "Źródła 26.3",
-      "source": "https://github.com/Glitchfiend/TerraBlender"
-    },
-    {
-      "name": "SofronPackGen v0.1 (wyłączony)",
-      "id": "legacy",
-      "root": "26.3-Sofron-Pack-Gen-v0.1",
-      "role": "nie używać jako źródła / przeciwprzykład krasu",
-      "mechanic": "Własne biomy, struktury, stary kras, river carver; świadomie nieprzenoszone.",
-      "version": "Archiwalna wersja 26.3",
-      "source": "https://github.com/AntoniSofron/SofronPackGen"
+      "default": true
     }
   ]
 }

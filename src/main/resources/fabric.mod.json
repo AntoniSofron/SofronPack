@@ -32,5 +32,9 @@
     "sofron-extended-client.mixins.json",
     "sofron-optimization.mixins.json"
   ],
-  "icon": "assets/sofronpack/icon.png"
+  "icon": "assets/sofronpack/icon.png",
+  "authors": [
+    "Antoni Sofron"
+  ],
+  "license": "All Rights Reserved"
 }

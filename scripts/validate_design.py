@@ -5,7 +5,8 @@ from pathlib import Path
 d=json.loads(Path("design/catalog.json").read_text(encoding="utf-8"))
 qs=d["questions"]
 assert d["minecraft"]=="26.3"
-assert len(qs)==84 and len(d["categories"])==11 and len(d["audit"])==11
+assert len(qs)==84 and len(d["categories"])==11
+assert "audit" not in d and all("refs" not in q for q in qs)
 keys=[q["key"] for q in qs]
 assert len(set(keys))==len(keys)
 for q in qs:
