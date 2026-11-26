@@ -101,8 +101,9 @@ public final class ChunkLightAtlas {
             out.set(2+section-low,out.size());
             int y0 = section*16;
             if (local.size() > 12 && local.stream().allMatch(s -> s.radius() >= 2)) {
-                out.add(-1);
+                int start = out.size();
                 bake(out,local,x0,y0,z0);
+                if (out.size() == start) out.set(2+section-low, 0);
             } else {
                 out.add(local.size());
                 for (LightSource s : local) {
@@ -142,14 +143,30 @@ public final class ChunkLightAtlas {
                 sums[at+3]+=peak*weight; sums[at+4]+=peak*influence;
             }
         }
+        int start = out.size();
+        out.add(-1);
+        int commonRgb = -1;
+        boolean mixed = false;
         for (int i=0; i<sums.length; i+=5) {
             float weight=sums[i+3];
             int rgb=0;
             if (weight>1e-5f) {
                 for (int k=0;k<3;k++) rgb |= Math.min(255,Math.round(255*sums[i+k]/weight)) << (k*8);
+                if (commonRgb == -1) commonRgb = rgb;
+                else if (commonRgb != rgb) mixed = true;
             }
             out.add(rgb);
             put(out,weight>1e-5f ? sums[i+4] : 0);
+        }
+        if (commonRgb == -1) {
+            out.size(start);
+        } else if (!mixed) {
+            // Zero-energy nodes contribute no hue. Keep every energy word unchanged.
+            out.set(start, -2);
+            out.set(start + 1, commonRgb);
+            for (int node = 0; node < GRID * GRID * GRID; node++)
+                out.set(start + 2 + node, out.getInt(start + 2 + node * 2));
+            out.size(start + 2 + GRID * GRID * GRID);
         }
     }
 
