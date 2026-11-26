@@ -1,0 +1,13 @@
+{
+  "variants": {
+    "type=bottom": {
+      "model": "sofronpack:block/pine_slab"
+    },
+    "type=double": {
+      "model": "sofronpack:block/pine_planks"
+    },
+    "type=top": {
+      "model": "sofronpack:block/pine_slab_top"
+    }
+  }
+}

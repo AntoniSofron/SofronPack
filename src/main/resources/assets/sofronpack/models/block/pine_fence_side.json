@@ -1,0 +1,11 @@
+{
+  "parent": "minecraft:block/spruce_fence_side",
+  "textures": {
+    "all": "sofronpack:block/pine_planks",
+    "texture": "sofronpack:block/pine_planks",
+    "top": "sofronpack:block/pine_planks",
+    "bottom": "sofronpack:block/pine_planks",
+    "side": "sofronpack:block/pine_planks",
+    "particle": "sofronpack:block/pine_planks"
+  }
+}

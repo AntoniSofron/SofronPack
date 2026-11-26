@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:block/spruce_log_horizontal",
+  "textures": {
+    "side": "sofronpack:block/pine_log",
+    "end": "sofronpack:block/pine_log_top"
+  }
+}

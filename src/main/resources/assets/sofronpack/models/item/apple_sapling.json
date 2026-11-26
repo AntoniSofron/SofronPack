@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/spruce_sapling",
+  "textures": {
+    "layer0": "minecraft:block/oak_sapling"
+  }
+}
