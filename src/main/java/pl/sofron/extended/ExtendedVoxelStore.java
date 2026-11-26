@@ -402,30 +402,26 @@ public final class ExtendedVoxelStore {
         List<String> palette = new ArrayList<>();
         palette.add("minecraft:air");
         int index = 0;
-        for (int yi = 0; yi < count; yi++) {
-            // Read directly from the chunk's 16x16x16 palette instead of
-            // repeating BlockPos -> world chunk/section lookups 100k times.
-            var section = sections[(yi * CELL) / 16];
+        for (var section : sections) {
+            int sectionEnd = index + 16 * GRID * GRID;
             if (section == null) {
-                index += GRID * GRID;
+                index = sectionEnd;
                 continue;
             }
-            int localY = (yi * CELL) & 15;
-            for (int z = 0; z < GRID; z++) {
+            BlockState first = section.getBlockState(0, 0, 0);
+            short material = materialIndex(first, mapping, palette);
+            if (!section.maybeHas(state -> state != first)) {
+                if (material != 0) Arrays.fill(cells, index, sectionEnd, material);
+                index = sectionEnd;
+                continue;
+            }
+            BlockState previous = first;
+            for (int y = 0; y < 16; y++) for (int z = 0; z < GRID; z++) {
                 for (int x = 0; x < GRID; x++) {
-                    // Store the actual Minecraft block at exact integer
-                    // coordinates: no 2-block averaging, synthetic colours
-                    // or diagonally interpolated heightfield.
-                    BlockState state = section.getBlockState(x, localY, z);
-                    Short material = mapping.get(state);
-                    if (material == null) {
-                        material = 0;
-                        if (!state.isAir() && (state.getRenderShape() != RenderShape.INVISIBLE
-                                || !state.getFluidState().isEmpty())) {
-                            material = (short) palette.size();
-                            palette.add(serializeState(state));
-                        }
-                        mapping.put(state, material);
+                    BlockState state = section.getBlockState(x, y, z);
+                    if (state != previous) {
+                        material = materialIndex(state, mapping, palette);
+                        previous = state;
                     }
                     cells[index++] = material;
                 }
@@ -433,6 +429,19 @@ public final class ExtendedVoxelStore {
         }
         return encode(chunkX, chunkZ, minimum, count, grass, foliage, water,
                 palette.toArray(String[]::new), cells);
+    }
+
+    private static short materialIndex(BlockState state, IdentityHashMap<BlockState, Short> mapping,
+                                       List<String> palette) {
+        Short known = mapping.get(state);
+        if (known != null) return known;
+        short material = 0;
+        if (!state.isAir() && (state.getRenderShape() != RenderShape.INVISIBLE || !state.getFluidState().isEmpty())) {
+            material = (short) palette.size();
+            palette.add(serializeState(state));
+        }
+        mapping.put(state, material);
+        return material;
     }
 
     /**

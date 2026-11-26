@@ -34,6 +34,10 @@ public final class ExtendedVolumeMesh {
         final int[] opacity;
         final ExtendedVoxelMesher.ModelFace[][] shapes;
         final int top;
+        // Exclusive end of a run of fully opaque layers (positive) or empty layers
+        // (negative). Mixed layers retain the ordinary per-voxel visibility checks.
+        final int[] layerRuns;
+        final short[] uniformMaterial;
         Volume(VoxelChunk source, MaterialResolver materials) {
             this.source = source;
             cells[0] = source.unpack();
@@ -48,6 +52,24 @@ public final class ExtendedVolumeMesh {
             int end = cells[0].length;
             while (end > 0 && cells[0][end - 1] == 0) end--;
             top = (end + 255) >> 8;
+            layerRuns = new int[top + 1];
+            uniformMaterial = new short[top];
+            for (int y = top - 1; y >= 0; y--) {
+                int start = y * 256;
+                short first = cells[0][start];
+                int limit = start + 256;
+                int mismatch = java.util.Arrays.mismatch(cells[0], start, limit - 1,
+                        cells[0], start + 1, limit);
+                uniformMaterial[y] = mismatch < 0 ? first : -1;
+                int kind = opacity[first];
+                if (kind == 1) continue;
+                int at = mismatch < 0 ? limit : start + mismatch + 1;
+                while (at < start + 256 && opacity[cells[0][at]] == kind) at++;
+                if (at != start + 256) continue;
+                int next = layerRuns[y + 1];
+                layerRuns[y] = kind == 2 ? (next > 0 ? next : y + 1)
+                        : (next < 0 ? next : -(y + 1));
+            }
         }
 
         void prepare(int level) {
@@ -58,26 +80,35 @@ public final class ExtendedVolumeMesh {
             short[] small = new short[w * w * height], large = cells[level - 1];
             byte[] previousFrost = frost[level - 1];
             byte[] smallFrost = previousFrost == null ? null : new byte[small.length];
-            for (int y = 0; y < height; y++) for (int z = 0; z < w; z++) for (int x = 0; x < w; x++) {
-                int base = (y * previous + z * 2) * previous + x * 2;
-                int rank = 0;
-                short representative = 0;
-                byte representativeFrost = 0;
-                // Reduce the horizontal footprint only. Fluid boundaries retain their exact Y.
-                for (int child = 0; child < 4; child++) {
-                    int at = base + (child & 1) + (child >> 1) * previous;
-                    if (at >= large.length) continue;
-                    short id = large[at];
-                    int score = (opacity[id] << 4) + child;
-                    if (id != 0 && opacity[id] != 0 && score >= rank) {
-                        rank = score;
-                        representative = id;
-                        if (previousFrost != null) representativeFrost = previousFrost[at];
-                    }
+            for (int y = 0; y < height; y++) {
+                int layerStart = y * w * w;
+                short uniform = uniformMaterial[y];
+                if (uniform >= 0 && (previousFrost == null || opacity[uniform] == 0)) {
+                    if (opacity[uniform] != 0)
+                        java.util.Arrays.fill(small, layerStart, layerStart + w * w, uniform);
+                    continue;
                 }
-                int dst = (y * w + z) * w + x;
-                small[dst] = representative;
-                if (smallFrost != null) smallFrost[dst] = representativeFrost;
+                for (int z = 0; z < w; z++) for (int x = 0; x < w; x++) {
+                    int base = (y * previous + z * 2) * previous + x * 2;
+                    int rank = 0;
+                    short representative = 0;
+                    byte representativeFrost = 0;
+                    // Reduce the horizontal footprint only. Fluid boundaries retain their exact Y.
+                    for (int child = 0; child < 4; child++) {
+                        int at = base + (child & 1) + (child >> 1) * previous;
+                        if (at >= large.length) continue;
+                        short id = large[at];
+                        int score = (opacity[id] << 4) + child;
+                        if (id != 0 && opacity[id] != 0 && score >= rank) {
+                            rank = score;
+                            representative = id;
+                            if (previousFrost != null) representativeFrost = previousFrost[at];
+                        }
+                    }
+                    int dst = (y * w + z) * w + x;
+                    small[dst] = representative;
+                    if (smallFrost != null) smallFrost[dst] = representativeFrost;
+                }
             }
             cells[level] = small;
             frost[level] = smallFrost;
@@ -122,6 +153,8 @@ public final class ExtendedVolumeMesh {
     public Mesh build(VoxelChunk[] chunks, int[] levels, MaterialResolver materials) {
         Volume[] data = new Volume[chunks.length];
         for (int i = 0; i < chunks.length; i++) {
+            // Face culling reads only cardinal neighbors.
+            if (i == 0 || i == TILE + 1 || i == chunks.length - TILE - 2 || i == chunks.length - 1) continue;
             VoxelChunk source = chunks[i];
             if (source == null) continue;
             long key = ExtendedVoxelStore.pack(source.chunkX(), source.chunkZ());
@@ -167,7 +200,40 @@ public final class ExtendedVolumeMesh {
                     var scan = new Plane(v, materials, face, cx * 16, cz * 16, step, yStep);
                     for (int slice = 0; slice < planes; slice++) {
                         scan.slice = face < 2 ? slice : slice * step;
+                        if (face < 2) {
+                            int run = v.layerRuns[slice];
+                            int adjacentY = slice + (face == 0 ? 1 : -1);
+                            if (run < 0 || (run > 0 && adjacentY >= 0 && v.layerRuns[adjacentY] > 0))
+                                continue;
+                        }
+                        int sideNeighbor = switch (face) {
+                            case 2 -> slice == 0 ? owner - stride : owner;
+                            case 3 -> slice == width - 1 ? owner + stride : owner;
+                            case 4 -> slice == 0 ? owner - 1 : owner;
+                            case 5 -> slice == width - 1 ? owner + 1 : owner;
+                            default -> owner;
+                        };
                         for (int row = 0; row < rows; row++) {
+                            if (face >= 2) {
+                                int y = row * yStep;
+                                int run = v.layerRuns[y];
+                                int hiddenEnd = 0;
+                                if (run < 0) hiddenEnd = -run;
+                                else if (run > 0 && cutoutPass) hiddenEnd = run;
+                                else if (run > 0 && data[sideNeighbor] != null) {
+                                    Volume next = data[sideNeighbor];
+                                    int offset = v.source.minY() - next.source.minY();
+                                    int ny = y + offset;
+                                    if (ny >= 0 && ny < next.top && next.layerRuns[ny] > 0)
+                                        hiddenEnd = Math.min(run, next.layerRuns[ny] - offset);
+                                }
+                                int emptyRows = (hiddenEnd - y) / yStep;
+                                if (emptyRows > 0) {
+                                    scan.skipEmptyRows(emptyRows);
+                                    row += emptyRows - 1;
+                                    continue;
+                                }
+                            }
                             for (int col = 0; col < width; col++) {
                                 int x = (face < 4 ? col : slice) * step;
                                 int y = face < 2 ? slice : row * yStep;

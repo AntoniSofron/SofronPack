@@ -128,6 +128,12 @@ public abstract class SofronScanMesher2D {
         this.currentIndex = 0;
     }
 
+    /** At a row boundary, flush pending rectangles before advancing over empty rows. */
+    public final void skipEmptyRows(int rows) {
+        this.emitRanged(-1);
+        this.currentIndex += rows * 32;
+    }
+
     public final void endRow() {
         if ((this.currentIndex&31)!=0) {
             this.skip(32-(this.currentIndex&31));
