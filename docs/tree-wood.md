@@ -15,3 +15,7 @@ Building blocks, stripped logs, doors, trapdoors, fences, gates, stairs, slabs,
 buttons, pressure plates, shelves, signs and hanging signs are included.
 Complex door/sign/shelf textures initially reuse spruce visuals; logs/planks
 have unique colors. Both families also include flower-pot saplings, normal and chest boats. Boats initially use spruce/oak models and textures, with independent entities, recipes and drops.
+
+## Fir and chestnut (0.1.91)
+
+Fir uses the five existing spruce and two giant spruce templates with fir blocks in the new Old Growth Fir Taiga. Single and 2x2 saplings use native fir features; mega fir uses podzol. Chestnut reuses apple shapes and has a separate chestnut item (0.5% base leaf drop, Fortune increases chance). Generation selectors use 0.5% of mixed forest attempts, 10% of plains attempts, and 35% of the oak branch in shrubland and savanna. Existing chunks are not regenerated. Textures are initially shared with spruce/apple. Chestnuts are a non-food item (horse chestnuts).

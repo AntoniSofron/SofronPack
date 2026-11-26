@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "building",
+  "pattern": [
+    "C C",
+    "LLL",
+    "LLL"
+  ],
+  "key": {
+    "C": "minecraft:iron_chain",
+    "L": "sofronpack:stripped_fir_log"
+  },
+  "result": {
+    "id": "sofronpack:fir_hanging_sign",
+    "count": 6
+  }
+}

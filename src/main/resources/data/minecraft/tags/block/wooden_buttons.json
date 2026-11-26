@@ -1,6 +1,8 @@
 {
   "values": [
     "sofronpack:pine_button",
-    "sofronpack:apple_button"
+    "sofronpack:apple_button",
+    "sofronpack:fir_button",
+    "sofronpack:chestnut_button"
   ]
 }

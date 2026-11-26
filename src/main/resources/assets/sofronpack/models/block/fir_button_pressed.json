@@ -1,0 +1,11 @@
+{
+  "parent": "minecraft:block/spruce_button_pressed",
+  "textures": {
+    "all": "minecraft:block/spruce_planks",
+    "texture": "minecraft:block/spruce_planks",
+    "top": "minecraft:block/spruce_planks",
+    "bottom": "minecraft:block/spruce_planks",
+    "side": "minecraft:block/spruce_planks",
+    "particle": "minecraft:block/spruce_planks"
+  }
+}

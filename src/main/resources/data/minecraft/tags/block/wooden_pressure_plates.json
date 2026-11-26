@@ -1,6 +1,8 @@
 {
   "values": [
     "sofronpack:pine_pressure_plate",
-    "sofronpack:apple_pressure_plate"
+    "sofronpack:apple_pressure_plate",
+    "sofronpack:fir_pressure_plate",
+    "sofronpack:chestnut_pressure_plate"
   ]
 }

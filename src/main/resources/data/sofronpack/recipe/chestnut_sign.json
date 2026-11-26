@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "building",
+  "pattern": [
+    "PPP",
+    "PPP",
+    " S "
+  ],
+  "key": {
+    "P": "sofronpack:chestnut_planks",
+    "S": "minecraft:stick"
+  },
+  "result": {
+    "id": "sofronpack:chestnut_sign",
+    "count": 3
+  }
+}

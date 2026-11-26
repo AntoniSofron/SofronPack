@@ -19,6 +19,13 @@ abstract class OverworldVegetationBiomeMixin {
     @Unique private static final ResourceKey<Biome> RAINFOREST =
             ResourceKey.create(Registries.BIOME, Identifier.parse("sofronpack:rainforest"));
 
+    @Unique private static final ResourceKey<Biome> FIR_TAIGA = ResourceKey.create(Registries.BIOME, Identifier.parse("sofronpack:old_growth_fir_taiga"));
+
+    @Inject(method = "pickMiddleBiome", at = @At("RETURN"), cancellable = true)
+    private void sofronpack$firTaiga(int temperature, int humidity, Climate.Parameter weirdness, CallbackInfoReturnable<ResourceKey<Biome>> result) {
+        if (net.minecraft.world.level.biome.Biomes.OLD_GROWTH_SPRUCE_TAIGA.equals(result.getReturnValue()) && (weirdness.min() < -4000L || (weirdness.min() >= 0 && weirdness.min() < 4000L))) result.setReturnValue(FIR_TAIGA);
+    }
+
     // Assign warm inland climate slots while vanilla builds the Overworld climate index.
     @Inject(method = "pickMiddleBiome", at = @At("HEAD"), cancellable = true)
     private void sofronpack$warmBiomes(int temperature, int humidity, Climate.Parameter weirdness,

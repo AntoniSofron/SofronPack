@@ -32,6 +32,10 @@ public final class TreeWoodContent {
     private static final List<Item> FUNCTIONAL = new ArrayList<>();
     public static final Family PINE = create("pine", true);
     public static final Family APPLE = create("apple", false);
+    public static final Family FIR = create("fir", true);
+    public static final Family CHESTNUT = create("chestnut", false);
+    public static final Item CHESTNUT_ITEM = Registry.register(BuiltInRegistries.ITEM, id("chestnut"),
+            new Item(new Item.Properties().setId(ResourceKey.create(Registries.ITEM, id("chestnut")))));
 
     private static Identifier id(String name) { return Identifier.fromNamespaceAndPath("sofronpack", name); }
     private static ResourceKey<Feature> feature(String name) { return ResourceKey.create(Registries.FEATURE, id(name)); }
@@ -62,12 +66,12 @@ public final class TreeWoodContent {
         Block leaves = part(n+"_leaves", pine?Blocks.SPRUCE_LEAVES:Blocks.OAK_LEAVES,
                 p -> pine ? new LeavesBlock(AmbientLeavesBlockSoundPlayer.noAmbientSound(), p)
                           : new TintedParticleLeavesBlock(0.01F, p), NATURAL, 30, 60);
-        WeightedList<ResourceKey<Feature>> normal = pine ? WeightedList.of(feature("pine_tree"))
-                : WeightedList.<ResourceKey<Feature>>builder().add(feature("apple_tree"), 4).add(feature("fancy_apple_tree"), 1).build();
-        WeightedList<ResourceKey<Feature>> mega = pine ? WeightedList.of(feature("mega_pine_tree"))
+        WeightedList<ResourceKey<Feature>> normal = pine ? WeightedList.of(feature(n+"_tree"))
+                : WeightedList.<ResourceKey<Feature>>builder().add(feature(n+"_tree"), 4).add(feature("fancy_"+n+"_tree"), 1).build();
+        WeightedList<ResourceKey<Feature>> mega = pine ? WeightedList.of(feature("mega_"+n+"_tree"))
                 : WeightedList.<ResourceKey<Feature>>builder().build();
         TreeGrower grower = new TreeGrower("sofronpack:"+n, normal, mega,
-                WeightedList.<ResourceKey<Feature>>builder().build(), feature(pine?"pine_tree":"apple_tree"));
+                WeightedList.<ResourceKey<Feature>>builder().build(), feature(n+"_tree"));
         Block sapling = part(n+"_sapling", pine?Blocks.SPRUCE_SAPLING:Blocks.OAK_SAPLING,
                 p -> new SaplingBlock(grower,p), NATURAL, 60, 100);
         block("potted_"+n+"_sapling", Blocks.POTTED_OAK_SAPLING, p -> new FlowerPotBlock(sapling,p));
@@ -95,6 +99,7 @@ public final class TreeWoodContent {
     }
     public static void register() {
         TreeBoats.register();
+        NATURAL.add(CHESTNUT_ITEM);
         tab("building_blocks", BUILDING);
         tab("natural_blocks", NATURAL);
         tab("functional_blocks", FUNCTIONAL);

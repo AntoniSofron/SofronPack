@@ -7,6 +7,14 @@
     "sofronpack:apple_log",
     "sofronpack:apple_wood",
     "sofronpack:stripped_apple_log",
-    "sofronpack:stripped_apple_wood"
+    "sofronpack:stripped_apple_wood",
+    "sofronpack:fir_log",
+    "sofronpack:fir_wood",
+    "sofronpack:stripped_fir_log",
+    "sofronpack:stripped_fir_wood",
+    "sofronpack:chestnut_log",
+    "sofronpack:chestnut_wood",
+    "sofronpack:stripped_chestnut_log",
+    "sofronpack:stripped_chestnut_wood"
   ]
 }

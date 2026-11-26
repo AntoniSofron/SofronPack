@@ -1,0 +1,15 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "building",
+  "pattern": [
+    "LL",
+    "LL"
+  ],
+  "key": {
+    "L": "sofronpack:chestnut_log"
+  },
+  "result": {
+    "id": "sofronpack:chestnut_wood",
+    "count": 3
+  }
+}

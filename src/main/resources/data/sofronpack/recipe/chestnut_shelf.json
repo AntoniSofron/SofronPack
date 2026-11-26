@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "building",
+  "pattern": [
+    "LLL",
+    "   ",
+    "LLL"
+  ],
+  "key": {
+    "L": "sofronpack:stripped_chestnut_log"
+  },
+  "result": {
+    "id": "sofronpack:chestnut_shelf",
+    "count": 6
+  }
+}

@@ -1,6 +1,8 @@
 {
   "values": [
     "sofronpack:pine_wall_sign",
-    "sofronpack:apple_wall_sign"
+    "sofronpack:apple_wall_sign",
+    "sofronpack:fir_wall_sign",
+    "sofronpack:chestnut_wall_sign"
   ]
 }

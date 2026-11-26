@@ -21,6 +21,16 @@ public record GiantSpruceVariants(Holder<Feature> original) implements Feature {
     @Override
     public boolean place(WorldGenLevel level, ChunkGenerator generator, RandomSource random, BlockPos origin) {
         var biome = level.getBiome(origin);
+        if (biome.is(SpruceVariants.FIR_TAIGA)) {
+            var firKey = net.minecraft.resources.ResourceKey.create(net.minecraft.core.registries.Registries.FEATURE, net.minecraft.resources.Identifier.fromNamespaceAndPath("sofronpack", "mega_fir_tree"));
+            var nativeFir = level.registryAccess().lookupOrThrow(net.minecraft.core.registries.Registries.FEATURE).getOrThrow(firKey).value();
+            if (!(original.value() instanceof TreeFeature tree) || level instanceof net.minecraft.server.level.ServerLevel) return nativeFir.place(level, generator, random, origin);
+            int v = 1 + random.nextInt(2);
+            int root = v == 1 ? 4 : 5;
+            if (!TreeTemplates.placeTwoByTwo(level, random, origin, tree, "tall_spruce_" + v, new BlockPos(root, 0, root), Blocks.SPRUCE_LOG, Blocks.SPRUCE_WOOD, Blocks.SPRUCE_LEAVES)) return nativeFir.place(level, generator, random, origin);
+            for (int x = 0; x < 2; x++) for (int z = 0; z < 2; z++) level.setBlock(origin.offset(x,-1,z), Blocks.PODZOL.defaultBlockState(),19);
+            return true;
+        }
         if (level instanceof net.minecraft.server.level.ServerLevel)
             return original.value().place(level, generator, random, origin);
         var pineKey = net.minecraft.resources.ResourceKey.create(net.minecraft.core.registries.Registries.FEATURE,

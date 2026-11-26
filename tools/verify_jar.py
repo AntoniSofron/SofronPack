@@ -537,7 +537,7 @@ with zipfile.ZipFile(jar) as z:
 
     assert "pl/sofron/terralab/trees/TreeWoodContent.class" in files
     assert "pl/sofron/terralab/trees/TreeBoats.class" in files
-    for wood in ("pine", "apple"):
+    for wood in ("pine", "apple", "fir", "chestnut"):
         for part in ("log", "wood", "planks", "leaves", "sapling", "stairs", "slab", "fence", "fence_gate", "door", "trapdoor", "button", "pressure_plate", "shelf", "sign", "hanging_sign"):
             name = f"{wood}_{part}"
             assert f"assets/sofronpack/blockstates/{name}.json" in files
@@ -550,6 +550,8 @@ with zipfile.ZipFile(jar) as z:
     for wood in ("oak", "dark_oak"):
         assert b'"minecraft:apple"' not in z.read(f"data/minecraft/loot_table/blocks/{wood}_leaves.json")
     assert b'"minecraft:apple"' in z.read("data/sofronpack/loot_table/blocks/apple_leaves.json")
+    assert b'"sofronpack:chestnut"' in z.read("data/sofronpack/loot_table/blocks/chestnut_leaves.json")
+    assert "data/sofronpack/worldgen/biome/old_growth_fir_taiga.json" in z.namelist()
 
 
 pathlib.Path("dist").mkdir(exist_ok=True)

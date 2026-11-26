@@ -54,17 +54,18 @@ final class TreeTemplates {
         boolean decorate = !tree.decorators().isEmpty();
         Set<BlockPos> logs = decorate ? new HashSet<>() : Set.of();
         Set<BlockPos> leaves = decorate ? new HashSet<>() : Set.of();
+        boolean fir = log == Blocks.SPRUCE_LOG && !path.contains("pine_") && level.getBiome(origin).is(SpruceVariants.FIR_TAIGA);
         for (StructureBlockInfo block : wood) {
             Block target = log == Blocks.SPRUCE_LOG && path.contains("pine_")
                     ? (block.state().is(Blocks.SPRUCE_WOOD) ? TreeWoodContent.PINE.wood() : TreeWoodContent.PINE.log())
-                    : block.state().getBlock();
+                    : fir ? (block.state().is(Blocks.SPRUCE_WOOD) ? TreeWoodContent.FIR.wood() : TreeWoodContent.FIR.log()) : block.state().getBlock();
             level.setBlock(block.pos(), target.withPropertiesOf(block.state()), 19);
             if (decorate) logs.add(block.pos());
         }
         for (var block : canopy) {
             if (TreeFeature.validTreePos(level, block.pos())) {
                 Block target = log == Blocks.SPRUCE_LOG && path.contains("pine_")
-                        ? TreeWoodContent.PINE.leaves() : block.state().getBlock();
+                        ? TreeWoodContent.PINE.leaves() : fir ? TreeWoodContent.FIR.leaves() : block.state().getBlock();
                 level.setBlock(block.pos(), target.withPropertiesOf(block.state()).setValue(BlockStateProperties.PERSISTENT, false), 19);
                 if (decorate) leaves.add(block.pos());
             }

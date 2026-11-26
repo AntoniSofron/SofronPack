@@ -1,0 +1,19 @@
+{
+  "variants": {
+    "facing=east": {
+      "model": "sofronpack:block/fir_wall_sign",
+      "y": 270
+    },
+    "facing=north": {
+      "model": "sofronpack:block/fir_wall_sign",
+      "y": 180
+    },
+    "facing=south": {
+      "model": "sofronpack:block/fir_wall_sign"
+    },
+    "facing=west": {
+      "model": "sofronpack:block/fir_wall_sign",
+      "y": 90
+    }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    "sofronpack:fir_boat",
+    "minecraft:chest"
+  ],
+  "result": {
+    "id": "sofronpack:fir_chest_boat"
+  }
+}

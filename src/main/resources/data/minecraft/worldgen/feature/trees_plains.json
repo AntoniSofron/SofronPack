@@ -6,6 +6,13 @@
   },
   "features": [
     {
+      "chance": 0.1,
+      "feature": {
+        "feature": "sofronpack:chestnut_tree_selector",
+        "placement": []
+      }
+    },
+    {
       "chance": 0.15,
       "feature": {
         "feature": "sofronpack:apple_tree_selector",

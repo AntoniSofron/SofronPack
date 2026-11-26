@@ -11,6 +11,8 @@
     "sofronpack:clay_slab",
     "sofronpack:farmland_slab",
     "sofronpack:pine_slab",
-    "sofronpack:apple_slab"
+    "sofronpack:apple_slab",
+    "sofronpack:fir_slab",
+    "sofronpack:chestnut_slab"
   ]
 }

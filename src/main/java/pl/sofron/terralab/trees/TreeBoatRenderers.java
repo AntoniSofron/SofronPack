@@ -10,5 +10,9 @@ public final class TreeBoatRenderers {
         EntityRendererRegistry.register(TreeBoats.PINE.chestBoat(), ctx -> new BoatRenderer(ctx, ModelLayers.SPRUCE_CHEST_BOAT));
         EntityRendererRegistry.register(TreeBoats.APPLE.boat(), ctx -> new BoatRenderer(ctx, ModelLayers.OAK_BOAT));
         EntityRendererRegistry.register(TreeBoats.APPLE.chestBoat(), ctx -> new BoatRenderer(ctx, ModelLayers.OAK_CHEST_BOAT));
+        EntityRendererRegistry.register(TreeBoats.FIR.boat(), ctx -> new BoatRenderer(ctx, ModelLayers.SPRUCE_BOAT));
+        EntityRendererRegistry.register(TreeBoats.FIR.chestBoat(), ctx -> new BoatRenderer(ctx, ModelLayers.SPRUCE_CHEST_BOAT));
+        EntityRendererRegistry.register(TreeBoats.CHESTNUT.boat(), ctx -> new BoatRenderer(ctx, ModelLayers.OAK_BOAT));
+        EntityRendererRegistry.register(TreeBoats.CHESTNUT.chestBoat(), ctx -> new BoatRenderer(ctx, ModelLayers.OAK_CHEST_BOAT));
     }
 }

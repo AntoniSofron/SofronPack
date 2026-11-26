@@ -1,0 +1,14 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "building",
+  "pattern": [
+    "PPP"
+  ],
+  "key": {
+    "P": "sofronpack:chestnut_planks"
+  },
+  "result": {
+    "id": "sofronpack:chestnut_slab",
+    "count": 6
+  }
+}

@@ -1,6 +1,8 @@
 {
   "values": [
     "sofronpack:pine_sapling",
-    "sofronpack:apple_sapling"
+    "sofronpack:apple_sapling",
+    "sofronpack:fir_sapling",
+    "sofronpack:chestnut_sapling"
   ]
 }

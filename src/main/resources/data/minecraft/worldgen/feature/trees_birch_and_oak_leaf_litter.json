@@ -3,6 +3,13 @@
   "default": "minecraft:oak_bees_0002_leaf_litter",
   "features": [
     {
+      "chance": 0.005,
+      "feature": {
+        "feature": "sofronpack:chestnut_tree_selector",
+        "placement": []
+      }
+    },
+    {
       "chance": 0.0075,
       "feature": {
         "feature": "sofronpack:apple_tree_selector",

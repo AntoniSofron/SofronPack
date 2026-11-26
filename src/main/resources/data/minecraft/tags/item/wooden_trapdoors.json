@@ -1,6 +1,8 @@
 {
   "values": [
     "sofronpack:pine_trapdoor",
-    "sofronpack:apple_trapdoor"
+    "sofronpack:apple_trapdoor",
+    "sofronpack:fir_trapdoor",
+    "sofronpack:chestnut_trapdoor"
   ]
 }

@@ -2,6 +2,8 @@
   "replace": false,
   "values": [
     "sofronpack:pine_boat",
-    "sofronpack:apple_boat"
+    "sofronpack:apple_boat",
+    "sofronpack:fir_boat",
+    "sofronpack:chestnut_boat"
   ]
 }

@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "building",
+  "pattern": [
+    "PP",
+    "PP",
+    "PP"
+  ],
+  "key": {
+    "P": "sofronpack:chestnut_planks"
+  },
+  "result": {
+    "id": "sofronpack:chestnut_door",
+    "count": 3
+  }
+}

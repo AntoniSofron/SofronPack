@@ -1,6 +1,8 @@
 {
   "values": [
     "sofronpack:pine_fence",
-    "sofronpack:apple_fence"
+    "sofronpack:apple_fence",
+    "sofronpack:fir_fence",
+    "sofronpack:chestnut_fence"
   ]
 }

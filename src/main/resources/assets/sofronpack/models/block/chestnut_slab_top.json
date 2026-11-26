@@ -1,0 +1,11 @@
+{
+  "parent": "minecraft:block/spruce_slab_top",
+  "textures": {
+    "all": "sofronpack:block/apple_planks",
+    "texture": "sofronpack:block/apple_planks",
+    "top": "sofronpack:block/apple_planks",
+    "bottom": "sofronpack:block/apple_planks",
+    "side": "sofronpack:block/apple_planks",
+    "particle": "sofronpack:block/apple_planks"
+  }
+}

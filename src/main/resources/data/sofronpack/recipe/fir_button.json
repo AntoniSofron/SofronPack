@@ -1,0 +1,14 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "building",
+  "pattern": [
+    "P"
+  ],
+  "key": {
+    "P": "sofronpack:fir_planks"
+  },
+  "result": {
+    "id": "sofronpack:fir_button",
+    "count": 1
+  }
+}

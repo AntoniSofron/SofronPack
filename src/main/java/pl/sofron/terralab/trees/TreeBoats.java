@@ -19,6 +19,8 @@ public final class TreeBoats {
     public record Pair(EntityType<Boat> boat, EntityType<ChestBoat> chestBoat, Item item, Item chestItem) {}
     public static final Pair PINE = create("pine");
     public static final Pair APPLE = create("apple");
+    public static final Pair FIR = create("fir");
+    public static final Pair CHESTNUT = create("chestnut");
 
     private static Identifier id(String name) {
         return Identifier.fromNamespaceAndPath("sofronpack", name);
@@ -51,6 +53,8 @@ public final class TreeBoats {
                 Identifier.withDefaultNamespace("tools_and_utilities"))).register(output -> {
                     output.accept(PINE.item()); output.accept(PINE.chestItem());
                     output.accept(APPLE.item()); output.accept(APPLE.chestItem());
+                    output.accept(FIR.item()); output.accept(FIR.chestItem());
+                    output.accept(CHESTNUT.item()); output.accept(CHESTNUT.chestItem());
                 });
     }
 }

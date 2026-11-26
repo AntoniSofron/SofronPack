@@ -1,6 +1,8 @@
 {
   "values": [
     "sofronpack:pine_shelf",
-    "sofronpack:apple_shelf"
+    "sofronpack:apple_shelf",
+    "sofronpack:fir_shelf",
+    "sofronpack:chestnut_shelf"
   ]
 }

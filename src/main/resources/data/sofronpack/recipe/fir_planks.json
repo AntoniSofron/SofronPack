@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "building",
+  "ingredients": [
+    "#sofronpack:fir_logs"
+  ],
+  "result": {
+    "id": "sofronpack:fir_planks",
+    "count": 4
+  }
+}

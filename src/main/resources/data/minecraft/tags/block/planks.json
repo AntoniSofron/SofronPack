@@ -1,6 +1,8 @@
 {
   "values": [
     "sofronpack:pine_planks",
-    "sofronpack:apple_planks"
+    "sofronpack:apple_planks",
+    "sofronpack:fir_planks",
+    "sofronpack:chestnut_planks"
   ]
 }

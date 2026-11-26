@@ -1,0 +1,14 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "# #",
+    "###"
+  ],
+  "key": {
+    "#": "sofronpack:fir_planks"
+  },
+  "result": {
+    "id": "sofronpack:fir_boat"
+  }
+}

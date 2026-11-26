@@ -1,0 +1,13 @@
+{
+  "variants": {
+    "type=bottom": {
+      "model": "sofronpack:block/chestnut_slab"
+    },
+    "type=double": {
+      "model": "sofronpack:block/chestnut_planks"
+    },
+    "type=top": {
+      "model": "sofronpack:block/chestnut_slab_top"
+    }
+  }
+}
