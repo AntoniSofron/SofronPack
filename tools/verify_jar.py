@@ -445,6 +445,17 @@ with zipfile.ZipFile(jar) as z:
         "mashed_potatoes_poultry_bowl": (12, 12, True),
     }
     assert "pl/sofron/terralab/food/FoodContent.class" in files
+    for name in ("MillContent", "MillLogic", "MillBlock", "MillShaftBlock", "MillSailsBlock"):
+        assert f"pl/sofron/terralab/mill/{name}.class" in files
+    assert "assets/sofronpack/textures/item/flour.png" in files
+    for name in ("mill", "mill_shaft", "mill_sails"):
+        for path in (f"assets/sofronpack/blockstates/{name}.json",
+                     f"assets/sofronpack/models/block/{name}.json",
+                     f"assets/sofronpack/items/{name}.json",
+                     f"data/sofronpack/recipe/{name}.json",
+                     f"data/sofronpack/loot_table/blocks/{name}.json"):
+            assert path in files, path
+        assert json.loads(z.read(f"data/sofronpack/recipe/{name}.json"))["result"]["id"] == f"sofronpack:{name}"
     assert "pl/sofron/terralab/soil/mixin/FoodCraftingMixin.class" in files
     mixins = json.loads(z.read("sofron-soil.mixins.json"))
     assert "FoodCraftingMixin" in mixins["mixins"]

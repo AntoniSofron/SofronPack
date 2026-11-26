@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "SIS",
+    "P P",
+    "PPP"
+  ],
+  "key": {
+    "S": "minecraft:smooth_stone",
+    "I": "minecraft:iron_ingot",
+    "P": "#minecraft:planks"
+  },
+  "result": {
+    "id": "sofronpack:mill",
+    "count": 1
+  }
+}

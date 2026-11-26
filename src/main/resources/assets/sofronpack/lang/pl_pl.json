@@ -42,5 +42,9 @@
   "item.sofronpack.mashed_potatoes_bowl": "Miska purée ziemniaczanego",
   "item.sofronpack.mashed_potatoes_meat_bowl": "Miska purée z mięsem",
   "item.sofronpack.mashed_potatoes_fish_bowl": "Miska purée z rybą",
-  "item.sofronpack.mashed_potatoes_poultry_bowl": "Miska purée z drobiem"
+  "item.sofronpack.mashed_potatoes_poultry_bowl": "Miska purée z drobiem",
+  "item.sofronpack.flour": "Mąka",
+  "block.sofronpack.mill": "Młyn",
+  "block.sofronpack.mill_shaft": "Wał młyna",
+  "block.sofronpack.mill_sails": "Skrzydła młyna"
 }

@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:block",
+  "pools": [
+    {
+      "rolls": 1,
+      "condition": {
+        "type": "minecraft:survives_explosion"
+      },
+      "entries": [
+        {
+          "type": "minecraft:item",
+          "name": "sofronpack:mill_sails"
+        }
+      ]
+    }
+  ],
+  "random_sequence": "sofronpack:blocks/mill_sails"
+}

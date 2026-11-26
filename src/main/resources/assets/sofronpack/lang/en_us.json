@@ -42,5 +42,9 @@
   "item.sofronpack.mashed_potatoes_bowl": "Mashed Potatoes Bowl",
   "item.sofronpack.mashed_potatoes_meat_bowl": "Mashed Potatoes and Meat",
   "item.sofronpack.mashed_potatoes_fish_bowl": "Mashed Potatoes and Fish",
-  "item.sofronpack.mashed_potatoes_poultry_bowl": "Mashed Potatoes and Poultry"
+  "item.sofronpack.mashed_potatoes_poultry_bowl": "Mashed Potatoes and Poultry",
+  "item.sofronpack.flour": "Flour",
+  "block.sofronpack.mill": "Mill",
+  "block.sofronpack.mill_shaft": "Mill Shaft",
+  "block.sofronpack.mill_sails": "Windmill Sails"
 }
