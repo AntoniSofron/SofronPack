@@ -35,7 +35,7 @@ jobs:
       - name: Compare builds
         run: |
           cp tools/LavaFrames.java /tmp/
-          for ref in 2e5e34a0532251ac7475deef88ad33014ca3a1e0 74da67e0342a33eb8f3050c46521b088a99e09d9; do
+          for ref in 2e5e34a0532251ac7475deef88ad33014ca3a1e0 27fb3c38b67f66c95555a93be2e29763c633e56d; do
             work=/tmp/lake-${ref}
             git worktree add --detach "$work" "$ref"
             mkdir -p "$work"/{run/{mods,config,saves},src/main/java/pl/sofron/smoke}
