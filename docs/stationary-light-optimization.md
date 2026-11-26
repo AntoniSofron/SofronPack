@@ -1,6 +1,6 @@
-# Stationary RGB atlas (0.1.97)
+# Stationary RGB atlas (0.1.98)
 
-The existing radial light model is retained. Dense sections group sources by exact RGB hue, accumulate the same squared weights and energy, then apply hue per grid node. No source count reduction or distance reduction is used; floating-point accumulation order can change rounding slightly. Small-radius sources retain the old sampling path.
+The existing radial light model is retained. Dense sections group sources by exact RGB hue, accumulate the same squared weights and energy, then apply hue per grid node. No source count reduction or distance reduction is used; floating-point accumulation order can change rounding slightly. Small-radius sources retain the old sampling path. Identical block-centered emitters in dense contiguous X rows additionally use cached radial prefix sums; summing a row takes one range lookup at each affected lattice node. Scattered or differently powered sources fall back to the original kernel.
 
 The client hands immutable source-list snapshots to a single background worker. It builds the existing compact column atlas and computes changed 4 KiB ranges. The render thread polls without blocking; at most one build is in flight, intermediate source revisions can be coalesced. The published origin always matches the uploaded data, and world changes discard stale work. Small updates use a single GPU submission with only changed ranges; reallocations or large changes upload the complete image. Existing vanilla block light gates static tint on completely dark surfaces. This is not a full per-color obstacle solver and cannot distinguish two independently lit sides of a wall. Distant LOD RGB is not changed in this revision.
 

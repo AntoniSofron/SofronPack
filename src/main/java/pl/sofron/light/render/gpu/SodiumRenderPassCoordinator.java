@@ -102,7 +102,7 @@ public final class SodiumRenderPassCoordinator {
         }
         if (!stationaryAtlas.busy() && (index.revision() != lastRevision || width != lastWidth
                 || originX != lastOriginX || originZ != lastOriginZ)) {
-            stationaryAtlas.submit(index.snapshot(),originX,originZ,width,index.revision());
+            stationaryAtlas.submit(index.snapshotFor(mc.level),originX,originZ,width,index.revision());
             lastRevision = index.revision(); lastWidth = width;
             lastOriginX = originX; lastOriginZ = originZ;
         }

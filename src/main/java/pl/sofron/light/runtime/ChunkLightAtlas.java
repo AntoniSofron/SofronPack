@@ -30,12 +30,14 @@ public final class ChunkLightAtlas {
     // direct buffers on every atlas revision trigger expensive native cleanup.
     private ByteBuffer staging;
     private final float[] bakeScratch = new float[GRID*GRID*GRID*5];
+    private final RadialLightRuns runs = new RadialLightRuns();
     private final float[] groupWeights = new float[GRID*GRID*GRID];
     private final float[] groupEnergy = new float[GRID*GRID*GRID];
     public record Snapshot(ByteBuffer bytes, int chunkCount, int lightReferences) {}
     public void clear() {
         cached.clear();
         falloffs.clear();
+        runs.clear();
         staging = null;
     }
 
@@ -135,6 +137,7 @@ public final class ChunkLightAtlas {
             if (peak <= 0) continue;
             java.util.Arrays.fill(groupWeights, 0f);
             java.util.Arrays.fill(groupEnergy, 0f);
+            if (!runs.accumulate(entry.getValue(),x0,y0,z0,groupWeights,groupEnergy))
             for (LightSource s : entry.getValue()) {
             double x=s.x()-x0, y=s.y()-y0, z=s.z()-z0, radius=s.radius();
             if (s.power()<=0) continue;
