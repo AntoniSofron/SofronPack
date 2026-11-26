@@ -22,6 +22,7 @@ public final class SofronPackLightClient implements ClientModInitializer {
             System.out.println("[SofronPack] Sodium missing: client lighting disabled.");
             return;
         }
+        pl.sofron.extended.client.RemoteLodCache.register();
         diagnostics = new LightDiagnostics(FabricLoader.getInstance().getConfigDir().resolve("sofron-pack-light-diagnostics.txt"));
         CONFIG = LightConfig.load(FabricLoader.getInstance().getConfigDir().resolve("sofron-pack-light.json"));
         ClientTickEvents.END_CLIENT_TICK.register(client -> {

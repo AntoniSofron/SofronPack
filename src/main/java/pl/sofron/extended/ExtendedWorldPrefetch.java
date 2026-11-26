@@ -124,6 +124,8 @@ public final class ExtendedWorldPrefetch {
     public static void register() {
         generationTicket = Registry.register(BuiltInRegistries.TICKET_TYPE,
                 Identifier.parse("sofronpack:distant_generation"), new TicketType(0L, TicketType.FLAG_LOADING));
+        // Dedicated servers only serve ordinary Minecraft chunks. LOD storage belongs to each client.
+        if (net.fabricmc.loader.api.FabricLoader.getInstance().getEnvironmentType() == net.fabricmc.api.EnvType.SERVER) return;
         ServerChunkEvents.CHUNK_LOAD.register((level, chunk, generated) -> {
             if (level == lastLevel && ExtendedWorldConfig.get().enabled) {
                 if (recentlyLoaded.size() >= 2048) recentlyLoaded.removeFirst();

@@ -367,7 +367,7 @@ public final class ExtendedVoxelStore {
     }
 
     /** Copy compact section palettes on the server thread. The encoder owns every copy. */
-    public static java.util.function.Supplier<VoxelChunk> captureSections(ServerLevel level, ChunkAccess chunk) {
+    public static java.util.function.Supplier<VoxelChunk> captureSections(net.minecraft.world.level.Level level, ChunkAccess chunk) {
         long start = System.nanoTime();
         try {
             return snapshotSections(level, chunk);
@@ -378,7 +378,7 @@ public final class ExtendedVoxelStore {
     }
 
     private static java.util.function.Supplier<VoxelChunk> snapshotSections(
-            ServerLevel level, ChunkAccess chunk) {
+            net.minecraft.world.level.Level level, ChunkAccess chunk) {
         int chunkX = chunk.getPos().x(), chunkZ = chunk.getPos().z(), minY = level.getMinY();
         var live = chunk.getSections();
         var sections = new LevelChunkSection[live.length];

@@ -169,7 +169,7 @@ public final class ExtendedWorldLodRenderer {
     private static void prepareFrameInternal(double cameraX, double cameraZ) {
         Minecraft mc = Minecraft.getInstance();
         if (!ExtendedWorldConfig.get().enabled || mc.level == null
-                || mc.getSingleplayerServer() == null || mc.player == null) {
+                || !RemoteLodCache.canRender(mc, mc.level) || mc.player == null) {
             if (device != null) close();
             return;
         }

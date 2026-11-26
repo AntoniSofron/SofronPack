@@ -88,6 +88,7 @@ def main():
             rcon("place feature sofronpack:swamp_wild_rice 40 260 42")
             expect("block 40 260 42 sofronpack:wild_rice_crop[half=lower,age=7]")
             expect("block 40 261 42 sofronpack:wild_rice_crop[half=upper,age=7]")
+            assert not list(RUN.rglob("sofronpack-extended-world")), "Dedicated server created a LOD archive"
             print("PASS: wild rice game runtime smoke", flush=True)
         finally:
             if process.poll() is None:

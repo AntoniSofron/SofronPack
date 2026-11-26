@@ -40,7 +40,7 @@ public abstract class ExtendedWorldFogMixin {
         // atmosphere's biome/weather/cave rules, but never to the extended
         // 128-chunk fog where these fields encode our volumetric parameters.
         boolean extendedWorld = ExtendedWorldConfig.get().enabled && level != null
-                && net.minecraft.client.Minecraft.getInstance().getSingleplayerServer() != null
+                && pl.sofron.extended.client.RemoteLodCache.canRender(net.minecraft.client.Minecraft.getInstance(), level)
                 && level.dimension().equals(Level.OVERWORLD)
                 && camera.getFluidInCamera() == FogType.NONE;
         if (!extendedWorld) {

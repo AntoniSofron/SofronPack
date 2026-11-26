@@ -9,6 +9,8 @@
     "ExtendedVoxelPipelineMixin",
     "ExtendedWorldFogMixin",
     "ExtendedFogCullingMixin",
+    "BiomeZoomSeedAccessor",
+    "ClientLodEditMixin",
     "SofronMinimalDebugOverlayMixin"
   ],
   "injectors": {

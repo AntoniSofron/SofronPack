@@ -15,7 +15,7 @@ public final class ExtendedWorldOptions {
         option.setTooltip(Component.literal("SofronPack samodzielnie wyświetla i zapisuje wokselowy " +
                 "teren do 128 chunków. Zwykły zasięg renderowania i symulacji " +
                 "pozostaje bez zmian. Generowanie nowego terenu działa stopniowo " +
-                "w trybie jednoosobowym. Nie potrzebujesz dodatkowego moda."));
+                "w trybie jednoosobowym. W multiplayerze klient zapisuje odwiedzony teren na dysku gracza."));
         option.setBinding(value -> ExtendedWorldConfig.get().setEnabled(value),
                 () -> ExtendedWorldConfig.get().enabled);
         option.setDefaultValue(false);
