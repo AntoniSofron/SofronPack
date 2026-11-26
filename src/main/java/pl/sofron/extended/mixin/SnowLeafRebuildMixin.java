@@ -16,8 +16,7 @@ public abstract class SnowLeafRebuildMixin {
     @Inject(method = "setBlockDirty(Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/state/BlockState;Lnet/minecraft/world/level/block/state/BlockState;)V",
             at = @At("RETURN"))
     private void sofronpack$refreshSnowGradient(BlockPos pos, BlockState oldState, BlockState newState, CallbackInfo ci) {
-        if (SnowLeafTint.snow(oldState) == SnowLeafTint.snow(newState)
-                && SnowLeafTint.eligible(oldState) == SnowLeafTint.eligible(newState)) return;
+        if (SnowLeafTint.kind(oldState) == SnowLeafTint.kind(newState)) return;
         int section = pos.getY() >> 4;
         int lower = (pos.getY() - 8) >> 4;
         if (lower != section) setSectionDirty(pos.getX() >> 4, lower, pos.getZ() >> 4);

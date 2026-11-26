@@ -4,6 +4,12 @@ package pl.sofron.terralab.trees;
 public final class SnowLeafGradient {
     public static final int DEPTH = 8;
     private SnowLeafGradient() {}
+    public static boolean leaf(String id) {
+        if (id == null) return false;
+        int end = id.indexOf('[');
+        if (end < 0) end = id.length();
+        return end >= 7 && id.regionMatches(end - 7, "_leaves", 0, 7);
+    }
     public static boolean eligible(String id) {
         if (id == null) return false;
         int end = id.indexOf('[');
@@ -29,19 +35,25 @@ public final class SnowLeafGradient {
     public static byte[] voxelSteps(String[] palette, short[] cells) {
         byte[] kinds = new byte[palette.length];
         boolean hasSnow = false, hasLeaves = false;
-        for (int i = 1; i < palette.length; i++) {
+        for (int i = 0; i < palette.length; i++) {
             if (snow(palette[i])) { kinds[i] = 1; hasSnow = true; }
             else if (eligible(palette[i])) { kinds[i] = 2; hasLeaves = true; }
+            else if (leaf(palette[i])) kinds[i] = 3;
+            else if ("minecraft:air".equals(palette[i]) || "minecraft:cave_air".equals(palette[i]) || "minecraft:void_air".equals(palette[i])) kinds[i] = 4;
         }
         if (!hasSnow || !hasLeaves) return null;
         byte[] steps = null;
         for (int i = 256; i < cells.length; i++) {
             if (kinds[cells[i] & 0xffff] != 1) continue;
+            byte support = kinds[cells[i - 256] & 0xffff];
+            if (support != 2 && support != 3) continue;
             for (int j = 1; j <= DEPTH && i >= j * 256; j++) {
                 int at = i - j * 256;
-                if (kinds[cells[at] & 0xffff] != 2) break;
-                if (steps == null) steps = new byte[cells.length];
-                steps[at] = (byte)(DEPTH + 1 - j);
+                byte kind = kinds[cells[at] & 0xffff];
+                if (kind == 2) {
+                    if (steps == null) steps = new byte[cells.length];
+                    steps[at] = (byte)Math.max(steps[at], DEPTH + 1 - j);
+                } else if (kind != 3 && kind != 4) break;
             }
         }
         return steps;

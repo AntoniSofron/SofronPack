@@ -10,7 +10,7 @@ class SnowLeafGradientTest {
         assertEquals(0x123456, SnowLeafGradient.blend(0x123456, 0));
     }
     @Test void eightLeavesAndGap() {
-        String[] palette = {"minecraft:air", "minecraft:oak_leaves", "minecraft:snow[layers=1]", "minecraft:cherry_leaves"};
+        String[] palette = {"minecraft:air", "minecraft:oak_leaves", "minecraft:snow[layers=1]", "minecraft:cherry_leaves", "minecraft:stone", "minecraft:snow_block"};
         short[] cells = new short[12 * 256];
         for (int y = 0; y < 10; y++) cells[y * 256] = 1;
         cells[10 * 256] = 2;
@@ -19,7 +19,19 @@ class SnowLeafGradientTest {
         assertEquals(0, frost[256]);
         cells[6 * 256] = 3;
         frost = SnowLeafGradient.voxelSteps(palette, cells);
+        assertEquals(4, frost[5 * 256]);
+        assertEquals(0, frost[6 * 256]);
+        cells[7 * 256] = 0;
+        frost = SnowLeafGradient.voxelSteps(palette, cells);
+        assertEquals(4, frost[5 * 256]);
+        cells[6 * 256] = 4;
+        frost = SnowLeafGradient.voxelSteps(palette, cells);
         assertEquals(0, frost[5 * 256]);
+        cells[10 * 256] = 5;
+        frost = SnowLeafGradient.voxelSteps(palette, cells);
+        assertEquals(8, frost[9 * 256]);
+        cells[9 * 256] = 0;
+        assertNull(SnowLeafGradient.voxelSteps(palette, cells));
         assertFalse(SnowLeafGradient.eligible("minecraft:flowering_azalea_leaves"));
         assertFalse(SnowLeafGradient.eligible("minecraft:red_poplar_leaves"));
         assertTrue(SnowLeafGradient.eligible("sofronpack:fir_leaves[distance=7]"));

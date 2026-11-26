@@ -28,7 +28,7 @@ public final class ExtendedLodMeshFingerprint {
             throw new IllegalStateException(impossible);
         }
         // Bump this format salt whenever mesh algorithms change.
-        string(hash, "SofronPack-mesh-v1:volume6:surface6:packed48:snow8");
+        string(hash, "SofronPack-mesh-v1:volume6:surface6:packed48:snow8:gaps");
         TreeSet<String> used = new TreeSet<>();
         for (var chunk : sources) {
             if (chunk == null) {
