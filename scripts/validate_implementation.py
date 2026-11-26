@@ -168,7 +168,7 @@ for name in winter_files:
     assert winter['effects']['grass_color'] == '#B28035'
     assert winter['effects']['water_color'] == taiga['effects']['water_color']
     assert winter['attributes']['minecraft:visual/sky_color'].startswith('#')
-custom_biomes = {f'sofronpack/worldgen/biome/{name}.json' for name in ('shrubland', 'rainforest')}
+custom_biomes = {f'sofronpack/worldgen/biome/{name}.json' for name in ('shrubland', 'rainforest', 'old_growth_fir_taiga')}
 assert biome_files == custom_biomes | winter_files | {f'minecraft/worldgen/biome/{name}.json' for name in ('swamp', 'birch_forest', 'old_growth_birch_forest', 'taiga', 'old_growth_spruce_taiga', 'old_growth_pine_taiga', 'dark_forest', 'savanna', 'savanna_plateau', 'windswept_savanna', 'jungle', 'sparse_jungle', 'bamboo_jungle')}, biome_files
 swamp = data[ROOT / 'minecraft/worldgen/biome/swamp.json']
 assert swamp['effects']['grass_color'] == '#688D46'

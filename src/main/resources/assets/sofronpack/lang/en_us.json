@@ -148,5 +148,7 @@
   "item.sofronpack.chestnut_chest_boat": "Chestnut Chest Boat",
   "entity.sofronpack.chestnut_chest_boat": "Chestnut Chest Boat",
   "biome.sofronpack.old_growth_fir_taiga": "Old Growth Fir Taiga",
-  "item.sofronpack.chestnut": "Chestnut"
+  "item.sofronpack.chestnut": "Chestnut",
+  "block.sofronpack.white_petals": "White Petals",
+  "block.sofronpack.fallen_chestnuts": "Fallen Chestnuts"
 }

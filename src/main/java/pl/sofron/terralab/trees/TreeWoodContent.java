@@ -15,6 +15,7 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.util.random.WeightedList;
 import net.minecraft.world.item.*;
+import net.minecraft.world.food.FoodProperties;
 import net.minecraft.world.level.block.*;
 import net.minecraft.world.level.block.entity.BlockEntityTypes;
 import net.minecraft.world.level.block.grower.TreeGrower;
@@ -35,7 +36,12 @@ public final class TreeWoodContent {
     public static final Family FIR = create("fir", true);
     public static final Family CHESTNUT = create("chestnut", false);
     public static final Item CHESTNUT_ITEM = Registry.register(BuiltInRegistries.ITEM, id("chestnut"),
-            new Item(new Item.Properties().setId(ResourceKey.create(Registries.ITEM, id("chestnut")))));
+            new Item(new Item.Properties().setId(ResourceKey.create(Registries.ITEM, id("chestnut")))
+                    .food(new FoodProperties.Builder().nutrition(1).saturationModifier(0.5F).build())));
+    public static final Block WHITE_PETALS = part("white_petals", Blocks.PINK_PETALS,
+            p -> new FlowerBedBlock(p, 3), NATURAL, 0, 0);
+    public static final Block FALLEN_CHESTNUTS = part("fallen_chestnuts", Blocks.LEAF_LITTER,
+            LeafLitterBlock::new, NATURAL, 0, 0);
 
     private static Identifier id(String name) { return Identifier.fromNamespaceAndPath("sofronpack", name); }
     private static ResourceKey<Feature> feature(String name) { return ResourceKey.create(Registries.FEATURE, id(name)); }
@@ -99,7 +105,7 @@ public final class TreeWoodContent {
     }
     public static void register() {
         TreeBoats.register();
-        NATURAL.add(CHESTNUT_ITEM);
+        tab("food_and_drinks", List.of(CHESTNUT_ITEM));
         tab("building_blocks", BUILDING);
         tab("natural_blocks", NATURAL);
         tab("functional_blocks", FUNCTIONAL);

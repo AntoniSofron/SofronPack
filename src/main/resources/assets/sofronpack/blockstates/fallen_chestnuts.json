@@ -1,0 +1,64 @@
+{
+  "variants": {
+    "facing=north,segment_amount=1": {
+      "model": "sofronpack:block/fallen_chestnuts_1"
+    },
+    "facing=east,segment_amount=1": {
+      "model": "sofronpack:block/fallen_chestnuts_1",
+      "y": 90
+    },
+    "facing=south,segment_amount=1": {
+      "model": "sofronpack:block/fallen_chestnuts_1",
+      "y": 180
+    },
+    "facing=west,segment_amount=1": {
+      "model": "sofronpack:block/fallen_chestnuts_1",
+      "y": 270
+    },
+    "facing=north,segment_amount=2": {
+      "model": "sofronpack:block/fallen_chestnuts_2"
+    },
+    "facing=east,segment_amount=2": {
+      "model": "sofronpack:block/fallen_chestnuts_2",
+      "y": 90
+    },
+    "facing=south,segment_amount=2": {
+      "model": "sofronpack:block/fallen_chestnuts_2",
+      "y": 180
+    },
+    "facing=west,segment_amount=2": {
+      "model": "sofronpack:block/fallen_chestnuts_2",
+      "y": 270
+    },
+    "facing=north,segment_amount=3": {
+      "model": "sofronpack:block/fallen_chestnuts_3"
+    },
+    "facing=east,segment_amount=3": {
+      "model": "sofronpack:block/fallen_chestnuts_3",
+      "y": 90
+    },
+    "facing=south,segment_amount=3": {
+      "model": "sofronpack:block/fallen_chestnuts_3",
+      "y": 180
+    },
+    "facing=west,segment_amount=3": {
+      "model": "sofronpack:block/fallen_chestnuts_3",
+      "y": 270
+    },
+    "facing=north,segment_amount=4": {
+      "model": "sofronpack:block/fallen_chestnuts_4"
+    },
+    "facing=east,segment_amount=4": {
+      "model": "sofronpack:block/fallen_chestnuts_4",
+      "y": 90
+    },
+    "facing=south,segment_amount=4": {
+      "model": "sofronpack:block/fallen_chestnuts_4",
+      "y": 180
+    },
+    "facing=west,segment_amount=4": {
+      "model": "sofronpack:block/fallen_chestnuts_4",
+      "y": 270
+    }
+  }
+}

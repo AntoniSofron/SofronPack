@@ -148,5 +148,7 @@
   "item.sofronpack.chestnut_chest_boat": "Łódź kasztanowca ze skrzynią",
   "entity.sofronpack.chestnut_chest_boat": "Łódź kasztanowca ze skrzynią",
   "biome.sofronpack.old_growth_fir_taiga": "Starodrzew jodłowej tajgi",
-  "item.sofronpack.chestnut": "Kasztan"
+  "item.sofronpack.chestnut": "Kasztan",
+  "block.sofronpack.white_petals": "Białe płatki",
+  "block.sofronpack.fallen_chestnuts": "Opadłe kasztany"
 }

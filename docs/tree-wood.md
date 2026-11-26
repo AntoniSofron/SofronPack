@@ -18,4 +18,8 @@ have unique colors. Both families also include flower-pot saplings, normal and c
 
 ## Fir and chestnut (0.1.91)
 
-Fir uses the five existing spruce and two giant spruce templates with fir blocks in the new Old Growth Fir Taiga. Single and 2x2 saplings use native fir features; mega fir uses podzol. Chestnut reuses apple shapes and has a separate chestnut item (0.5% base leaf drop, Fortune increases chance). Generation selectors use 0.5% of mixed forest attempts, 10% of plains attempts, and 35% of the oak branch in shrubland and savanna. Existing chunks are not regenerated. Textures are initially shared with spruce/apple. Chestnuts are a non-food item (horse chestnuts).
+Fir uses the five existing spruce and two giant spruce templates with fir blocks in the new Old Growth Fir Taiga. Single and 2x2 saplings use native fir features; mega fir uses podzol. Chestnut reuses apple shapes and has a separate chestnut item (0.5% base leaf drop, Fortune increases chance). Generation selectors use 0.5% of mixed forest attempts, 10% of plains attempts, and 35% of the oak branch in shrubland and savanna. Existing chunks are not regenerated. Textures are initially shared with spruce/apple. Chestnuts were initially non-food items.
+
+## Ground decorations (0.1.92)
+
+Apple and fancy apple trees use a small native place_on_ground decorator to scatter white petals; chestnut and fancy chestnut trees scatter fallen chestnuts. Each ground block has 1–4 segments, and breaking a fallen chestnut patch yields the corresponding number of chestnuts (subject to explosion decay). Chestnut items restore 1 hunger point and 1 saturation point (modifier 0.5), in-game only. A chestnut can also be crafted into a fallen chestnut decoration for placement.

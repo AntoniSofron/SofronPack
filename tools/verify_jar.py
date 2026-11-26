@@ -552,6 +552,15 @@ with zipfile.ZipFile(jar) as z:
     assert b'"minecraft:apple"' in z.read("data/sofronpack/loot_table/blocks/apple_leaves.json")
     assert b'"sofronpack:chestnut"' in z.read("data/sofronpack/loot_table/blocks/chestnut_leaves.json")
     assert "data/sofronpack/worldgen/biome/old_growth_fir_taiga.json" in z.namelist()
+    for name in ("white_petals", "fallen_chestnuts"):
+        assert f"assets/sofronpack/blockstates/{name}.json" in files
+        assert f"assets/sofronpack/items/{name}.json" in files
+        assert f"assets/sofronpack/textures/block/{name}.png" in files
+        assert f"data/sofronpack/loot_table/blocks/{name}.json" in files
+    for tree in ("apple_tree", "fancy_apple_tree", "chestnut_tree", "fancy_chestnut_tree"):
+        feature = json.loads(z.read(f"data/sofronpack/worldgen/feature/{tree}.json"))
+        assert feature["decorators"][0]["type"] == "minecraft:place_on_ground"
+        assert len(feature["decorators"][0]["block_state_provider"]["entries"]) == 16
 
 
 pathlib.Path("dist").mkdir(exist_ok=True)
