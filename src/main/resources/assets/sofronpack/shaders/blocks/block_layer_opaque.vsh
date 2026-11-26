@@ -223,8 +223,10 @@ void main() {
     // Add the light color to the vertex color, and pass the texture coordinates to the fragment shader
 #ifndef OIT_ALPHA_ONLY
     spl_UnlitVertexColor = _vert_color.rgb;
-    v_Color = _vert_color * texture(u_LightTex, _vert_tex_light_coord);
-    spl_Sunlit = texture(u_LightTex, vec2(0.03125, _vert_tex_light_coord.y)).r;
+    vec4 lightmap = texture(u_LightTex, _vert_tex_light_coord);
+    vec3 sky = texture(u_LightTex, vec2(0.03125, _vert_tex_light_coord.y)).rgb;
+    v_Color = _vert_color * lightmap;
+    spl_Sunlit = sky.r;
     spl_LightCoord = _vert_tex_light_coord;
     // Fully sunlit vertices have zero stationary tint. Diagnostics still sample them.
     splStationaryVertex = splVoxelCamera.w > 0.0 && (spl_Sunlit < 0.85 || splLightHeader.z != 0)
@@ -236,9 +238,12 @@ void main() {
         // Vanilla block light is an inexpensive conservative occlusion gate:
         // a colored source cannot tint completely unlit surfaces through walls.
         float blockLight = smoothstep(0.03125, 0.15625, _vert_tex_light_coord.x);
-        float blend = min((1.0 - exp(-splStationaryVertex.a * 1.15)) * daylight * blockLight, 0.92);
-        float redBoost = 1.0 + 0.65 * max(0.0, hue.r - max(hue.g, hue.b));
-        v_Color.rgb = mix(v_Color.rgb, min(vec3(1.0), v_Color.rgb * hue * redBoost), blend);
+        // Recolor the block-light contribution while retaining the ambient sky and material tint.
+        vec3 ambient = min(lightmap.rgb, sky);
+        vec3 block = lightmap.rgb - ambient;
+        float brightness = max(max(block.r, block.g), block.b);
+        float blend = smoothstep(0.0, 0.25, splStationaryVertex.a) * daylight * blockLight;
+        v_Color.rgb = _vert_color.rgb * (ambient + mix(block, hue * brightness, blend));
     }
 #else
     spl_UnlitVertexColor = _vert_color.rgb;
