@@ -1,0 +1,55 @@
+name: Compare lake lighting frame times
+on:
+  push:
+    branches: ['optimization/lava-timing']
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 24
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.5.0'
+      - name: Prepare lake
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq xvfb mesa-vulkan-drivers libvulkan1 libgl1-mesa-dri
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('scripts/wild_rice_smoke.py')
+          s=p.read_text()
+          a=s.index('            for biome')
+          b=s.index('        finally:',a)
+          cmds=["forceload add 16 16 80 80","fill 16 257 16 80 260 80 minecraft:stone","fill 17 258 17 79 260 79 minecraft:lava","time set midnight","weather clear","save-all flush"]
+          lines=["            for cmd in "+repr(cmds)+":","                print(cmd,rcon(cmd),flush=True)",'            expect("block 48 260 47 minecraft:lava")']
+          p.write_text(s[:a]+"\n".join(lines)+"\n"+s[b:])
+          PY
+          python3 scripts/wild_rice_smoke.py
+      - name: Compare builds
+        run: |
+          cp tools/LavaFrames.java /tmp/
+          for ref in 2e5e34a0532251ac7475deef88ad33014ca3a1e0 74da67e0342a33eb8f3050c46521b088a99e09d9; do
+            work=/tmp/lake-${ref}
+            git worktree add --detach "$work" "$ref"
+            mkdir -p "$work"/{run/{mods,config,saves},src/main/java/pl/sofron/smoke}
+            cp -a run/sofronpack-wild-rice-smoke "$work/run/saves/Lake"
+            cp libs/sodium*.jar "$work/run/mods/"
+            cp /tmp/LavaFrames.java "$work/src/main/java/pl/sofron/smoke/"
+            sed -i '/var camera =/i\        pl.sofron.smoke.LavaFrames.frame(mc);' "$work/src/main/java/pl/sofron/light/mixin/MinecraftFramePrepareMixin.java"
+            echo '{"enabled":false}' > "$work/run/config/sofronpack-extended-world.json"
+            printf 'renderDistance:6\nsimulationDistance:4\nenableVsync:false\nmaxFps:260\npauseOnLostFocus:false\n' > "$work/run/options.txt"
+            (cd "$work" && timeout 300 xvfb-run -a env LIBGL_ALWAYS_SOFTWARE=1 gradle --console=plain runClient --args='--graphicsBackend vulkan --quickPlaySingleplayer Lake --width 960 --height 540') > "$ref.log" 2>&1 || { tail -90 "$ref.log"; exit 1; }
+            grep LAVA_RESULT "$ref.log"
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lake-frame-times
+          path: '*.log'
