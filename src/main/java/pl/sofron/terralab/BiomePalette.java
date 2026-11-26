@@ -30,7 +30,7 @@ public record BiomePalette(int id, int sky, int fog, int water, int grass, int f
                         : birch == 0x8EA347 ? 0x789D56 : DEFAULT_SPRUCE;
                 var palette = new BiomePalette(id, rgb(fields[2]), rgb(fields[3]), rgb(fields[4]),
                         rgb(fields[5]), rgb(fields[6]), birch, rgb(fields[8]), spruce);
-                if (id < 1 || id >= 255 || BY_ID[id] != null || BIOMES.put("minecraft:" + fields[1], palette) != null)
+                if (id < 1 || id >= 255 || BY_ID[id] != null || BIOMES.put(Identifier.parse(fields[1]).toString(), palette) != null)
                     throw new IllegalArgumentException("Duplicate or invalid biome palette: " + row);
                 BY_ID[id] = palette;
             }

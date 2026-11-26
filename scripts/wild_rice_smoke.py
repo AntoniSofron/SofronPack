@@ -57,6 +57,11 @@ def main():
         thread.start()
         try:
             wait_ready(process, lines, timeout=300)
+            for biome in ("shrubland", "rainforest"):
+                result = rcon(f"locate biome sofronpack:{biome}")
+                if "blocks away" not in result:
+                    raise AssertionError(f"Could not locate {biome}: {result}")
+                print(result, flush=True)
             rcon("forceload add 32 32 47 47")
             rcon("fill 37 257 37 47 265 47 minecraft:air")
             rcon("fill 38 259 38 46 259 46 minecraft:dirt")

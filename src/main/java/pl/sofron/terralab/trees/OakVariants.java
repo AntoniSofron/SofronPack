@@ -2,6 +2,8 @@ package pl.sofron.terralab.trees;
 
 import pl.sofron.terralab.TerraLabMod;
 import com.mojang.serialization.MapCodec;
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.Registries;
@@ -15,9 +17,11 @@ import net.minecraft.world.level.chunk.ChunkGenerator;
 import net.minecraft.world.level.levelgen.feature.Feature;
 import net.minecraft.world.level.levelgen.feature.TreeFeature;
 
-public record OakVariants(Holder<Feature> original) implements Feature {
-    public static final MapCodec<OakVariants> CODEC = Feature.CODEC.fieldOf("original")
-            .xmap(OakVariants::new, OakVariants::original);
+public record OakVariants(Holder<Feature> original, boolean templatesOnly) implements Feature {
+    public static final MapCodec<OakVariants> CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(
+            Feature.CODEC.fieldOf("original").forGetter(OakVariants::original),
+            Codec.BOOL.optionalFieldOf("templates_only", false).forGetter(OakVariants::templatesOnly)
+    ).apply(instance, OakVariants::new));
     private static final ResourceKey<Feature> SMALL = ResourceKey.create(Registries.FEATURE,
             Identifier.withDefaultNamespace("oak"));
     private static final ResourceKey<Feature> TALL = ResourceKey.create(Registries.FEATURE,
@@ -34,7 +38,7 @@ public record OakVariants(Holder<Feature> original) implements Feature {
         }
         if (!(original.value() instanceof TreeFeature local)) return false;
 
-        int ticket = random.nextInt(15);
+        int ticket = templatesOnly ? 7 + random.nextInt(8) : random.nextInt(15);
         if (ticket >= 7) {
             boolean first = ticket < 11;
             return TreeTemplates.place(level, random, origin, local, first ? "oak_1" : "oak_2",

@@ -6,7 +6,8 @@
   "mixins": [
     "ExtendedChunkFutureAccess",
     "ExtendedChunkEditMixin",
-    "SofronDeepLavaMixin"
+    "SofronDeepLavaMixin",
+    "OverworldVegetationBiomeMixin"
   ],
   "injectors": {
     "defaultRequire": 1

@@ -66,3 +66,5 @@ id,biome,sky,fog,water,grass,foliage,birch,oak
 65,windswept_hills,80A8FF,BAD3FF,3F76E4,87B58E,66A564,80A755,-
 66,windswept_savanna,6EB1FF,CFCFD7,47B7F0,C2B14E,A0A432,8EA347,-
 67,wooded_badlands,E6E0C8,D9D0AA,47B7F0,AEB259,A2A232,8EA347,-
+68,sofronpack:shrubland,89B4EF,B9CCCF,52B4D0,A8B85A,849D40,8EA347,-
+69,sofronpack:rainforest,81BCE4,AACBC1,399F9A,52BB43,309537,8ECC51,-
