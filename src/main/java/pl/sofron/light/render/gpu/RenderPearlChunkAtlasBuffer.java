@@ -43,14 +43,17 @@ public final class RenderPearlChunkAtlasBuffer implements AutoCloseable {
      * needs the complete image; otherwise existing GPU bytes remain valid. */
     public void uploadDelta(pl.sofron.light.runtime.AsyncStationaryAtlas.Result update) {
         ByteBuffer data = update.atlas().bytes().duplicate();
-        int size = data.remaining();
-        if (update.full() || buffer == null || size > capacityBytes) { upload(data); return; }
-        if (update.ranges().isEmpty()) return;
+        uploadRanges(data,update.ranges(),update.full());
+    }
+    public void uploadRanges(ByteBuffer data,java.util.List<pl.sofron.light.runtime.AsyncStationaryAtlas.Range> ranges,boolean full){
+        int size=data.remaining();
+        if (full || buffer == null || size > capacityBytes) { upload(data); return; }
+        if (ranges.isEmpty()) return;
         long changed=0;
-        for (var range : update.ranges()) changed+=range.length();
+        for (var range : ranges) changed+=range.length();
         if (changed*2 >= size) { upload(data); return; }
         CommandEncoder encoder=device.createCommandEncoder();
-        for (var range : update.ranges()) {
+        for (var range : ranges) {
             encoder.writeToBuffer(buffer.slice(range.offset(),range.length()),
                     data.slice(data.position()+range.offset(),range.length()));
         }

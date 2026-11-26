@@ -164,7 +164,7 @@ public final class ChunkLightAtlas {
                 groupEnergy[at]+=influence;
             }
             }
-            boolean[] reachable=geometry.known()?reach.sample(entry.getValue(),x0,y0,z0,geometry):null;
+            boolean[] reachable=geometry.known()?reach.sample(entry.getValue(),x0,y0,z0,geometry,groupWeights):null;
             for (int node=0;node<groupWeights.length;node++) {
                 if(reachable!=null&&!reachable[node])continue;
                 float weight=groupWeights[node];

@@ -13,8 +13,7 @@ public final class MinecraftOcclusion implements LightOcclusion {
     @Override public boolean blocks(int x, int y, int z) {
         cursor.set(x, y, z);
         if (!level.hasChunkAt(cursor)) return true;
-        return !level.getBlockState(cursor)
-        .getCollisionShape(level, cursor)
-        .isEmpty();
+        var state=level.getBlockState(cursor);
+        return !state.isAir() && !state.getCollisionShape(level,cursor).isEmpty();
     }
 }

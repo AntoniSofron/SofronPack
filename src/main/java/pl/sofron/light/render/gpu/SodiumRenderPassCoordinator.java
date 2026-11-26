@@ -72,7 +72,13 @@ public final class SodiumRenderPassCoordinator {
             voxelBytes.clear();
             if (field == null) voxelBytes.putLong(0).putLong(0);
             else pl.sofron.light.runtime.DynamicVoxelField.put(voxelBytes, field);
-            voxelBuffer.upload(voxelBytes.flip());
+            voxelBytes.flip();
+            if(field!=null&&lastVoxels!=null){
+                // Dynamic payload has a fixed layout: 16-byte header + int cells.
+                // Compare page ranges, not whole GPU buffers on every torch move.
+                var ranges=dynamicRanges(lastVoxels,field);
+                voxelBuffer.uploadRanges(voxelBytes,ranges,ranges.size()>32);
+            }else voxelBuffer.upload(voxelBytes);
             lastVoxels = field;
         }
         var index = SofronPackLightClient.LIGHTS.chunkIndex();
@@ -112,6 +118,24 @@ public final class SodiumRenderPassCoordinator {
                 diagnosticAtlasReferences != 0 && SofronPackLightClient.CONFIG.stationaryBlockLighting
                 && SofronPackLightClient.CONFIG.coloredLighting);
         nativeBuffer.upload(payload);
+    }
+
+    private static java.util.List<AsyncStationaryAtlas.Range> dynamicRanges(
+            pl.sofron.light.runtime.DynamicVoxelField.Snapshot before,
+            pl.sofron.light.runtime.DynamicVoxelField.Snapshot after){
+        var result=new java.util.ArrayList<AsyncStationaryAtlas.Range>();
+        int[] a=before.voxels(),b=after.voxels();
+        if(before.x0()!=after.x0()||before.y0()!=after.y0()||before.z0()!=after.z0())
+            result.add(new AsyncStationaryAtlas.Range(0,16));
+        int start=-1;
+        for(int i=0;i<b.length;i+=1024){
+            int end=Math.min(b.length,i+1024);
+            boolean changed=java.util.Arrays.mismatch(a,i,end,b,i,end)>=0;
+            if(changed&&start<0)start=i;
+            if(!changed&&start>=0){result.add(new AsyncStationaryAtlas.Range(16+4*start,4*(i-start)));start=-1;}
+        }
+        if(start>=0)result.add(new AsyncStationaryAtlas.Range(16+4*start,4*(b.length-start)));
+        return result;
     }
 
     public static void beforeDraw(RenderPass pass, CameraTransform camera) {

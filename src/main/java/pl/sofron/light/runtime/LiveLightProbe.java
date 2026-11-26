@@ -29,9 +29,13 @@ public final class LiveLightProbe {
             // Reuse the immutable moving-light snapshot instead of allocating a list.
             nearby = tracker.sources();
         } else {
-            var combined = new java.util.ArrayList<LightSource>(tracker.sources().size() + stationary.size());
+            var combined = new java.util.ArrayList<LightSource>(tracker.sources().size() + Math.min(64,stationary.size()));
             combined.addAll(tracker.sources());
-            combined.addAll(stationary);
+            // Filter before allocating references for every lava block in a column.
+            for(var s:stationary){
+                double dx=x-s.x(),dy=y-s.y(),dz=z-s.z();
+                if(dx*dx+dy*dy+dz*dz<s.radius()*s.radius())combined.add(s);
+            }
             nearby = combined;
         }
         return RgbLightField.sample(x, y, z, nearby,

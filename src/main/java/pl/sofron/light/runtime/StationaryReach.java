@@ -13,7 +13,13 @@ public final class StationaryReach {
     private int[] queue=new int[0];
     private final boolean[] mask=new boolean[729];
     public boolean[] sample(List<LightSource> lights,int ox,int oy,int oz,LightOcclusion geometry){
+        return sample(lights,ox,oy,oz,geometry,null);
+    }
+    public boolean[] sample(List<LightSource> lights,int ox,int oy,int oz,LightOcclusion geometry,float[] weights){
         Arrays.fill(mask,false);
+        int remaining=0;
+        for(int i=0;i<mask.length;i++)if(weights==null||weights[i]>0)remaining++;
+        if(remaining==0)return mask;
         if(lights.isEmpty())return mask;
         float max=0;
         for(var s:lights)max=Math.max(max,s.radius());
@@ -35,22 +41,22 @@ public final class StationaryReach {
         // Each cell is queued at most once. Cache opacity reads within this flood.
         while(head<tail){
             int at=queue[head++],dist=Byte.toUnsignedInt(visited[at]);
-            if(dist>maxSteps)continue;
             int x=at%n,y=at/plane,z=at/n%n;
+            int tx=x-halo+1,ty=y-halo+1,tz=z-halo+1;
+            if(tx>=0&&tx<18&&ty>=0&&ty<18&&tz>=0&&tz<18){
+                int node=((tz>>1)*9+(ty>>1))*9+(tx>>1);
+                if(!mask[node]&&(weights==null||weights[node]>0)){
+                    mask[node]=true;
+                    if(--remaining==0)return mask;
+                }
+            }
+            if(dist>maxSteps)continue;
             if(x>0)tail=offer(at-1,x-1,y,z,dist,tail,x0,y0,z0,geometry);
             if(x+1<n)tail=offer(at+1,x+1,y,z,dist,tail,x0,y0,z0,geometry);
             if(z>0)tail=offer(at-n,x,y,z-1,dist,tail,x0,y0,z0,geometry);
             if(z+1<n)tail=offer(at+n,x,y,z+1,dist,tail,x0,y0,z0,geometry);
             if(y>0)tail=offer(at-plane,x,y-1,z,dist,tail,x0,y0,z0,geometry);
             if(y+1<n)tail=offer(at+plane,x,y+1,z,dist,tail,x0,y0,z0,geometry);
-        }
-        for(int k=0;k<9;k++)for(int j=0;j<9;j++)for(int i=0;i<9;i++){
-            int x=halo+2*i,y=halo+2*j,z=halo+2*k;
-            boolean found=false;
-            // Nodes lie on block corners. Sample the neighboring air cells.
-            for(int dy=-1;dy<=0&&!found;dy++)for(int dz=-1;dz<=0&&!found;dz++)for(int dx=-1;dx<=0;dx++)
-                if(visited[(y+dy)*plane+(z+dz)*n+x+dx]!=0){found=true;break;}
-            mask[(k*9+j)*9+i]=found;
         }
         return mask;
     }

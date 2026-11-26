@@ -118,7 +118,6 @@ public final class ChunkLightIndex {
             if (!client.level.hasChunk(key.x, key.z)) continue;
             scans++;
             List<LightSource> lights = scanChunk(client, cfg, key.x, key.z);
-            if (captureGeometry(client,key.x,key.z)) revision++;
             Entry old = indexed.put(key, new Entry(lights, ticks));
             if (old == null ? !lights.isEmpty() : !old.lights().equals(lights)) {
                 buckets.replace(key.x, key.z, lights);
@@ -150,39 +149,33 @@ public final class ChunkLightIndex {
         return result;
     }
 
-    private boolean captureGeometry(Minecraft client,int cx,int cz){
-        var chunk=client.level.getChunkSource().getChunkNow(cx,cz);
-        if(chunk==null)return false;
-        long[][] masks=new long[chunk.getSections().length][];
-        for(int i=0;i<masks.length;i++){
-            var section=chunk.getSection(i);
-            if(section.hasOnlyAir()||!section.maybeHas(BlockState::canOcclude))continue;
-            if(!section.maybeHas(s->!s.canOcclude())){masks[i]=StationaryOcclusion.FULL;continue;}
-            long[] bits=new long[64];
-            for(int y=0;y<16;y++)for(int z=0;z<16;z++)for(int x=0;x<16;x++)
-                if(section.getBlockState(x,y,z).canOcclude())StationaryOcclusion.set(bits,x,y,z);
-            masks[i]=bits;
-        }
-        return buckets.geometry().replace(cx,cz,new StationaryOcclusion.Column(chunk.getSectionYFromSectionIndex(0),masks));
-    }
-
     private List<LightSource> scanChunk(Minecraft client, LightConfig cfg, int cx, int cz) {
         var chunk = client.level.getChunkSource().getChunkNow(cx, cz);
         if (chunk == null || !cfg.coloredLighting) return List.of();
         List<LightSource> found = new ArrayList<>();
-        for (int sectionIndex = 0; sectionIndex < chunk.getSections().length; sectionIndex++) {
-            var section = chunk.getSection(sectionIndex);
-            if (section.hasOnlyAir() || !section.maybeHas(state -> emission(state) != UNLIT)) continue;
-            int baseY = chunk.getSectionYFromSectionIndex(sectionIndex) << 4;
-            for (int dy=0; dy<16; dy++) for (int dx=0; dx<16; dx++) for (int dz=0; dz<16; dz++) {
-                var state = section.getBlockState(dx, dy, dz);
-                if (state.getLightEmission() == 0) continue;
-                Emission value = emission(state);
-                if (value == UNLIT) continue;
-                found.add(new LightSource((cx << 4) + dx + .5, baseY + dy + .5, (cz << 4) + dz + .5,
-                        value.radius, value.rule.intensity(), value.rule.color()));
+        long[][] masks=new long[chunk.getSections().length][];
+        for(int i=0;i<masks.length;i++){
+            var section=chunk.getSection(i);
+            if(section.hasOnlyAir())continue;
+            boolean luminous=section.maybeHas(state->emission(state)!=UNLIT);
+            boolean opaque=section.maybeHas(BlockState::canOcclude);
+            boolean mixed=opaque&&section.maybeHas(s->!s.canOcclude());
+            long[] bits=mixed?new long[64]:null;
+            masks[i]=mixed?bits:opaque?StationaryOcclusion.FULL:null;
+            if(!luminous&&!mixed)continue;
+            int baseY=chunk.getSectionYFromSectionIndex(i)<<4;
+            // A mixed lit section is read once, not separately for lights and geometry.
+            for(int y=0;y<16;y++)for(int z=0;z<16;z++)for(int x=0;x<16;x++){
+                var state=section.getBlockState(x,y,z);
+                if(mixed&&state.canOcclude())StationaryOcclusion.set(bits,x,y,z);
+                if(!luminous||state.getLightEmission()==0)continue;
+                Emission value=emission(state);
+                if(value==UNLIT)continue;
+                found.add(new LightSource((cx<<4)+x+.5,baseY+y+.5,(cz<<4)+z+.5,
+                    value.radius,value.rule.intensity(),value.rule.color()));
             }
         }
+        if(buckets.geometry().replace(cx,cz,new StationaryOcclusion.Column(chunk.getSectionYFromSectionIndex(0),masks)))revision++;
         return List.copyOf(found);
     }
 }
