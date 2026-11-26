@@ -35,6 +35,7 @@ public final class ChunkLightIndex {
     private boolean configuredColor;
     private long lastRuleRevision = Long.MIN_VALUE;
     public long revision() { return revision; }
+    public ChunkLightBuckets snapshot() { return buckets.snapshot(); }
     private static final int SCANS_PER_TICK = 3;
     private static final int REFRESH_TICKS = 600;
     private final Set<ChunkKey> dirty = new HashSet<>();

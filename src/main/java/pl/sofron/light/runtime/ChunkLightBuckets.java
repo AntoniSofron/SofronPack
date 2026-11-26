@@ -26,6 +26,15 @@ public final class ChunkLightBuckets {
     private int sourceCount;
     private float maxRadius;
 
+    /** Copy only immutable source-list references. Worker owns its lookup cache. */
+    public ChunkLightBuckets snapshot() {
+        var copy = new ChunkLightBuckets();
+        copy.buckets.putAll(buckets);
+        copy.maxRadius = maxRadius;
+        copy.sourceCount = sourceCount;
+        return copy;
+    }
+
     public void clear() {
         buckets.clear();
         affectingCache.clear();

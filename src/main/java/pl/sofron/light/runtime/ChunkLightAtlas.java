@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import pl.sofron.light.engine.LightSource;
+import pl.sofron.light.engine.RgbLight;
 
 /** Independently cached columns. Sparse sections keep exact sources, crowded sections
  * store the accumulated RGB field on a two-block lattice (nine nodes per axis). */
@@ -29,6 +30,8 @@ public final class ChunkLightAtlas {
     // direct buffers on every atlas revision trigger expensive native cleanup.
     private ByteBuffer staging;
     private final float[] bakeScratch = new float[GRID*GRID*GRID*5];
+    private final float[] groupWeights = new float[GRID*GRID*GRID];
+    private final float[] groupEnergy = new float[GRID*GRID*GRID];
     public record Snapshot(ByteBuffer bytes, int chunkCount, int lightReferences) {}
     public void clear() {
         cached.clear();
@@ -37,6 +40,10 @@ public final class ChunkLightAtlas {
     }
 
     public Snapshot build(ChunkLightIndex index, int originX, int originZ, int width) {
+        return build(index.snapshot(), originX, originZ, width);
+    }
+
+    public Snapshot build(ChunkLightBuckets index, int originX, int originZ, int width) {
         if (width < 1 || width > 129) throw new IllegalArgumentException("Invalid light atlas width");
         int cells = width*width;
         int size = 1+cells;
@@ -49,7 +56,7 @@ public final class ChunkLightAtlas {
         for (int z=0; z<width; z++) for (int x=0; x<width; x++) {
             int cx = originX+x, cz = originZ+z;
             long key = ((long)cx << 32) | (cz & 0xffffffffL);
-            List<LightSource> lights = index.lightsAffectingChunk(cx,cz);
+            List<LightSource> lights = index.affecting(cx,cz);
             if (lights.isEmpty()) { cached.remove(key); continue; }
             Column column = cached.get(key);
             if (column == null || !column.lights.equals(lights)) {
@@ -117,11 +124,20 @@ public final class ChunkLightAtlas {
     private void bake(IntArrayList out, List<LightSource> lights, int x0, int y0, int z0) {
         float[] sums = bakeScratch;
         java.util.Arrays.fill(sums, 0f);
-        for (LightSource s : lights) {
-            double x=s.x()-x0, y=s.y()-y0, z=s.z()-z0, radius=s.radius();
-            var c = s.color();
+        // Group by exact hue; sum every source's original radial energy and
+        // squared influence, then apply RGB once per grid node per hue.
+        // No source is discarded or moved, and no brightness cap is introduced.
+        var groups = new java.util.LinkedHashMap<RgbLight,List<LightSource>>();
+        for (LightSource light : lights) groups.computeIfAbsent(light.color(), k -> new ArrayList<>()).add(light);
+        for (var entry : groups.entrySet()) {
+            RgbLight c = entry.getKey();
             float peak = Math.max(c.red(),Math.max(c.green(),c.blue()));
-            if (peak<=0 || s.power()<=0) continue;
+            if (peak <= 0) continue;
+            java.util.Arrays.fill(groupWeights, 0f);
+            java.util.Arrays.fill(groupEnergy, 0f);
+            for (LightSource s : entry.getValue()) {
+            double x=s.x()-x0, y=s.y()-y0, z=s.z()-z0, radius=s.radius();
+            if (s.power()<=0) continue;
             float[] falloff = null;
             if (radius <= 64 && x*2 == Math.rint(x*2) && y*2 == Math.rint(y*2) && z*2 == Math.rint(z*2)) {
                 falloff = falloffs.computeIfAbsent(s.radius(), r -> {
@@ -137,9 +153,17 @@ public final class ChunkLightAtlas {
                 if (sq >= radius*radius) continue;
                 float influence = s.power()*(falloff == null ? attenuation(sq, radius) : falloff[(int)(4*sq)]);
                 float weight = influence*influence;
-                int at=5*((k*GRID+j)*GRID+i);
+                int at=(k*GRID+j)*GRID+i;
+                groupWeights[at]+=weight;
+                groupEnergy[at]+=influence;
+            }
+            }
+            for (int node=0;node<groupWeights.length;node++) {
+                float weight=groupWeights[node];
+                if (weight==0f) continue;
+                int at=5*node;
                 sums[at]+=c.red()*weight; sums[at+1]+=c.green()*weight; sums[at+2]+=c.blue()*weight;
-                sums[at+3]+=peak*weight; sums[at+4]+=peak*influence;
+                sums[at+3]+=peak*weight; sums[at+4]+=peak*groupEnergy[node];
             }
         }
         for (int i=0; i<sums.length; i+=5) {

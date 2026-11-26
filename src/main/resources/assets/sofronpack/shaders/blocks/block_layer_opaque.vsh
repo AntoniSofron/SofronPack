@@ -230,7 +230,7 @@ void main() {
     if (splStationaryVertex.a > 0.0001 && splLightHeader.z == 0) {
         vec3 hue = clamp(splStationaryVertex.rgb, 0.0, 1.0);
         float daylight = 1.0 - smoothstep(0.38, 0.85, spl_Sunlit);
-        float blend = min((1.0 - exp(-splStationaryVertex.a * 1.15)) * daylight, 0.92);
+        // Vanilla block light is an inexpensive conservative occlusion gate:\n        // a colored source cannot tint completely unlit surfaces through walls.\n        float blockLight = smoothstep(0.03125, 0.15625, _vert_tex_light_coord.x);\n        float blend = min((1.0 - exp(-splStationaryVertex.a * 1.15)) * daylight * blockLight, 0.92);
         float redBoost = 1.0 + 0.65 * max(0.0, hue.r - max(hue.g, hue.b));
         v_Color.rgb = mix(v_Color.rgb, min(vec3(1.0), v_Color.rgb * hue * redBoost), blend);
     }

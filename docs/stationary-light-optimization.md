@@ -1,0 +1,7 @@
+# Stationary RGB atlas (0.1.97)
+
+The existing radial light model is retained. Dense sections group sources by exact RGB hue, accumulate the same squared weights and energy, then apply hue per grid node. No source count reduction or distance reduction is used; floating-point accumulation order can change rounding slightly. Small-radius sources retain the old sampling path.
+
+The client hands immutable source-list snapshots to a single background worker. It builds the existing compact column atlas and computes changed 4 KiB ranges. The render thread polls without blocking; at most one build is in flight, intermediate source revisions can be coalesced. The published origin always matches the uploaded data, and world changes discard stale work. Small updates use a single GPU submission with only changed ranges; reallocations or large changes upload the complete image. Existing vanilla block light gates static tint on completely dark surfaces. This is not a full per-color obstacle solver and cannot distinguish two independently lit sides of a wall. Distant LOD RGB is not changed in this revision.
+
+The GPU/CPU budgets and visual performance require in-game measurement; no FPS multiplier is asserted.

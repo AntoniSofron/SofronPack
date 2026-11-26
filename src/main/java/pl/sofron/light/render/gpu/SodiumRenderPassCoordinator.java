@@ -5,6 +5,7 @@ import com.mojang.renderpearl.api.commands.RenderPass;
 import net.caffeinemc.mods.sodium.client.render.viewport.CameraTransform;
 import pl.sofron.light.SofronPackLightClient;
 import pl.sofron.light.runtime.ChunkLightAtlas;
+import pl.sofron.light.runtime.AsyncStationaryAtlas;
 import net.minecraft.client.Minecraft;
 import pl.sofron.light.emissive.OreMasks;
 
@@ -19,7 +20,9 @@ public final class SodiumRenderPassCoordinator {
     private static pl.sofron.light.runtime.DynamicVoxelField.Snapshot lastVoxels;
     private static final java.nio.ByteBuffer voxelBytes = java.nio.ByteBuffer.allocateDirect(
         16 + 4 * pl.sofron.light.runtime.DynamicVoxelField.CELLS).order(java.nio.ByteOrder.nativeOrder());
-    private static final ChunkLightAtlas stationaryAtlas = new ChunkLightAtlas();
+    private static final AsyncStationaryAtlas stationaryAtlas = new AsyncStationaryAtlas();
+    private static Object atlasWorld;
+    private static int publishedOriginX, publishedOriginZ;
     private static long lastRevision = Long.MIN_VALUE;
     private static int lastOriginX, lastOriginZ, lastWidth;
     private static final RenderPearlLightUniformPayload payload = new RenderPearlLightUniformPayload();
@@ -34,9 +37,12 @@ public final class SodiumRenderPassCoordinator {
     private SodiumRenderPassCoordinator() {}
 
     public static void prepareFrame(double x, double y, double z) {
-        if (SofronPackLightClient.CONFIG == null) return;
+        if (SofronPackLightClient.CONFIG == null || Minecraft.getInstance().player == null || Minecraft.getInstance().level == null) return;
         if (nativeBuffer == null) nativeBuffer = new RenderPearlNativeLightBuffer(RenderSystem.getDevice());
-        if (chunkAtlasBuffer == null) chunkAtlasBuffer = new RenderPearlChunkAtlasBuffer(RenderSystem.getDevice(), "SofronLightAtlas");
+        if (chunkAtlasBuffer == null) {
+            chunkAtlasBuffer = new RenderPearlChunkAtlasBuffer(RenderSystem.getDevice(), "SofronLightAtlas");
+            chunkAtlasBuffer.upload(ChunkLightAtlas.empty());
+        }
         if (oreBuffer == null) oreBuffer = new RenderPearlChunkAtlasBuffer(RenderSystem.getDevice(), "SofronOreRects");
         var masks = OreMasks.current();
         if (uploadedMasks != masks) {
@@ -70,24 +76,41 @@ public final class SodiumRenderPassCoordinator {
             lastVoxels = field;
         }
         var index = SofronPackLightClient.LIGHTS.chunkIndex();
-        if (index.revision() != lastRevision || width != lastWidth || originX != lastOriginX || originZ != lastOriginZ) {
-            try {
-                ChunkLightAtlas.Snapshot atlas=stationaryAtlas.build(index,originX,originZ,width);
-                chunkAtlasBuffer.upload(atlas);
-                diagnosticAtlasReferences = atlas.lightReferences();
-                diagnosticAtlasCells = atlas.chunkCount();
-            } catch (IllegalStateException | IllegalArgumentException atlasLimit) {
-                diagnosticAtlasFailures++;
-                diagnosticAtlasReferences = 0;
-                diagnosticAtlasCells = 1;
-                chunkAtlasBuffer.upload(ChunkLightAtlas.empty());
-            }
-            lastRevision = index.revision();
-            lastWidth = width;
-            lastOriginX = originX;
-            lastOriginZ = originZ;
+        if (atlasWorld != mc.level) {
+            stationaryAtlas.reset();
+            atlasWorld = mc.level;
+            lastRevision = Long.MIN_VALUE;
+            diagnosticAtlasReferences = 0;
+            diagnosticAtlasCells = 0;
+            chunkAtlasBuffer.upload(ChunkLightAtlas.empty());
         }
-        payload.update(debugMode, originX, originZ, x, y, z, field, diagnosticAtlasReferences != 0);
+        try {
+            var completed = stationaryAtlas.poll();
+            if (completed != null) {
+                chunkAtlasBuffer.uploadDelta(completed);
+                publishedOriginX = completed.x(); publishedOriginZ = completed.z();
+                diagnosticAtlasReferences = completed.atlas().lightReferences();
+                diagnosticAtlasCells = completed.atlas().chunkCount();
+            }
+        } catch (RuntimeException failed) {
+            // Recover on the next source revision; no stale delta baseline.
+            diagnosticAtlasFailures++;
+            stationaryAtlas.reset();
+            diagnosticAtlasReferences = 0;
+            diagnosticAtlasCells = 0;
+            chunkAtlasBuffer.upload(ChunkLightAtlas.empty());
+        }
+        if (!stationaryAtlas.busy() && (index.revision() != lastRevision || width != lastWidth
+                || originX != lastOriginX || originZ != lastOriginZ)) {
+            stationaryAtlas.submit(index.snapshot(),originX,originZ,width,index.revision());
+            lastRevision = index.revision(); lastWidth = width;
+            lastOriginX = originX; lastOriginZ = originZ;
+        }
+        // The published atlas and its origin are one transaction. Never sample
+        // yesterday's atlas using the new player's chunk coordinates.
+        payload.update(debugMode, publishedOriginX, publishedOriginZ, x, y, z, field,
+                diagnosticAtlasReferences != 0 && SofronPackLightClient.CONFIG.stationaryBlockLighting
+                && SofronPackLightClient.CONFIG.coloredLighting);
         nativeBuffer.upload(payload);
     }
 
@@ -100,6 +123,6 @@ public final class SodiumRenderPassCoordinator {
         voxelBuffer.bind(pass);
         submissions++;
     }
-    public static void close() { stationaryAtlas.clear(); if (nativeBuffer != null) nativeBuffer.close(); nativeBuffer = null; if(chunkAtlasBuffer!=null) chunkAtlasBuffer.close(); chunkAtlasBuffer=null; if(oreBuffer!=null) oreBuffer.close(); oreBuffer=null; uploadedMasks=null; if(fadeBuffer!=null) fadeBuffer.close(); fadeBuffer=null; uploadedFades=null; if(voxelBuffer!=null) voxelBuffer.close(); voxelBuffer=null; lastVoxels=null; lastRevision=Long.MIN_VALUE; }
+    public static void close() { stationaryAtlas.reset(); atlasWorld=null; diagnosticAtlasReferences=0; diagnosticAtlasCells=0; if (nativeBuffer != null) nativeBuffer.close(); nativeBuffer = null; if(chunkAtlasBuffer!=null) chunkAtlasBuffer.close(); chunkAtlasBuffer=null; if(oreBuffer!=null) oreBuffer.close(); oreBuffer=null; uploadedMasks=null; if(fadeBuffer!=null) fadeBuffer.close(); fadeBuffer=null; uploadedFades=null; if(voxelBuffer!=null) voxelBuffer.close(); voxelBuffer=null; lastVoxels=null; lastRevision=Long.MIN_VALUE; }
     public static long submissions() { return submissions; }
 }
