@@ -189,7 +189,11 @@ with zipfile.ZipFile(jar) as z:
     assert "GpuFormat.RGBA32_UINT" in pipeline
     # Packed instances are now built and persisted on the LOD worker,
     # not repacked on the GPU upload thread.
-    assert "ExtendedPackedQuads.pack(result.vertices())" in renderer
+    assert "ExtendedPackedQuads.pack(result.vertices(),lighting)" in renderer
+    assert "LodRgbLighting.build(lightingChunks,materials,settings,tx,tz)" in renderer
+    assert "pl/sofron/extended/LodRgbLighting.class" in files
+    assert "pl/sofron/light/runtime/StationaryReach.class" in files
+    assert "pl/sofron/light/runtime/StationaryOcclusion.class" in files
     assert "ExtendedLodMeshCache.load(" in renderer
     assert "ExtendedLodMeshCache.saveDeferred(" in renderer
     assert "GPU_UPLOAD_TIME_BUDGET_NS" in renderer
@@ -212,6 +216,7 @@ with zipfile.ZipFile(jar) as z:
     assert b"in uvec4 PackedA" in vertex_shader
     assert b"gl_VertexIndex" in vertex_shader
     assert b"coordinate(corner * 3" in vertex_shader
+    assert b"light >> 25u" in vertex_shader
     # Full captured volumes must use all four distance-dependent
     # 1/2/4/8-block rings rather than forcing distant 1x1 geometry.
     lod_levels = pathlib.Path(
