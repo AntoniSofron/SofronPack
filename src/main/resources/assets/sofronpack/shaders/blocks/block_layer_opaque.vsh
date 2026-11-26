@@ -58,12 +58,9 @@ uniform isamplerBuffer SofronLightAtlas;
 int spl_atlas(int i) { return texelFetch(SofronLightAtlas, i).r; }
 float spl_float(int i) { return intBitsToFloat(spl_atlas(i)); }
 // Store energy-weighted hue during interpolation to keep dark nodes neutral.
-vec3 bakedHue(int i) {
-    uint packedHue = uint(spl_atlas(i));
-    return vec3((uvec3(packedHue) >> uvec3(0u,8u,16u)) & uvec3(255u)) / 255.0;
-}
 vec4 bakedNode(int i) {
-    vec3 hue = bakedHue(i);
+    uint packedHue = uint(spl_atlas(i));
+    vec3 hue = vec3((uvec3(packedHue) >> uvec3(0u,8u,16u)) & uvec3(255u)) / 255.0;
     float energy = spl_float(i+1);
     return vec4(hue * energy, energy);
 }
@@ -89,27 +86,6 @@ vec4 bakedLight(int start, vec3 p) {
     return vec4(result.rgb / max(result.a, 1e-10), result.a);
 }
 
-float energyRow(int i, float x) {
-    float left = spl_float(i);
-    if (x == 0.0) return left;
-    return mix(left, spl_float(i+1), x);
-}
-
-float energyPlane(int i, vec2 t) {
-    float lower = energyRow(i, t.x);
-    if (t.y == 0.0) return lower;
-    return mix(lower, energyRow(i+9, t.x), t.y);
-}
-
-vec4 singleHueLight(int start, vec3 p) {
-    ivec3 cell = ivec3(floor(p));
-    vec3 t = p - vec3(cell);
-    int i = start + 1 + (cell.z * 9 + cell.y) * 9 + cell.x;
-    float energy = energyPlane(i, t.xy);
-    if (t.z != 0.0) energy = mix(energy, energyPlane(i+81, t.xy), t.z);
-    return vec4(bakedHue(start) * (energy / max(energy, 1e-10)), energy);
-}
-
 vec4 spl_evalChunkLights(vec3 cameraRelativePos) {
     int width = spl_atlas(0);
     vec3 position = cameraRelativePos + splAtlasCamera.xyz;
@@ -124,7 +100,6 @@ vec4 spl_evalChunkLights(vec3 cameraRelativePos) {
     int begin = column+offset+1;
     int count = spl_atlas(begin-1);
     vec3 p = position - vec3(section)*16.0;
-    if (count == -2) return singleHueLight(begin, p * 0.5);
     if (count < 0) return bakedLight(begin, p * 0.5);
     vec3 weightedHue=vec3(0.0);
     float hueWeight=0.0;
