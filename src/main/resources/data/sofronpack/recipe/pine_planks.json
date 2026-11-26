@@ -1,12 +1,8 @@
 {
   "type": "minecraft:crafting_shapeless",
+  "category": "building",
   "ingredients": [
-    [
-      "sofronpack:pine_log",
-      "sofronpack:pine_wood",
-      "sofronpack:stripped_pine_log",
-      "sofronpack:stripped_pine_wood"
-    ]
+    "#sofronpack:pine_logs"
   ],
   "result": {
     "id": "sofronpack:pine_planks",

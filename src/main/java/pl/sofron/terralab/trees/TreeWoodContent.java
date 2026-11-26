@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.function.Function;
 import net.fabricmc.fabric.api.creativetab.v1.CreativeModeTabEvents;
 import net.fabricmc.fabric.api.object.builder.v1.block.entity.FabricBlockEntityType;
-import net.fabricmc.fabric.api.registry.StrippableBlockRegistry;
+import net.fabricmc.fabric.api.item.v1.BlockTransformerHelper;
 import net.fabricmc.fabric.api.registry.FlammableBlockRegistry;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Registry;
@@ -56,8 +56,8 @@ public final class TreeWoodContent {
         Block wood = part(n+"_wood", pine?Blocks.SPRUCE_WOOD:Blocks.OAK_WOOD, RotatedPillarBlock::new, BUILDING, 5, 5);
         Block strippedLog = part("stripped_"+n+"_log", pine?Blocks.STRIPPED_SPRUCE_LOG:Blocks.STRIPPED_OAK_LOG, RotatedPillarBlock::new, BUILDING, 5, 5);
         Block strippedWood = part("stripped_"+n+"_wood", pine?Blocks.STRIPPED_SPRUCE_WOOD:Blocks.STRIPPED_OAK_WOOD, RotatedPillarBlock::new, BUILDING, 5, 5);
-        StrippableBlockRegistry.register(log, strippedLog);
-        StrippableBlockRegistry.register(wood, strippedWood);
+        BlockTransformerHelper.registerStripping(log, strippedLog.defaultBlockState());
+        BlockTransformerHelper.registerStripping(wood, strippedWood.defaultBlockState());
         Block planks = part(n+"_planks", Blocks.OAK_PLANKS, Block::new, BUILDING, 5, 20);
         Block leaves = part(n+"_leaves", pine?Blocks.SPRUCE_LEAVES:Blocks.OAK_LEAVES,
                 p -> pine ? new LeavesBlock(AmbientLeavesBlockSoundPlayer.noAmbientSound(), p)
@@ -79,7 +79,7 @@ public final class TreeWoodContent {
         part(n+"_button", Blocks.OAK_BUTTON, p -> new ButtonBlock(set,30,p), FUNCTIONAL,5,20);
         part(n+"_pressure_plate", Blocks.OAK_PRESSURE_PLATE, p -> new PressurePlateBlock(set,p), FUNCTIONAL,5,20);
         Block shelf = part(n+"_shelf", Blocks.OAK_SHELF, ShelfBlock::new, FUNCTIONAL,5,20);
-        ((FabricBlockEntityType)(Object)BlockEntityTypes.SHELF).addSupportedBlock(shelf);
+        ((FabricBlockEntityType)(Object)BlockEntityTypes.SHELF).addValidBlock(shelf);
         Block sign = block(n+"_sign", Blocks.OAK_SIGN, p -> new StandingSignBlock(type,p));
         Block wall = block(n+"_wall_sign", Blocks.OAK_WALL_SIGN, p -> new WallSignBlock(type,p));
         Block hanging = block(n+"_hanging_sign", Blocks.OAK_HANGING_SIGN, p -> new CeilingHangingSignBlock(type,p));
@@ -88,8 +88,8 @@ public final class TreeWoodContent {
                 new StandingAndWallBlockItem(sign,wall,Direction.DOWN,itemProps(n+"_sign").stacksTo(16))));
         FUNCTIONAL.add(Registry.register(BuiltInRegistries.ITEM,id(n+"_hanging_sign"),
                 new HangingSignItem(hanging,wallHanging,itemProps(n+"_hanging_sign").stacksTo(16))));
-        for (Block b : new Block[]{sign,wall}) ((FabricBlockEntityType)(Object)BlockEntityTypes.SIGN).addSupportedBlock(b);
-        for (Block b : new Block[]{hanging,wallHanging}) ((FabricBlockEntityType)(Object)BlockEntityTypes.HANGING_SIGN).addSupportedBlock(b);
+        for (Block b : new Block[]{sign,wall}) ((FabricBlockEntityType)(Object)BlockEntityTypes.SIGN).addValidBlock(b);
+        for (Block b : new Block[]{hanging,wallHanging}) ((FabricBlockEntityType)(Object)BlockEntityTypes.HANGING_SIGN).addValidBlock(b);
         return new Family(log,wood,strippedLog,strippedWood,planks,leaves,sapling);
     }
     public static void register() {

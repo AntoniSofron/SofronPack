@@ -1,12 +1,8 @@
 {
   "type": "minecraft:crafting_shapeless",
+  "category": "building",
   "ingredients": [
-    [
-      "sofronpack:apple_log",
-      "sofronpack:apple_wood",
-      "sofronpack:stripped_apple_log",
-      "sofronpack:stripped_apple_wood"
-    ]
+    "#sofronpack:apple_logs"
   ],
   "result": {
     "id": "sofronpack:apple_planks",
