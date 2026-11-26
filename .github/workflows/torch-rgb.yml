@@ -22,7 +22,7 @@ jobs:
           gradle-version: '9.5.0'
       - run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq xvfb mesa-vulkan-drivers libvulkan1 python3-pil
+          sudo apt-get install -y -qq imagemagick xvfb mesa-vulkan-drivers libvulkan1 python3-pil
           mkdir -p run/{mods,config,saves} src/main/java/pl/sofron/smoke
           cp libs/sodium*.jar run/mods/
           python3 scripts/wild_rice_smoke.py
@@ -30,8 +30,8 @@ jobs:
           cp tools/torch-smoke/TorchProbe.java src/main/java/pl/sofron/smoke/
           sed -i '/var camera =/i\        pl.sofron.smoke.TorchProbe.frame(mc);' src/main/java/pl/sofron/light/mixin/MinecraftFramePrepareMixin.java
           echo '{"enabled":false}' > run/config/sofronpack-extended-world.json
-          printf 'renderDistance:5\nsimulationDistance:4\npauseOnLostFocus:false\n' > run/options.txt
-          timeout 260 xvfb-run -a env LIBGL_ALWAYS_SOFTWARE=1 gradle --console=plain runClient --args='--graphicsBackend vulkan --quickPlaySingleplayer Torches --width 960 --height 540' > torch.log 2>&1 || { tail -100 torch.log; exit 1; }
+          printf 'renderDistance:5\nsimulationDistance:5\npauseOnLostFocus:false\n' > run/options.txt
+          timeout 260 xvfb-run -a -s "-screen 0 960x540x24" env LIBGL_ALWAYS_SOFTWARE=1 gradle --console=plain runClient --args='--graphicsBackend vulkan --quickPlaySingleplayer Torches --width 960 --height 540' > torch.log 2>&1 || { tail -100 torch.log; exit 1; }
           grep 'TORCH ' torch.log
           /usr/bin/python3 tools/torch-smoke/check.py
       - uses: actions/upload-artifact@v4
