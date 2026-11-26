@@ -17,7 +17,9 @@ abstract class LightIndexMixin {
         if (old != state) {
             SofronPackLightClient.VOXELS.invalidate(pos);
             SofronPackLightClient.PROBE.invalidate(pos);
-            if (old.getLightEmission() > 0 || state.getLightEmission() > 0)
+            // A fluid level change often leaves every stationary light parameter identical.
+            int before = old.getLightEmission(), after = state.getLightEmission();
+            if (before != after || (after > 0 && old.getBlock() != state.getBlock()))
                 SofronPackLightClient.LIGHTS.chunkIndex().invalidate(pos.getX() >> 4, pos.getZ() >> 4);
         }
     }

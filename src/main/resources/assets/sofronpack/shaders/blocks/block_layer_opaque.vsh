@@ -65,21 +65,24 @@ vec4 bakedNode(int i) {
     return vec4(hue * energy, energy);
 }
 
+vec4 bakedRow(int i, float x) {
+    vec4 left = bakedNode(i);
+    if (x == 0.0) return left;
+    return mix(left, bakedNode(i+2), x);
+}
+
+vec4 bakedPlane(int i, vec2 t) {
+    vec4 lower = bakedRow(i, t.x);
+    if (t.y == 0.0) return lower;
+    return mix(lower, bakedRow(i+18, t.x), t.y);
+}
+
 vec4 bakedLight(int start, vec3 p) {
-    ivec3 cell = min(ivec3(p), ivec3(7));
+    ivec3 cell = ivec3(floor(p));
     vec3 t = p - vec3(cell);
     int i = start + 2*((cell.z*9 + cell.y)*9 + cell.x);
-    if (all(equal(p, floor(p)))) {
-        ivec3 node = ivec3(p);
-        vec4 v = bakedNode(start + 2*((node.z*9 + node.y)*9 + node.x));
-        return vec4(v.rgb / max(v.a, 1e-10), v.a);
-    }
-    vec4 lo = mix(mix(bakedNode(i), bakedNode(i+2), t.x),
-                  mix(bakedNode(i+18), bakedNode(i+20), t.x), t.y);
-    i += 162;
-    vec4 hi = mix(mix(bakedNode(i), bakedNode(i+2), t.x),
-                  mix(bakedNode(i+18), bakedNode(i+20), t.x), t.y);
-    vec4 result = mix(lo, hi, t.z);
+    vec4 result = bakedPlane(i, t.xy);
+    if (t.z != 0.0) result = mix(result, bakedPlane(i+162, t.xy), t.z);
     return vec4(result.rgb / max(result.a, 1e-10), result.a);
 }
 

@@ -30,7 +30,6 @@ public final class SofronPackLightClient implements ClientModInitializer {
             pl.sofron.light.runtime.LeafDetailRange.tick(client);
             LIGHTS.tick(client, CONFIG);
             VOXELS.tick(client, CONFIG, LIGHTS.nearbyEntities());
-            PROBE.tick(client, LIGHTS, CONFIG);
             diagnostics.tick(client, LIGHTS, CONFIG);
         });
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> {
