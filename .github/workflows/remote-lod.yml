@@ -24,27 +24,33 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq xvfb mesa-vulkan-drivers libvulkan1 libgl1-mesa-dri
+          git worktree add --detach "$RUNNER_TEMP/sofron-server" HEAD
+          ln -s "$RUNNER_TEMP/sofron-server/run" run-server
+          mkdir -p "$RUNNER_TEMP/sofron-server/run"
           mkdir -p run/config run/mods run-server/config
           cp libs/sodium-*.jar run/mods/
           echo '{"enabled":true}' | tee run/config/sofronpack-extended-world.json > run-server/config/sofronpack-extended-world.json
           echo 'eula=true' > run-server/eula.txt
           printf 'online-mode=false\nview-distance=4\nsimulation-distance=3\n' > run-server/server.properties
           printf 'renderDistance:4\n' > run/options.txt
-          echo "tasks.named('runServer') { workingDir = file('run-server') }" >> build.gradle
-          gradle --console=plain runServer > server.log 2>&1 &
+          gradle -p "$RUNNER_TEMP/sofron-server" --console=plain runServer > server.log 2>&1 &
+          process=$!
           for i in {1..120}; do
+            kill -0 "$process" || break
             grep -q 'Done (' server.log && break
             sleep 2
           done
           grep -q 'Done (' server.log
-          xvfb-run -a env LIBGL_ALWAYS_SOFTWARE=1 MESA_GL_VERSION_OVERRIDE=4.6 gradle --console=plain runClient --args='--quickPlayMultiplayer localhost:25565' > client.log 2>&1 &
+          xvfb-run -a env SDL_VIDEO_FORCE_EGL=1 LIBGL_ALWAYS_SOFTWARE=1 MESA_GL_VERSION_OVERRIDE=4.6 gradle --console=plain runClient --args='--graphicsBackend vulkan --quickPlayMultiplayer localhost:25565' > client.log 2>&1 &
+          process=$!
           for i in {1..120}; do
+            kill -0 "$process" || break
             if test -d run/sofronpack-cache && find run/sofronpack-cache -name '*.voxel.v4.bin' -size +8c | grep -q .; then break; fi
             sleep 2
           done
           find run/sofronpack-cache -name '*.voxel.v4.bin' -size +8c | grep .
           test -f run-server/world/level.dat
-          test -z "$(find run-server \( -name 'sofronpack-extended-world' -o -name '*.voxel.v4.bin' -o -name lod-mesh-v1 \) -print -quit)"
+          test -z "$(find -H run-server \( -name 'sofronpack-extended-world' -o -name '*.voxel.v4.bin' -o -name lod-mesh-v1 \) -print -quit)"
       - name: Show diagnostics
         if: failure()
         run: tail -n 100 server.log client.log
