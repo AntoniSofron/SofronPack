@@ -23,6 +23,7 @@ public final class ExtendedSurfaceMesh {
 
     private static final class Columns {
         final VoxelChunk source;
+        final ExtendedTerrainPreview.Tile preview;
         final String[] palette;
         final int minimum, grass, foliage, water;
         // Store the winning full-resolution column index for each coarser footprint.
@@ -36,6 +37,7 @@ public final class ExtendedSurfaceMesh {
 
         Columns(VoxelChunk source, MaterialResolver materials) {
             this.source = source;
+            preview = null;
             palette = source.palette();
             minimum = source.minY(); grass = source.grassTint(); foliage = source.foliageTint(); water = source.waterTint();
             boolean[] solid = new boolean[palette.length];
@@ -75,6 +77,7 @@ public final class ExtendedSurfaceMesh {
 
         Columns(ExtendedTerrainPreview.Tile tile, int chunkX, int chunkZ) {
             source = null;
+            preview = tile;
             palette = ExtendedTerrainPreview.MATERIALS;
             int ox = (chunkX & 3) * 16, oz = (chunkZ & 3) * 16;
             minimum = tile.minimum;
@@ -136,16 +139,14 @@ public final class ExtendedSurfaceMesh {
         Columns[] data = new Columns[chunks.length];
         for (int i = 0; i < chunks.length; i++) {
             VoxelChunk chunk = chunks[i];
-            if (chunk == null) {
-                if (previews != null && previews[i] != null)
-                    data[i] = new Columns(previews[i], tx * TILE + i % (TILE + 2) - 1,
-                            tz * TILE + i / (TILE + 2) - 1);
-                continue;
-            }
-            long key = ExtendedVoxelStore.pack(chunk.chunkX(), chunk.chunkZ());
+            var preview = chunk == null && previews != null ? previews[i] : null;
+            if (chunk == null && preview == null) continue;
+            int chunkX = chunk == null ? tx * TILE + i % (TILE + 2) - 1 : chunk.chunkX();
+            int chunkZ = chunk == null ? tz * TILE + i / (TILE + 2) - 1 : chunk.chunkZ();
+            long key = ExtendedVoxelStore.pack(chunkX, chunkZ);
             Columns columns = cache.get(key);
-            if (columns == null || columns.source != chunk) {
-                columns = new Columns(chunk, materials);
+            if (columns == null || columns.source != chunk || columns.preview != preview) {
+                columns = chunk == null ? new Columns(preview, chunkX, chunkZ) : new Columns(chunk, materials);
                 cache.put(key, columns);
                 if (cache.size() > 2048) cache.pollFirstEntry();
             }

@@ -1,7 +1,6 @@
 package pl.sofron.extended;
 
 import java.io.ByteArrayOutputStream;
-import java.util.Arrays;
 import java.util.zip.Deflater;
 import java.util.zip.Inflater;
 import java.util.zip.DataFormatException;
@@ -40,9 +39,9 @@ public final class ExtendedVoxelCodec {
         if (count != 0) packed[pos] = (byte)accumulator;
         // Every candidate is exact; never store a larger stream than the
         // original fast zlib representation. No downsampling or eviction.
-        byte[] best = deflate(legacy, Deflater.BEST_SPEED);
-        byte[] bitstream = tagged(BITS, packed);
-        if (bitstream.length < best.length) best = bitstream;
+        byte[] buffer = new byte[8192];
+        byte[] best = compress(legacy, 0, buffer, null);
+        best = compress(packed, BITS, buffer, best);
         ByteArrayOutputStream runs = new ByteArrayOutputStream();
         int height = cells.length / GRID_AREA;
         int activeHeight = (used + GRID_AREA - 1) / GRID_AREA;
@@ -60,8 +59,7 @@ public final class ExtendedVoxelCodec {
             // Abort this candidate on very noisy volumes, not the chunk.
             if (runs.size() > legacy.length) return best;
         }
-        byte[] columns = tagged(COLUMN_RUNS, runs.toByteArray());
-        return columns.length < best.length ? columns : best;
+        return compress(runs.toByteArray(), COLUMN_RUNS, buffer, best);
     }
 
     public static boolean legacy(byte[] encoded) {
@@ -115,20 +113,15 @@ public final class ExtendedVoxelCodec {
                     int run = readVarint(raw, offset), v = readVarint(raw, offset);
                     if (run < 1 || run > height - y || v >= paletteSize)
                         throw new IllegalArgumentException("Invalid column run");
+                    if (v == 0) {
+                        y += run;
+                        continue;
+                    }
                     for (int end = y + run; y < end; y++) result[y * GRID_AREA + column] = (short)v;
                 }
             }
             if (offset[0] != raw.length) throw new IllegalArgumentException("Trailing column data");
         } else throw new IllegalArgumentException("Unknown voxel codec");
-        return result;
-    }
-
-    private static byte[] tagged(int mode, byte[] raw) {
-        byte[] data = deflate(raw, 3);
-        byte[] result = new byte[data.length + HEADER];
-        result[1] = (byte)mode;
-        for (int i = 0; i < 4; i++) result[2 + i] = (byte)(raw.length >>> (24 - i * 8));
-        System.arraycopy(data, 0, result, HEADER, data.length);
         return result;
     }
 
@@ -148,16 +141,22 @@ public final class ExtendedVoxelCodec {
         throw new IllegalArgumentException("Oversized column run");
     }
 
-    private static byte[] deflate(byte[] raw, int level) {
-        Deflater d = new Deflater(level);
+    private static byte[] compress(byte[] raw, int mode, byte[] buffer, byte[] best) {
+        Deflater d = new Deflater(mode == 0 ? Deflater.BEST_SPEED : 3);
         try {
             d.setInput(raw);
             d.finish();
             ByteArrayOutputStream out = new ByteArrayOutputStream();
-            byte[] buffer = new byte[8192];
+            if (mode != 0) {
+                out.write(0);
+                out.write(mode);
+                for (int shift = 24; shift >= 0; shift -= 8) out.write(raw.length >>> shift);
+            }
             while (!d.finished()) {
                 int n = d.deflate(buffer);
                 if (n == 0 && !d.finished()) throw new IllegalStateException("Zlib made no progress");
+                // Once the prefix reaches the incumbent size this candidate cannot win.
+                if (best != null && out.size() + n >= best.length) return best;
                 out.write(buffer, 0, n);
             }
             return out.toByteArray();

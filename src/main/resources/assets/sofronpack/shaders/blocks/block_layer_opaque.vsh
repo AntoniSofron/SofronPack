@@ -65,21 +65,24 @@ vec4 bakedNode(int i) {
     return vec4(hue * energy, energy);
 }
 
+vec4 bakedRow(int i, float x) {
+    vec4 left = bakedNode(i);
+    if (x == 0.0) return left;
+    return mix(left, bakedNode(i+2), x);
+}
+
+vec4 bakedPlane(int i, vec2 t) {
+    vec4 lower = bakedRow(i, t.x);
+    if (t.y == 0.0) return lower;
+    return mix(lower, bakedRow(i+18, t.x), t.y);
+}
+
 vec4 bakedLight(int start, vec3 p) {
-    ivec3 cell = min(ivec3(p), ivec3(7));
+    ivec3 cell = ivec3(floor(p));
     vec3 t = p - vec3(cell);
     int i = start + 2*((cell.z*9 + cell.y)*9 + cell.x);
-    if (all(equal(p, floor(p)))) {
-        ivec3 node = ivec3(p);
-        vec4 v = bakedNode(start + 2*((node.z*9 + node.y)*9 + node.x));
-        return vec4(v.rgb / max(v.a, 1e-10), v.a);
-    }
-    vec4 lo = mix(mix(bakedNode(i), bakedNode(i+2), t.x),
-                  mix(bakedNode(i+18), bakedNode(i+20), t.x), t.y);
-    i += 162;
-    vec4 hi = mix(mix(bakedNode(i), bakedNode(i+2), t.x),
-                  mix(bakedNode(i+18), bakedNode(i+20), t.x), t.y);
-    vec4 result = mix(lo, hi, t.z);
+    vec4 result = bakedPlane(i, t.xy);
+    if (t.z != 0.0) result = mix(result, bakedPlane(i+162, t.xy), t.z);
     return vec4(result.rgb / max(result.a, 1e-10), result.a);
 }
 
@@ -230,7 +233,10 @@ void main() {
     if (splStationaryVertex.a > 0.0001 && splLightHeader.z == 0) {
         vec3 hue = clamp(splStationaryVertex.rgb, 0.0, 1.0);
         float daylight = 1.0 - smoothstep(0.38, 0.85, spl_Sunlit);
-        // Vanilla block light is an inexpensive conservative occlusion gate:\n        // a colored source cannot tint completely unlit surfaces through walls.\n        float blockLight = smoothstep(0.03125, 0.15625, _vert_tex_light_coord.x);\n        float blend = min((1.0 - exp(-splStationaryVertex.a * 1.15)) * daylight * blockLight, 0.92);
+        // Vanilla block light is an inexpensive conservative occlusion gate:
+        // a colored source cannot tint completely unlit surfaces through walls.
+        float blockLight = smoothstep(0.03125, 0.15625, _vert_tex_light_coord.x);
+        float blend = min((1.0 - exp(-splStationaryVertex.a * 1.15)) * daylight * blockLight, 0.92);
         float redBoost = 1.0 + 0.65 * max(0.0, hue.r - max(hue.g, hue.b));
         v_Color.rgb = mix(v_Color.rgb, min(vec3(1.0), v_Color.rgb * hue * redBoost), blend);
     }

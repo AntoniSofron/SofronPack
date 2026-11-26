@@ -18,7 +18,14 @@ public final class LiveLightProbe {
     private int age;
     private volatile boolean dirty = true;
 
-    public RgbLight eyeLight() { return eyeLight; }
+    /** The renderer uses its light atlas. Sample the eye position only for an explicit query. */
+    public RgbLight eyeLight() {
+        var client = Minecraft.getInstance();
+        var config = pl.sofron.light.SofronPackLightClient.CONFIG;
+        if (config == null) return RgbLight.BLACK;
+        if (client.isSameThread()) tick(client, pl.sofron.light.SofronPackLightClient.LIGHTS, config);
+        return eyeLight;
+    }
 
     public RgbLight sample(Minecraft client, LightTracker tracker, LightConfig cfg,
                            double x, double y, double z) {

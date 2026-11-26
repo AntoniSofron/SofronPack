@@ -434,6 +434,7 @@ with zipfile.ZipFile(jar) as z:
         "src/main/java/pl/sofron/extended/client/ExtendedVoxelAtlas.java").read_text()
     assert '!baseName.endsWith("_leaves")' in leaf_policy
     leaf_quad_shader = z.read("assets/sofronpack/shaders/blocks/block_layer_opaque.vsh")
+    assert any(line.lstrip().startswith(b"float blend =") for line in leaf_quad_shader.splitlines())
     assert b"(_material_params & 128u)" in leaf_quad_shader
     assert b"128.0 * 128.0" in leaf_quad_shader
 
