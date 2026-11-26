@@ -18,7 +18,7 @@ public final class LightDiagnostics {
         if (++ticks % 200 != 0 || client.player == null || client.level == null) return;
         ChunkLightIndex index = tracker.chunkIndex();
         StringBuilder b = new StringBuilder();
-        b.append("Sofron Pack Light RGB diagnostics (0.9.24)\n")
+        b.append("SofronPack Light RGB diagnostics (0.1.102)\n")
          .append("Updated every 200 client ticks (approximately 10 seconds).\n")
          .append("This is CPU-side state + atlas submission counters; NOT a GPU pixel readback.\n\n")
          .append("coloredLighting=").append(cfg.coloredLighting).append('\n')
@@ -36,7 +36,7 @@ public final class LightDiagnostics {
          .append("renderDistanceChunks=").append(client.options.renderDistance().get()).append('\n');
         int samples = 0;
         b.append("\nFirst indexed sources (location, RGB, intensity, radius):\n");
-        for (LightSource source : index.allLights()) {
+        for (LightSource source : index.sampleLights(12)) {
             if (samples++ >= 12) break;
             b.append(String.format(java.util.Locale.ROOT,
                 "  %.1f %.1f %.1f  rgb=(%.3f, %.3f, %.3f) power=%.2f radius=%.1f\n",

@@ -90,6 +90,19 @@ public final class SodiumRenderPassCoordinator {
             diagnosticAtlasCells = 0;
             chunkAtlasBuffer.upload(ChunkLightAtlas.empty());
         }
+        boolean active=SofronPackLightClient.CONFIG.dynamicLighting
+                && SofronPackLightClient.CONFIG.stationaryBlockLighting
+                && SofronPackLightClient.CONFIG.coloredLighting && index.indexedLights()>0;
+        if(!active){
+            // Geometry-only revisions in unlit terrain must never rebuild or
+            // upload an atlas. If the last light disappears, clear immediately.
+            if(stationaryAtlas.busy()||stationaryAtlas.published()!=null||diagnosticAtlasReferences!=0){
+                stationaryAtlas.reset();
+                diagnosticAtlasReferences=0;diagnosticAtlasCells=0;
+                chunkAtlasBuffer.upload(ChunkLightAtlas.empty());
+            }
+            lastRevision=Long.MIN_VALUE;
+        }else{
         try {
             var completed = stationaryAtlas.poll();
             if (completed != null) {
@@ -111,6 +124,7 @@ public final class SodiumRenderPassCoordinator {
             stationaryAtlas.submit(index.snapshotFor(mc.level),originX,originZ,width,index.revision());
             lastRevision = index.revision(); lastWidth = width;
             lastOriginX = originX; lastOriginZ = originZ;
+        }
         }
         // The published atlas and its origin are one transaction. Never sample
         // yesterday's atlas using the new player's chunk coordinates.

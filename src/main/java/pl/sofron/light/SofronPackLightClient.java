@@ -2,6 +2,7 @@ package pl.sofron.light;
 
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientChunkEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.loader.api.FabricLoader;
 import pl.sofron.light.config.LightConfig;
@@ -25,6 +26,11 @@ public final class SofronPackLightClient implements ClientModInitializer {
         pl.sofron.extended.client.RemoteLodCache.register();
         diagnostics = new LightDiagnostics(FabricLoader.getInstance().getConfigDir().resolve("sofron-pack-light-diagnostics.txt"));
         CONFIG = LightConfig.load(FabricLoader.getInstance().getConfigDir().resolve("sofron-pack-light.json"));
+        ClientChunkEvents.CHUNK_UNLOAD.register((level,chunk)->{
+            var pos=chunk.getPos();
+            VOXELS.invalidateChunk(pos.x(),pos.z());
+            PROBE.invalidateChunk(pos.x(),pos.z());
+        });
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             pl.sofron.light.emissive.OreFades.tick(client);
             pl.sofron.light.runtime.LeafDetailRange.tick(client);

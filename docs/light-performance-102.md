@@ -1,0 +1,3 @@
+# Additional RGB hot path optimizations (0.1.102)
+
+Moving-light item profiles are memoized by registered item identity and invalidated on light-rule, radius or color-setting changes. The two existing moving-light paths preserve their separate emission/radius semantics. Dynamic collision cache entries also invalidate on client chunk unload. No stationary atlas build or upload occurs in source-free terrain; removal of the final light clears the previous atlas. Diagnostics only collect the 12 sources they actually report instead of copying the entire index. Existing source selection, visual settings and LOD format are unchanged.

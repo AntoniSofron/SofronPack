@@ -127,6 +127,7 @@ public final class ChunkLightIndex {
     }
 
     public List<LightSource> allLights() { return buckets.allLights(); }
+    public List<LightSource> sampleLights(int limit){return buckets.sampleLights(limit);}
 
     public List<LightSource> lightsAffectingChunk(int chunkX, int chunkZ) {
         return buckets.affecting(chunkX, chunkZ);

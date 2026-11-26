@@ -37,6 +37,12 @@ public final class LightTracker {
             .thenComparingDouble(entry -> entry.source().y())
             .thenComparingDouble(entry -> entry.source().z());
 
+    private record ItemProfile(float radius,float power,RgbLight hue){}
+    private static final ItemProfile DARK=new ItemProfile(0,0,RgbLight.BLACK);
+    private final java.util.IdentityHashMap<net.minecraft.world.item.Item,ItemProfile> profiles=new java.util.IdentityHashMap<>();
+    private long profileRevision=Long.MIN_VALUE;
+    private double profileRadius;
+    private boolean profileColored;
     private final Set<SourceKey> previousSelected = new HashSet<>();
     private static final RgbLight FIRE_COLOR = new RgbLight(1f, .42f, .12f);
 
@@ -47,6 +53,7 @@ public final class LightTracker {
         nearbyEntities.clear();
         chunkIndex.clear();
         previousSelected.clear();
+        profiles.clear();profileRevision=Long.MIN_VALUE;
 
     }
 
@@ -55,6 +62,10 @@ public final class LightTracker {
             reset(); return;
         }
         BlockLightRules.poll();
+        long revision=BlockLightRules.revision();
+        if(profileRevision!=revision||profileRadius!=cfg.dynamicLightRadius||profileColored!=cfg.coloredLighting){
+            profiles.clear();profileRevision=revision;profileRadius=cfg.dynamicLightRadius;profileColored=cfg.coloredLighting;
+        }
         var player = client.player;
         var found = new ArrayList<LightSource>();
         double px = player.getX(), py = player.getY(), pz = player.getZ();
@@ -120,20 +131,20 @@ public final class LightTracker {
         return new SourceKey(Math.round(source.x()*2), Math.round(source.y()*2), Math.round(source.z()*2));
     }
     private static double squared(double x,double y,double z) { return x*x+y*y+z*z; }
-    private static void addStack(List<LightSource> list, ItemStack stack,
-                                 double x, double y, double z, LightConfig cfg) {
-        if (stack.isEmpty()) return;
-        String id = BuiltInRegistries.ITEM.getKey(stack.getItem()).toString();
-        if (!BlockLightRules.isTracked(id)
-            && !(stack.getItem() instanceof BlockItem blockItem
-                && blockItem.getBlock().defaultBlockState().getLightEmission() > 0)) return;
-        var rule = BlockLightRules.rule(id);
-        RgbLight rgb = cfg.coloredLighting && rule != null ? rule.color() : BlockLightRules.neutral();
-        float power = rule == null ? 1f : rule.intensity();
-        int emission = rule != null && rule.emission() != null ? rule.emission() :
-            stack.getItem() instanceof BlockItem blockItem ? blockItem.getBlock().defaultBlockState().getLightEmission() : 15;
-        float radius = BlockLightRules.tintRadius(rule, (float)cfg.dynamicLightRadius, emission);
-        if (radius <= 0f || power <= 0f) return;
-        list.add(new LightSource(x,y,z,radius,power,rgb));
+    private void addStack(List<LightSource> list,ItemStack stack,double x,double y,double z,LightConfig cfg){
+        if(stack.isEmpty())return;
+        ItemProfile p=profiles.computeIfAbsent(stack.getItem(),item->profile(item,cfg));
+        if(p.radius>0&&p.power>0)list.add(new LightSource(x,y,z,p.radius,p.power,p.hue));
+    }
+    private static ItemProfile profile(net.minecraft.world.item.Item item,LightConfig cfg){
+        String id=BuiltInRegistries.ITEM.getKey(item).toString();
+        int vanilla=item instanceof BlockItem bi?bi.getBlock().defaultBlockState().getLightEmission():-1;
+        if(!BlockLightRules.isTracked(id)&&vanilla<=0)return DARK;
+        var rule=BlockLightRules.rule(id);
+        RgbLight rgb=cfg.coloredLighting&&rule!=null?rule.color():BlockLightRules.neutral();
+        float power=rule==null?1f:rule.intensity();
+        int emission=rule!=null&&rule.emission()!=null?rule.emission():vanilla>=0?vanilla:15;
+        float radius=BlockLightRules.tintRadius(rule,(float)cfg.dynamicLightRadius,emission);
+        return radius<=0||power<=0?DARK:new ItemProfile(radius,power,rgb);
     }
 }

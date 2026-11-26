@@ -81,6 +81,15 @@ public final class ChunkLightBuckets {
     public int chunkCount() { return buckets.size(); }
     int cachedColumns() { return affectingCache.size(); }
     public int sourceCount() { return sourceCount; }
+    public List<LightSource> sampleLights(int limit){
+        var result=new ArrayList<LightSource>(Math.max(0,limit));
+        for(var lights:buckets.values())for(var light:lights){
+            if(result.size()>=limit)return result;
+            result.add(light);
+        }
+        return result;
+    }
+
     public List<LightSource> allLights() {
         ArrayList<LightSource> result = new ArrayList<>();
         buckets.values().forEach(result::addAll);
