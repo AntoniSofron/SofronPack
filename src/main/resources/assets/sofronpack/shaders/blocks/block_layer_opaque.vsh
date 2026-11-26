@@ -242,8 +242,10 @@ void main() {
         vec3 ambient = min(lightmap.rgb, sky);
         vec3 block = lightmap.rgb - ambient;
         float brightness = max(max(block.r, block.g), block.b);
+        // Compensate the lower perceived brightness of saturated red sources.
+        brightness *= 1.0 + 0.65 * max(0.0, hue.r - max(hue.g, hue.b));
         float blend = smoothstep(0.0, 0.25, splStationaryVertex.a) * daylight * blockLight;
-        v_Color.rgb = _vert_color.rgb * (ambient + mix(block, hue * brightness, blend));
+        v_Color.rgb = _vert_color.rgb * (ambient + mix(block, min(vec3(1.0) - ambient, hue * brightness), blend));
     }
 #else
     spl_UnlitVertexColor = _vert_color.rgb;
