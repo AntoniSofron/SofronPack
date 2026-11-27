@@ -37,6 +37,12 @@ final class TreeTemplates {
 
     static boolean place(WorldGenLevel level, RandomSource random, BlockPos origin, TreeFeature tree,
                          String path, BlockPos root, Block log, Block woodBlock, Block leavesBlock, Rotation rotation) {
+        return place(level, random, origin, tree, path, root, log, woodBlock, leavesBlock, rotation, null);
+    }
+
+    static boolean place(WorldGenLevel level, RandomSource random, BlockPos origin, TreeFeature tree,
+                         String path, BlockPos root, Block log, Block woodBlock, Block leavesBlock, Rotation rotation,
+                         TreeWoodContent.Family species) {
         var id = Identifier.fromNamespaceAndPath(TerraLabMod.MOD_ID, path);
         var template = level.getLevel().getServer().getStructureTemplateManager().get(id).orElse(null);
         if (template == null || origin.getY() + template.getSize().getY() - 1 > level.getMaxY()) return false;
@@ -54,18 +60,19 @@ final class TreeTemplates {
         boolean decorate = !tree.decorators().isEmpty();
         Set<BlockPos> logs = decorate ? new HashSet<>() : Set.of();
         Set<BlockPos> leaves = decorate ? new HashSet<>() : Set.of();
-        boolean fir = log == Blocks.SPRUCE_LOG && !path.contains("pine_") && level.getBiome(origin).is(SpruceVariants.FIR_TAIGA);
+        if (log == Blocks.SPRUCE_LOG) {
+            if (path.contains("pine_")) species = TreeWoodContent.PINE;
+            else if (level.getBiome(origin).is(SpruceVariants.FIR_TAIGA)) species = TreeWoodContent.FIR;
+        }
         for (StructureBlockInfo block : wood) {
-            Block target = log == Blocks.SPRUCE_LOG && path.contains("pine_")
-                    ? (block.state().is(Blocks.SPRUCE_WOOD) ? TreeWoodContent.PINE.wood() : TreeWoodContent.PINE.log())
-                    : fir ? (block.state().is(Blocks.SPRUCE_WOOD) ? TreeWoodContent.FIR.wood() : TreeWoodContent.FIR.log()) : block.state().getBlock();
+            Block target = block.state().getBlock();
+            if (species != null) target = block.state().is(woodBlock) ? species.wood() : species.log();
             level.setBlock(block.pos(), target.withPropertiesOf(block.state()), 19);
             if (decorate) logs.add(block.pos());
         }
         for (var block : canopy) {
             if (TreeFeature.validTreePos(level, block.pos())) {
-                Block target = log == Blocks.SPRUCE_LOG && path.contains("pine_")
-                        ? TreeWoodContent.PINE.leaves() : fir ? TreeWoodContent.FIR.leaves() : block.state().getBlock();
+                Block target = species == null ? block.state().getBlock() : species.leaves();
                 level.setBlock(block.pos(), target.withPropertiesOf(block.state()).setValue(BlockStateProperties.PERSISTENT, false), 19);
                 if (decorate) leaves.add(block.pos());
             }

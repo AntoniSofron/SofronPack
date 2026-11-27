@@ -571,6 +571,13 @@ with zipfile.ZipFile(jar) as z:
         assert f"data/sofronpack/loot_table/blocks/{name}.json" in files
     for tree in ("apple_tree", "fancy_apple_tree", "chestnut_tree", "fancy_chestnut_tree"):
         feature = json.loads(z.read(f"data/sofronpack/worldgen/feature/{tree}.json"))
+        if tree in ("apple_tree", "fancy_apple_tree"):
+            placed = feature["default"]
+            assert placed["placement"][0]["predicate"] == {"type": "minecraft:would_survive", "state": "sofronpack:apple_sapling"}
+            feature = placed["feature"]
+            if tree == "apple_tree":
+                assert feature["type"] == "sofronpack:oak_variants" and feature["apple"]
+                feature = feature["original"]
         assert feature["decorators"][0]["type"] == "minecraft:place_on_ground"
         assert len(feature["decorators"][0]["block_state_provider"]["entries"]) == 16
 

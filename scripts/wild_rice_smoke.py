@@ -21,6 +21,21 @@ def expect(command: str, success: bool = True) -> str:
         raise AssertionError(f"{command}: expected {success}, got {response!r}")
     return response
 
+def check_apple_ground():
+    # Isolate the test above the terrain, inside the already loaded chunk.
+    rcon("fill 32 279 32 47 307 47 minecraft:air")
+    for feature in ("apple_tree", "fancy_apple_tree"):
+        for support in ("oak_leaves[persistent=true]", "oak_log"):
+            rcon(f"setblock 40 279 40 minecraft:{support}")
+            rcon(f"place feature sofronpack:{feature} 40 280 40")
+            expect("block 40 280 40 minecraft:air")
+            expect(f"block 40 279 40 minecraft:{support}")
+        rcon("fill 32 279 32 47 279 47 minecraft:dirt")
+        rcon(f"place feature sofronpack:{feature} 40 280 40")
+        expect("block 40 280 40 #minecraft:logs")
+        rcon("fill 32 279 32 47 307 47 minecraft:air")
+    print("PASS: both apple generators require soil and reject crowns and logs", flush=True)
+
 def main():
     RUN.mkdir(parents=True, exist_ok=True)
     (RUN / "eula.txt").write_text("eula=true\n", encoding="utf-8")
@@ -88,6 +103,7 @@ def main():
             rcon("place feature sofronpack:swamp_wild_rice 40 260 42")
             expect("block 40 260 42 sofronpack:wild_rice_crop[half=lower,age=7]")
             expect("block 40 261 42 sofronpack:wild_rice_crop[half=upper,age=7]")
+            check_apple_ground()
             assert not list(RUN.rglob("sofronpack-extended-world")), "Dedicated server created a LOD archive"
             print("PASS: wild rice game runtime smoke", flush=True)
         finally:

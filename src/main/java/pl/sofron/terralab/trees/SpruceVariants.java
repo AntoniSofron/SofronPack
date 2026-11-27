@@ -53,6 +53,10 @@ public record SpruceVariants(Holder<Feature> original) implements Feature {
         boolean pine = biome.is(Biomes.OLD_GROWTH_PINE_TAIGA) || original.is(VANILLA_PINE);
         if (level instanceof net.minecraft.server.level.ServerLevel)
             return original.value().place(level, generator, random, origin);
+        if (biome.is(Biomes.TAIGA) && random.nextInt(5) == 0) {
+            return level.registryAccess().lookupOrThrow(Registries.FEATURE).getOrThrow(NEW_FIR).value()
+                    .place(level, generator, random, origin);
+        }
         Feature vanilla = original.value();
         if (mixed) {
             pine = random.nextInt(4) < 3;

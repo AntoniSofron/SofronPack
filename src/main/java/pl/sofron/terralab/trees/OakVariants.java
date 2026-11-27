@@ -13,14 +13,16 @@ import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.WorldGenLevel;
 import net.minecraft.world.level.biome.Biomes;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.Rotation;
 import net.minecraft.world.level.chunk.ChunkGenerator;
 import net.minecraft.world.level.levelgen.feature.Feature;
 import net.minecraft.world.level.levelgen.feature.TreeFeature;
 
-public record OakVariants(Holder<Feature> original, boolean templatesOnly) implements Feature {
+public record OakVariants(Holder<Feature> original, boolean templatesOnly, boolean apple) implements Feature {
     public static final MapCodec<OakVariants> CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(
             Feature.CODEC.fieldOf("original").forGetter(OakVariants::original),
-            Codec.BOOL.optionalFieldOf("templates_only", false).forGetter(OakVariants::templatesOnly)
+            Codec.BOOL.optionalFieldOf("templates_only", false).forGetter(OakVariants::templatesOnly),
+            Codec.BOOL.optionalFieldOf("apple", false).forGetter(OakVariants::apple)
     ).apply(instance, OakVariants::new));
     private static final ResourceKey<Feature> SMALL = ResourceKey.create(Registries.FEATURE,
             Identifier.withDefaultNamespace("oak"));
@@ -33,7 +35,7 @@ public record OakVariants(Holder<Feature> original, boolean templatesOnly) imple
     @Override
     public boolean place(WorldGenLevel level, ChunkGenerator generator, RandomSource random, BlockPos origin) {
         var biome = level.getBiome(origin);
-        if (biome.is(Biomes.SWAMP) || biome.is(Biomes.MANGROVE_SWAMP)) {
+        if (!apple && (biome.is(Biomes.SWAMP) || biome.is(Biomes.MANGROVE_SWAMP))) {
             return original.value().place(level, generator, random, origin);
         }
         if (!(original.value() instanceof TreeFeature local)) return false;
@@ -43,7 +45,8 @@ public record OakVariants(Holder<Feature> original, boolean templatesOnly) imple
             boolean first = ticket < 11;
             return TreeTemplates.place(level, random, origin, local, first ? "oak_1" : "oak_2",
                     first ? new BlockPos(6, 0, 6) : new BlockPos(6, 0, 7),
-                    Blocks.OAK_LOG, Blocks.OAK_WOOD, Blocks.OAK_LEAVES);
+                    Blocks.OAK_LOG, Blocks.OAK_WOOD, Blocks.OAK_LEAVES, Rotation.getRandom(random),
+                    apple ? TreeWoodContent.APPLE : null);
         }
         var shapeKey = ticket < 3 ? SMALL : TALL;
         var shape = level.registryAccess().lookupOrThrow(Registries.FEATURE).getOrThrow(shapeKey).value();
