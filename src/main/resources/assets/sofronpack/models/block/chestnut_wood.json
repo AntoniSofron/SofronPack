@@ -1,7 +1,7 @@
 {
   "parent": "minecraft:block/spruce_wood",
   "textures": {
-    "side": "sofronpack:block/apple_log",
-    "end": "sofronpack:block/apple_log"
+    "side": "sofronpack:block/chestnut_log",
+    "end": "sofronpack:block/chestnut_log"
   }
 }

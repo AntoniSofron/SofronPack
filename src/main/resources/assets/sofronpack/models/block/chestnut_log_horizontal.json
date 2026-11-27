@@ -1,7 +1,7 @@
 {
   "parent": "minecraft:block/spruce_log_horizontal",
   "textures": {
-    "side": "sofronpack:block/apple_log",
-    "end": "sofronpack:block/apple_log_top"
+    "side": "sofronpack:block/chestnut_log",
+    "end": "sofronpack:block/chestnut_log_top"
   }
 }

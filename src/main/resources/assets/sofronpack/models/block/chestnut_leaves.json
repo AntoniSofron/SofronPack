@@ -1,8 +1,8 @@
 {
   "parent": "sofronpack:block/near_leaves_template",
   "textures": {
-    "all": "minecraft:block/oak_leaves",
-    "top": "sofronpack:block/oak_leaves_top",
-    "bottom": "sofronpack:block/oak_leaves_bottom"
+    "all": "sofronpack:block/chestnut_leaves",
+    "top": "sofronpack:block/chestnut_leaves_top",
+    "bottom": "sofronpack:block/chestnut_leaves_bottom"
   }
 }

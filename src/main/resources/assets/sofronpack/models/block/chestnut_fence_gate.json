@@ -1,11 +1,11 @@
 {
   "parent": "minecraft:block/spruce_fence_gate",
   "textures": {
-    "all": "sofronpack:block/apple_planks",
-    "texture": "sofronpack:block/apple_planks",
-    "top": "sofronpack:block/apple_planks",
-    "bottom": "sofronpack:block/apple_planks",
-    "side": "sofronpack:block/apple_planks",
-    "particle": "sofronpack:block/apple_planks"
+    "all": "sofronpack:block/chestnut_planks",
+    "texture": "sofronpack:block/chestnut_planks",
+    "top": "sofronpack:block/chestnut_planks",
+    "bottom": "sofronpack:block/chestnut_planks",
+    "side": "sofronpack:block/chestnut_planks",
+    "particle": "sofronpack:block/chestnut_planks"
   }
 }
