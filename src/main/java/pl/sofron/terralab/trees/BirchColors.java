@@ -39,8 +39,6 @@ public final class BirchColors implements ClientModInitializer {
             var p = palette(biome);
             return p == null ? BiomePalette.DEFAULT_PINE : p.pine();
         });
-        register(TreeWoodContent.APPLE.leaves(), BlockTintSources.foliage().color(Blocks.OAK_LEAVES.defaultBlockState()),
-                (biome, x, z) -> biome.getFoliageColor());
         register(TreeWoodContent.FIR.leaves(), 0xFF000000 | BiomePalette.DEFAULT_FIR, (biome, x, z) -> {
             var p = palette(biome);
             return p == null ? BiomePalette.DEFAULT_FIR : p.fir();
@@ -57,7 +55,7 @@ public final class BirchColors implements ClientModInitializer {
         }
         // Pale oak texture is normalized so the fixed tint reproduces its original color.
         register(Blocks.PALE_OAK_LEAVES, 0xFFA0A69C, (biome, x, z) -> 0xA0A69C);
-        register(Blocks.OAK_LEAVES, BlockTintSources.foliage().color(Blocks.OAK_LEAVES.defaultBlockState()),
+        register(new Block[]{Blocks.OAK_LEAVES, TreeWoodContent.APPLE.leaves()}, BlockTintSources.foliage().color(Blocks.OAK_LEAVES.defaultBlockState()),
                 (biome, x, z) -> {
                     var p = palette(biome);
                     return p == null || p.oak() < 0 ? biome.getFoliageColor() : p.oak();
@@ -65,6 +63,10 @@ public final class BirchColors implements ClientModInitializer {
     }
 
     private static void register(Block block, int defaultColor, ColorResolver resolver) {
+        register(new Block[]{block}, defaultColor, resolver);
+    }
+
+    private static void register(Block[] blocks, int defaultColor, ColorResolver resolver) {
         ColorResolverRegistry.register(resolver);
         BlockColorRegistry.register(List.of(new BlockTintSource() {
             public int color(BlockState state) { return defaultColor; }
@@ -72,6 +74,6 @@ public final class BirchColors implements ClientModInitializer {
             public int colorInWorld(BlockState state, BlockAndTintGetter level, BlockPos pos) {
                 return SnowLeafTint.color(0xFF000000 | level.getBlockTint(pos, resolver), level, pos);
             }
-        }), block);
+        }), blocks);
     }
 }

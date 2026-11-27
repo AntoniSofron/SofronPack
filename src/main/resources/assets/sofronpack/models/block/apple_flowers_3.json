@@ -1,0 +1,6 @@
+{
+  "parent": "sofronpack:block/apple_flowers_template",
+  "textures": {
+    "flowers": "sofronpack:block/apple_flowers_3"
+  }
+}

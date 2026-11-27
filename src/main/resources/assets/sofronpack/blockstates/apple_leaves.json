@@ -1,7 +1,34 @@
 {
-  "variants": {
-    "": {
-      "model": "sofronpack:block/apple_leaves"
+  "multipart": [
+    {
+      "apply": {
+        "model": "sofronpack:block/apple_leaves"
+      }
+    },
+    {
+      "apply": [
+        {
+          "model": "sofronpack:block/apple_flowers_1"
+        },
+        {
+          "model": "sofronpack:block/apple_flowers_2"
+        },
+        {
+          "model": "sofronpack:block/apple_flowers_3"
+        },
+        {
+          "model": "sofronpack:block/apple_flowers_4"
+        },
+        {
+          "model": "sofronpack:block/apple_flowers_5"
+        },
+        {
+          "model": "sofronpack:block/apple_flowers_6"
+        },
+        {
+          "model": "sofronpack:block/apple_flowers_7"
+        }
+      ]
     }
-  }
+  ]
 }
