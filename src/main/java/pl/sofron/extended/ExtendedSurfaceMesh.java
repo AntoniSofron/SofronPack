@@ -269,7 +269,11 @@ public final class ExtendedSurfaceMesh {
             if (name.startsWith("minecraft:spruce_leaves")) return palette == null ? 0x619961 : palette.spruce();
             if (name.startsWith("minecraft:pale_oak_leaves")) return 0xA0A69C;
             if (name.startsWith("minecraft:birch_leaves")) return palette == null ? 0x80A755 : palette.birch();
-            if ((name.startsWith("minecraft:oak_leaves") || name.startsWith("sofronpack:apple_leaves")) && palette != null && palette.oak() >= 0) return palette.oak();
+            if (palette != null && palette.oak() >= 0) {
+                if (name.startsWith("minecraft:oak_leaves")) return palette.oak();
+                if (name.startsWith("sofronpack:apple_leaves")) return palette.apple();
+                if (name.startsWith("sofronpack:chestnut_leaves")) return palette.chestnut();
+            }
             return foliage & 0xffffff;
         }
         if (name.contains("vine")) return foliage & 0xffffff;

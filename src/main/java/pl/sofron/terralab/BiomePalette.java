@@ -11,7 +11,7 @@ import net.fabricmc.fabric.api.biome.v1.ModificationPhase;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.biome.BiomeSpecialEffects;
 
-public record BiomePalette(int id, int sky, int fog, int water, int grass, int foliage, int birch, int oak, int spruce) {
+public record BiomePalette(int id, int sky, int fog, int water, int grass, int foliage, int birch, int oak, int spruce, int apple, int chestnut) {
     private static final Map<String, BiomePalette> BIOMES = new HashMap<>();
     // IDs in the CSV are persistent. Old snapshots have 0 or 255 in the high byte.
     private static final BiomePalette[] BY_ID = new BiomePalette[256];
@@ -28,8 +28,11 @@ public record BiomePalette(int id, int sky, int fog, int water, int grass, int f
                 int birch = rgb(fields[7]);
                 int spruce = fields[1].equals("pale_garden") ? 0x85987F
                         : birch == 0x8EA347 ? 0x789D56 : DEFAULT_SPRUCE;
+                int oak = rgb(fields[8]);
+                int apple = oak < 0 ? -1 : blendTwoThirds(birch, oak);
+                int chestnut = oak < 0 ? -1 : blendTwoThirds(oak, birch);
                 var palette = new BiomePalette(id, rgb(fields[2]), rgb(fields[3]), rgb(fields[4]),
-                        rgb(fields[5]), rgb(fields[6]), birch, rgb(fields[8]), spruce);
+                        rgb(fields[5]), rgb(fields[6]), birch, oak, spruce, apple, chestnut);
                 if (id < 1 || id >= 255 || BY_ID[id] != null || BIOMES.put(Identifier.parse(fields[1]).toString(), palette) != null)
                     throw new IllegalArgumentException("Duplicate or invalid biome palette: " + row);
                 BY_ID[id] = palette;
@@ -37,6 +40,15 @@ public record BiomePalette(int id, int sky, int fog, int water, int grass, int f
         } catch (java.io.IOException ex) {
             throw new ExceptionInInitializerError(ex);
         }
+    }
+
+    private static int blendTwoThirds(int dominant, int accent) {
+        int color = 0;
+        for (int shift = 0; shift <= 16; shift += 8) {
+            int channel = (2 * ((dominant >>> shift) & 255) + ((accent >>> shift) & 255) + 1) / 3;
+            color |= channel << shift;
+        }
+        return color;
     }
 
     public int pine() {
