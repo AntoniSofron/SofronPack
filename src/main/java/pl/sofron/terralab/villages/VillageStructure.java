@@ -82,52 +82,75 @@ public final class VillageStructure extends Structure {
             add(VILLAGER,position(x,y,z),orientation);
         }
 
+        private record House(String model, int x, int y, int z, Rotation rotation, int residentX, int residentZ) {}
+
+        private static final List<House> HOUSES = List.of(
+                new House("house", -17,0,-10, Rotation.NONE, -16,-8),
+                new House("house_corner_alt", -13,0,4, Rotation.CLOCKWISE_90, -14,6),
+                new House("house_corner", -23,0,6, Rotation.CLOCKWISE_180, -26,4),
+                new House("house_farm", -1,1,13, Rotation.CLOCKWISE_90, -5,12),
+                new House("house_farm_alt", 9,0,13, Rotation.CLOCKWISE_90, 7,14),
+                new House("house", 17,0,10, Rotation.CLOCKWISE_180, 16,8));
+
+        private record Farm(String model, int x, int z) {}
+        private static final List<Farm> FARMS = List.of(
+                new Farm("wheat_farm", 18,19),
+                new Farm("potato_carrot_farm", 18,-4),
+                new Farm("potato_carrot_farm", 28,-4));
+
+        private <T> List<T> selectLots(List<T> candidates, int minimum) {
+            var available = new ArrayList<>(candidates);
+            int count = minimum + context.random().nextInt(candidates.size() - minimum + 1);
+            for (int i = 0; i < count; i++) {
+                java.util.Collections.swap(available, i, i + context.random().nextInt(available.size()-i));
+            }
+            return available.subList(0,count);
+        }
+
         void plan() {
             // Local ground level is zero. Align each doorway or farm gate with the ring or a spur.
             lot("square_fountain",-7,0,-7,Rotation.NONE);
             lot("church",12,0,-39,Rotation.CLOCKWISE_90);
-            lot("house",-17,0,-10,Rotation.NONE);
-            lot("house_corner_alt",-13,0,4,Rotation.CLOCKWISE_90);
-            lot("house_corner",-23,0,6,Rotation.CLOCKWISE_180);
-            lot("house_farm",-1,1,13,Rotation.CLOCKWISE_90);
-            lot("house_farm_alt",9,0,13,Rotation.CLOCKWISE_90);
-            lot("wheat_farm",18,0,19,Rotation.COUNTERCLOCKWISE_90);
-            lot("potato_carrot_farm",18,0,-4,Rotation.COUNTERCLOCKWISE_90);
+            boolean westSpur = false;
+            for (House house : selectLots(HOUSES, 3)) {
+                lot(house.model, house.x, house.y, house.z, house.rotation);
+                resident(house.residentX, 1, house.residentZ);
+                if (house.x == -23) westSpur = true;
+            }
+            for (Farm farm : selectLots(FARMS, 1)) {
+                lot(farm.model, farm.x, 0, farm.z, Rotation.COUNTERCLOCKWISE_90);
+            }
             lot("plain_well",33,-4,-2,Rotation.NONE);
             for (int x : new int[]{-5,5}) for (int z : new int[]{-5,5}) {
                 var rotation = orientation.getRotated(Rotation.getRandom(context.random()));
                 add(PREFIX+"square_oak",position(x,2,z).subtract(new BlockPos(2,0,2).rotate(rotation)),rotation);
             }
-            resident(-16,1,-8);
-            resident(-14,1,6);
-            resident(-26,1,4);
-            resident(7,1,14);
-            roads();
+            roads(westSpur);
         }
 
         // Plan the union before edging it, so junctions stay open across chunk boundaries.
-        static boolean path(int x, int z) {
+        static boolean path(int x, int z, boolean westSpur) {
             int radius = Math.max(Math.abs(x), Math.abs(z));
             return (radius >= 8 && radius <= 11)
-                    || (Math.abs(z) <= 2 && (x >= 12 && x <= 32 || x <= -12 && x >= -22));
+                    || (Math.abs(z) <= 2 && (x >= 12 && x <= 32 || westSpur && x <= -12 && x >= -22));
         }
 
-        static VillageGround.Surface paving(int x, int z) {
-            if (path(x,z)) return VillageGround.Surface.PATH;
+        static VillageGround.Surface paving(int x, int z, boolean westSpur) {
+            if (path(x,z,westSpur)) return VillageGround.Surface.PATH;
             if (Math.max(Math.abs(x),Math.abs(z)) < 8) return null; // authored square already has edging
             for (int dx=-1; dx<=1; dx++) for (int dz=-1; dz<=1; dz++) {
-                if (path(x+dx,z+dz)) return VillageGround.Surface.CURB;
+                if (path(x+dx,z+dz,westSpur)) return VillageGround.Surface.CURB;
             }
             return null;
         }
 
-        void roads() {
+        void roads(boolean westSpur) {
             for (int z=-12; z<=12; z++) {
                 int x=-23;
                 while (x<=33) {
                     int start=x;
-                    var surface=paving(x++,z);
-                    while (x<=33 && paving(x,z)==surface) x++;
+                    var surface=paving(x++,z,westSpur);
+                    while (x<=33 && paving(x,z,westSpur)==surface) x++;
                     if (surface!=null) ground.add(new VillageGround(position(start,0,z),
                             position(x-1,0,z),surface,Direction.NORTH));
                 }
