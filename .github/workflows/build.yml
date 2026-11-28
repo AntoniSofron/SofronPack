@@ -50,7 +50,7 @@ jobs:
           cp "build/libs/26.3-SofronPack-v${version}.jar" dist/
       - name: Test wild rice
         timeout-minutes: 9
-        run: python3 scripts/wild_rice_smoke.py
+        run: CHECK_PLAINS_VILLAGE=1 python3 scripts/wild_rice_smoke.py
       - name: Debug logs
         if: failure()
         run: |

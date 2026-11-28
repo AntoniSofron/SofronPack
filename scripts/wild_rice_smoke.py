@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import os
+import re
 import pathlib
 import subprocess
 import threading
@@ -35,6 +37,24 @@ def check_apple_ground():
         expect("block 40 280 40 #minecraft:logs")
         rcon("fill 32 279 32 47 307 47 minecraft:air")
     print("PASS: both apple generators require soil and reject crowns and logs", flush=True)
+
+def check_plains_village():
+    result = rcon("locate structure minecraft:village_plains")
+    match = re.search(r"\[(-?\d+), [^,]+, (-?\d+)\]", result)
+    if not match:
+        raise AssertionError(f"Could not locate the plains village: {result}")
+    x, z = map(int, match.groups())
+    rcon(f"forceload add {x-48} {z-48} {x+48} {z+48}")
+    try:
+        deadline = time.monotonic() + 90
+        command = f"execute positioned {x} 100 {z} if entity @e[type=minecraft:villager,distance=..130]"
+        while "Test passed" not in rcon(command):
+            if time.monotonic() >= deadline:
+                raise AssertionError(f"Village at {x}, {z} did not populate")
+            time.sleep(1)
+        print("PASS: naturally generated plains village populated", result, flush=True)
+    finally:
+        rcon(f"forceload remove {x-48} {z-48} {x+48} {z+48}")
 
 def main():
     RUN.mkdir(parents=True, exist_ok=True)
@@ -104,6 +124,8 @@ def main():
             expect("block 40 260 42 sofronpack:wild_rice_crop[half=lower,age=7]")
             expect("block 40 261 42 sofronpack:wild_rice_crop[half=upper,age=7]")
             check_apple_ground()
+            if os.environ.get("CHECK_PLAINS_VILLAGE"):
+                check_plains_village()
             assert not list(RUN.rglob("sofronpack-extended-world")), "Dedicated server created a LOD archive"
             print("PASS: wild rice game runtime smoke", flush=True)
         finally:

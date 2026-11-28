@@ -207,7 +207,8 @@ village_set = ROOT / 'minecraft/worldgen/structure_set/villages.json'
 assert structure_files == {ROOT / f'minecraft/worldgen/structure/{name}.json' for name in village_types} | {village_set}
 for name in village_types:
     structure = data[ROOT / f'minecraft/worldgen/structure/{name}.json']
-    assert structure['type'] == 'sofronpack:village' and structure['biomes'] == f'#minecraft:has_structure/{name}'
+    assert structure['type'] == 'sofronpack:village' and structure['biomes'] == ('minecraft:plains' if name == 'village_plains' else f'#minecraft:has_structure/{name}')
+assert data[village_set]['structures'] == [{'structure': 'minecraft:village_plains', 'weight': 1}]
 assert data[village_set]['placement']['frequency'] == 0.2
 assert not any("sofron_pack" in p.parts for p in data), "Legacy namespace prohibited"
 vanilla_sky = {

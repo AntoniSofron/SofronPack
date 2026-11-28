@@ -1,12 +1,15 @@
 package pl.sofron.terralab.villages;
 
 import com.mojang.serialization.MapCodec;
-import java.util.*;
-import net.minecraft.core.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.ResourceKey;
-import net.minecraft.world.level.levelgen.structure.templatesystem.StructureProcessorList;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.block.Rotation;
 import net.minecraft.world.level.levelgen.Heightmap;
@@ -14,17 +17,12 @@ import net.minecraft.world.level.levelgen.structure.*;
 import net.minecraft.world.level.levelgen.structure.pieces.StructurePiecesBuilder;
 import net.minecraft.world.level.levelgen.structure.pools.*;
 import net.minecraft.world.level.levelgen.structure.templatesystem.LiquidSettings;
-import static pl.sofron.terralab.villages.VillageGround.Surface.*;
 
-/** Plans an entire settlement from the terrain generator before any chunk places blocks. */
 public final class VillageStructure extends Structure {
     private static final MapCodec<VillageStructure> CODEC = simpleCodec(VillageStructure::new);
     private static final StructureType<VillageStructure> TYPE = () -> CODEC;
-    private static final String HOUSES = "minecraft:village/plains/houses/plains_";
-
-    private static final String FOUNTAIN = "minecraft:village/plains/town_centers/plains_fountain_01";
-    private static final ResourceKey<StructureProcessorList> SQUARE_PAVING = ResourceKey.create(
-            Registries.PROCESSOR_LIST, Identifier.parse("sofronpack:square_paving"));
+    private static final String PREFIX = "sofronpack:village/plains/";
+    private static final String VILLAGER = "minecraft:village/plains/villagers/unemployed";
 
     public static void register() {
         Registry.register(BuiltInRegistries.STRUCTURE_PIECE, Identifier.parse("sofronpack:village_ground"), VillageGround.TYPE);
@@ -33,245 +31,130 @@ public final class VillageStructure extends Structure {
     private VillageStructure(StructureSettings settings) { super(settings); }
     @Override public StructureType<?> type() { return TYPE; }
 
-    private enum Square {
-        FOUNTAIN(9), MARKET(11);
-
-        final int radius;
-        final int roadEdge;
-
-        Square(int radius) {
-            this.radius = radius;
-            this.roadEdge = radius + 3;
-        }
-    }
-
-    private record Terrain(GenerationContext c, Map<Long,Integer> heights) {
-        Terrain(GenerationContext c) { this(c, new HashMap<>()); }
-
-        int height(int x, int z) {
-            long key = ((long)x << 32) | Integer.toUnsignedLong(z);
-            return heights.computeIfAbsent(key, ignored -> dryGround(c,x,z));
-        }
-        int height(BlockPos p) { return height(p.getX(),p.getZ()); }
-
-        boolean streetFits(BlockPos start, Direction out, int length) {
-            int base = height(start);
-            for (int i=2; i<=length; i+=2) {
-                BlockPos p = start.relative(out,i);
-                int h = height(p);
-                if (h<60 || h>200 || Math.abs(h-base)>5 ||
-                        Math.abs(height(p.relative(out.getClockWise()))-h)>3) return false;
-                if (i%12==0) base=h;
-            }
-            return true;
-        }
-
-        boolean routesFit(BlockPos center, Direction out, Square square) {
-            int streetEnd = square.roadEdge + 36;
-            BlockPos junction = center.relative(out,streetEnd);
-            Direction side = out.getClockWise();
-            return streetFits(center.relative(out,square.roadEdge),out,36)
-                    && streetFits(center.relative(out.getOpposite(),square.roadEdge),out.getOpposite(),36)
-                    && streetFits(junction,side,12) && streetFits(junction,side.getOpposite(),12)
-                    && Math.abs(height(center.relative(out.getOpposite(),streetEnd+4))
-                            -height(center.relative(out.getOpposite(),streetEnd)))<=3;
-        }
-    }
-
-    private static int dryGround(GenerationContext c, int x, int z) {
-        int land = c.chunkGenerator().getFirstOccupiedHeight(x, z, Heightmap.Types.OCEAN_FLOOR_WG,
-                c.heightAccessor(), c.randomState());
-        if (land<c.chunkGenerator().getSeaLevel() && c.chunkGenerator().getFirstOccupiedHeight(x,z,
-                Heightmap.Types.WORLD_SURFACE_WG,c.heightAccessor(),c.randomState())>land) return -1000;
-        return land;
+    private static int height(GenerationContext c, int x, int z) {
+        return c.chunkGenerator().getFirstOccupiedHeight(x,z,Heightmap.Types.OCEAN_FLOOR_WG,c.heightAccessor(),c.randomState());
     }
 
     @Override protected Optional<GenerationStub> findGenerationPoint(GenerationContext c) {
-        int cx = c.chunkPos().getMiddleBlockX(), cz = c.chunkPos().getMiddleBlockZ();
-        Terrain terrain = new Terrain(c);
-        Direction preferred = Direction.from2DDataValue(c.random().nextInt(4));
-        Square square = c.random().nextBoolean() ? Square.MARKET : Square.FOUNTAIN;
-        Direction bestAxis = null;
-        BlockPos best = null;
-        int bestScore = Integer.MAX_VALUE;
-        for (int dx : new int[]{0,-14,14}) for (int dz : new int[]{0,-14,14}) {
-            int x = cx + dx, z = cz + dz, y = terrain.height(x,z);
-            if (y < 60 || y > 200) continue;
-            int relief = 0;
-            for (int i : new int[]{-square.roadEdge,0,square.roadEdge}) for (int j : new int[]{-square.roadEdge,0,square.roadEdge}) {
-                int h = terrain.height(x+i,z+j);
-                if (h < 60 || h > 200) relief = 100;
-                relief = Math.max(relief, Math.abs(h-y));
-            }
-            int score = y + 5 * relief;
-            if (relief <= 3 && score < bestScore) {
-                BlockPos candidate = new BlockPos(x,y,z);
-                Direction axis = preferred;
-                for (int turn=0; turn<4; turn++, axis=axis.getClockWise()) {
-                    if (terrain.routesFit(candidate,axis,square)) {
-                        best = candidate;
-                        bestScore = score;
-                        bestAxis = axis;
-                        break;
-                    }
-                }
-            }
-        }
-        if (best == null || c.random().nextFloat() < (best.getY()-60)/200f) return Optional.empty();
-        BlockPos center = best;
-        Direction axis = bestAxis;
-        return Optional.of(new GenerationStub(center, pieces -> new Layout(c,pieces,center,terrain).build(axis,square)));
-    }
-
-    private static Rotation rotation(Direction forward) {
-        return switch (forward) {
-            case EAST -> Rotation.NONE;
-            case SOUTH -> Rotation.CLOCKWISE_90;
-            case WEST -> Rotation.CLOCKWISE_180;
-            case NORTH -> Rotation.COUNTERCLOCKWISE_90;
-            default -> throw new IllegalArgumentException();
-        };
+        int x = c.chunkPos().getMiddleBlockX(), z = c.chunkPos().getMiddleBlockZ();
+        int y = height(c,x,z);
+        if (y < c.chunkGenerator().getSeaLevel() || y > 200) return Optional.empty();
+        var center = new BlockPos(x,y,z);
+        var layout = new Layout(c, center, Rotation.getRandom(c.random()));
+        layout.plan();
+        if (!layout.fitsTerrain()) return Optional.empty();
+        return Optional.of(new GenerationStub(center, layout::addTo));
     }
 
     private static final class Layout {
-        final GenerationContext c;
-        final StructurePiecesBuilder pieces;
+        final GenerationContext context;
         final BlockPos center;
+        final Rotation orientation;
         final List<PoolElementStructurePiece> buildings = new ArrayList<>();
-        final Terrain terrain;
-        Layout(GenerationContext c, StructurePiecesBuilder pieces, BlockPos center, Terrain terrain) {
-            this.c = c; this.pieces = pieces; this.center = center; this.terrain = terrain;
+        final List<VillageGround> ground = new ArrayList<>();
+
+        Layout(GenerationContext context, BlockPos center, Rotation orientation) {
+            this.context = context;
+            this.center = center;
+            this.orientation = orientation;
         }
 
-        void rect(BlockPos a, BlockPos b, VillageGround.Surface material) {
-            pieces.addPiece(new VillageGround(a,b,material,Direction.NORTH));
+        BlockPos position(int x, int y, int z) {
+            return center.offset(new BlockPos(x,y,z).rotate(orientation));
         }
 
-        void build(Direction axis, Square square) {
-            int r = square.radius;
-            int edge = square.roadEdge;
-            int houseOffset = r - 4;
-            rect(center.offset(-r,0,-r),center.offset(r,0,r),STONE);
-            for (Direction out : List.of(Direction.NORTH,Direction.EAST,Direction.SOUTH,Direction.WEST)) {
-                Direction side = out.getClockWise();
-                rect(center.relative(out,r+1).relative(side,-r),center.relative(out,edge).relative(side,edge),PATH);
-                for (int offset : new int[]{-houseOffset,houseOffset}) {
-                    house(center.relative(out,edge+1).relative(side,offset),out,false,false);
+        void add(String id, BlockPos origin, Rotation rotation) {
+            var manager = context.structureTemplateManager();
+            var element = StructurePoolElement.single(id).apply(StructureTemplatePool.Projection.RIGID);
+            buildings.add(new PoolElementStructurePiece(manager,element,origin,1,rotation,
+                    element.getBoundingBox(manager,origin,rotation),LiquidSettings.IGNORE_WATERLOGGING));
+        }
+
+        void lot(String name, int x, int y, int z, Rotation local) {
+            add(PREFIX + name, position(x,y,z), orientation.getRotated(local));
+            var box = buildings.getLast().getBoundingBox();
+            int support = Math.min(center.getY(), box.minY()-1);
+            ground.add(new VillageGround(new BlockPos(box.minX(),support,box.minZ()),
+                    new BlockPos(box.maxX(),support,box.maxZ()), VillageGround.Surface.FOUNDATION, Direction.NORTH));
+        }
+
+        void resident(int x,int y,int z) {
+            add(VILLAGER,position(x,y,z),orientation);
+        }
+
+        void plan() {
+            // Local ground level is zero. Align each doorway or farm gate with the ring or a spur.
+            lot("square_fountain",-7,0,-7,Rotation.NONE);
+            lot("church",12,0,-39,Rotation.CLOCKWISE_90);
+            lot("house",-17,0,-10,Rotation.NONE);
+            lot("house_corner_alt",-13,0,4,Rotation.CLOCKWISE_90);
+            lot("house_corner",-23,0,6,Rotation.CLOCKWISE_180);
+            lot("house_farm",-1,1,13,Rotation.CLOCKWISE_90);
+            lot("house_farm_alt",9,0,13,Rotation.CLOCKWISE_90);
+            lot("wheat_farm",18,0,19,Rotation.COUNTERCLOCKWISE_90);
+            lot("potato_carrot_farm",18,0,-4,Rotation.COUNTERCLOCKWISE_90);
+            lot("plain_well",33,-4,-2,Rotation.NONE);
+            for (int x : new int[]{-5,5}) for (int z : new int[]{-5,5}) {
+                var rotation = orientation.getRotated(Rotation.getRandom(context.random()));
+                add(PREFIX+"square_oak",position(x,2,z).subtract(new BlockPos(2,0,2).rotate(rotation)),rotation);
+            }
+            resident(-16,1,-8);
+            resident(-14,1,6);
+            resident(-26,1,4);
+            resident(7,1,14);
+            roads();
+        }
+
+        // Plan the union before edging it, so junctions stay open across chunk boundaries.
+        static boolean path(int x, int z) {
+            int radius = Math.max(Math.abs(x), Math.abs(z));
+            return (radius >= 8 && radius <= 11)
+                    || (Math.abs(z) <= 2 && (x >= 12 && x <= 32 || x <= -12 && x >= -22));
+        }
+
+        static VillageGround.Surface paving(int x, int z) {
+            if (path(x,z)) return VillageGround.Surface.PATH;
+            if (Math.max(Math.abs(x),Math.abs(z)) < 8) return null; // authored square already has edging
+            for (int dx=-1; dx<=1; dx++) for (int dz=-1; dz<=1; dz++) {
+                if (path(x+dx,z+dz)) return VillageGround.Surface.CURB;
+            }
+            return null;
+        }
+
+        void roads() {
+            for (int z=-12; z<=12; z++) {
+                int x=-23;
+                while (x<=33) {
+                    int start=x;
+                    var surface=paving(x++,z);
+                    while (x<=33 && paving(x,z)==surface) x++;
+                    if (surface!=null) ground.add(new VillageGround(position(start,0,z),
+                            position(x-1,0,z),surface,Direction.NORTH));
                 }
             }
-            boolean market = square == Square.MARKET;
-            template(FOUNTAIN,
-                    center.offset(market ? -10 : -4,0,-4),Rotation.NONE);
-            if (market) {
-                house(center.offset(1,0,-6),Direction.EAST,false,true);
-                house(center.offset(1,0,6),Direction.EAST,false,true);
-                well(center.offset(5,0,0));
-            }
-            road(axis,edge,c.random().nextInt(4)!=0,false);
-            road(axis.getOpposite(),edge,false,!market);
-            buildings.forEach(pieces::addPiece);
         }
 
-        void well(BlockPos middle) {
-            template("minecraft:desert_well/well",middle.offset(-2,-2,-2),Rotation.NONE);
-        }
-
-        boolean fits(BoundingBox box, int y) {
-            for (int x : new int[]{box.minX(),box.maxX()}) for (int z : new int[]{box.minZ(),box.maxZ()}) {
-                int h = terrain.height(x,z);
-                if (h<60 || h>200 || Math.abs(h-y)>4) return false;
+        boolean fitsTerrain() {
+            Map<Long,Integer> heights = new HashMap<>();
+            for (var strip : ground) {
+                var box = strip.getBoundingBox();
+                for (int x=box.minX();; x=Math.min(x+5,box.maxX())) {
+                    for (int z=box.minZ();; z=Math.min(z+5,box.maxZ())) {
+                        final int sx=x, sz=z;
+                        int h=heights.computeIfAbsent(((long)x<<32)|Integer.toUnsignedLong(z),
+                                ignored -> height(context,sx,sz));
+                        if (h < context.chunkGenerator().getSeaLevel() || Math.abs(h-center.getY())>4) return false;
+                        if (z==box.maxZ()) break;
+                    }
+                    if (x==box.maxX()) break;
+                }
             }
             return true;
         }
 
-        PoolElementStructurePiece piece(String model, BlockPos origin, Rotation rot) {
-            var factory = model.equals(FOUNTAIN)
-                    ? StructurePoolElement.single(model,c.registryAccess().getOrThrow(SQUARE_PAVING))
-                    : StructurePoolElement.single(model);
-            var element = factory.apply(StructureTemplatePool.Projection.RIGID);
-            var manager = c.structureTemplateManager();
-            return new PoolElementStructurePiece(manager,element,origin,1,rot,
-                    element.getBoundingBox(manager,origin,rot),LiquidSettings.IGNORE_WATERLOGGING);
-        }
-        void template(String model, BlockPos origin, Rotation rot) { buildings.add(piece(model,origin,rot)); }
-
-        void house(BlockPos entrance, Direction intoLot, boolean farm, boolean onSquare) {
-            String name = farm ? "small_farm_1" : "small_house_"+(1+c.random().nextInt(4));
-            Rotation rot = rotation(intoLot);
-            BlockPos origin = entrance.subtract(new BlockPos(0,0,farm ? 4 : 3).rotate(rot));
-            var house = piece(HOUSES+name,origin,rot);
-            var box = house.getBoundingBox();
-            if (!onSquare) {
-                if (!fits(box,entrance.getY())) return;
-                rect(new BlockPos(box.minX(),entrance.getY()-1,box.minZ()),
-                        new BlockPos(box.maxX(),entrance.getY()-1,box.maxZ()),FOUNDATION);
-            }
-            buildings.add(house);
-            if (!farm) template("minecraft:village/plains/villagers/unemployed",
-                    entrance.relative(intoLot,3),rot);
-        }
-
-        void road(Direction out, int edge, boolean junction, boolean endWell) {
-            Direction side = out.getClockWise();
-            BlockPos start = center.relative(out,edge);
-            int y = center.getY();
-            for (int section=0; section<3; section++) {
-                int length = 12;
-                BlockPos next = start.relative(out,length);
-                int target = Math.clamp(terrain.height(next), Math.max(60,y-5),Math.min(200,y+5));
-                line(start,out,length,y,target);
-                y = target;
-                start = new BlockPos(next.getX(),y,next.getZ());
-                if (section<2) for (int sign : new int[]{-1,1}) {
-                    Direction facing = sign == 1 ? side : side.getOpposite();
-                    house(start.relative(facing,sign==1 ? 2 : 1),facing,
-                            c.random().nextInt(4)<section+1,false);
-                }
-            }
-            if (junction) for (Direction turn : List.of(side,side.getOpposite())) {
-                BlockPos turnStart = start.relative(turn, turn==side ? 1 : 0);
-                // Two parallel lanes meet the last two slices of the main street.
-                if (turn.getClockWise()==out) turnStart=turnStart.relative(out,-1);
-                BlockPos far = turnStart.relative(turn,12);
-                int target=Math.clamp(terrain.height(far), Math.max(60,y-4), Math.min(200,y+4));
-                line(turnStart,turn,12,y,target);
-                house(new BlockPos(far.getX(),target,far.getZ()).relative(turn),turn,true,false);
-            }
-            if (endWell) {
-                BlockPos pad=start.relative(out,4);
-                rect(pad.offset(-3,0,-3),pad.offset(3,0,3),STONE);
-                well(pad);
-            }
-        }
-
-        void line(BlockPos start, Direction out, int length, int from, int to) {
-            int delta=to-from;
-            int rise=Math.abs(delta);
-            int sign=Integer.signum(delta);
-            for(int i=1;i<=length;i++) {
-                // Leave two level slices at either end for entrances and cross streets.
-                int run=length-4;
-                int step=Math.clamp(i-2,0,run);
-                int height;
-                var surface=PATH;
-                Direction uphill=delta>=0 ? out : out.getOpposite();
-                if (rise>=4) {
-                    int level=step*rise/run;
-                    int previous=Math.clamp(i-3,0,run)*rise/run;
-                    height=from+sign*level;
-                    if (level!=previous) {
-                        surface=STAIR;
-                        height=Math.max(height,from+sign*previous);
-                    }
-                } else {
-                    int half=Math.round(2f*delta*step/run);
-                    height=from+Math.floorDiv(half+1,2);
-                    if ((half&1)!=0) surface=SLAB;
-                }
-                BlockPos p=start.relative(out,i);
-                p=new BlockPos(p.getX(),height,p.getZ());
-                pieces.addPiece(new VillageGround(p,p.relative(out.getClockWise()),surface,uphill));
-            }
+        void addTo(StructurePiecesBuilder builder) {
+            ground.forEach(builder::addPiece);
+            buildings.forEach(builder::addPiece);
         }
     }
 }

@@ -16,7 +16,7 @@ import pl.sofron.terralab.soil.SoilBlocks;
 /** A level strip, landing or foundation. The bounding box includes cut and fill. */
 final class VillageGround extends StructurePiece {
     static final StructurePieceType TYPE = VillageGround::new;
-    enum Surface { STONE, PATH, SLAB, STAIR, FOUNDATION }
+    enum Surface { STONE, PATH, SLAB, STAIR, FOUNDATION, CURB }
     private final Surface surface;
     private final Direction uphill;
 
@@ -41,6 +41,7 @@ final class VillageGround extends StructurePiece {
             RandomSource random, BoundingBox clip, ChunkPos chunk, BlockPos pivot) {
         int y = boundingBox.minY() + 6;
         BlockState top = switch (surface) {
+            case CURB -> Blocks.COBBLESTONE.defaultBlockState();
             case STONE -> Blocks.STONE_BRICKS.defaultBlockState();
             case FOUNDATION -> Blocks.DIRT.defaultBlockState();
             case PATH -> Blocks.DIRT_PATH.defaultBlockState();
@@ -59,7 +60,8 @@ final class VillageGround extends StructurePiece {
                     pos.set(x,j,z);
                     if (!world.isEmptyBlock(pos)) world.setBlock(pos, Blocks.AIR.defaultBlockState(), 2);
                 }
-                world.setBlock(pos.set(x,y,z), top, 2);
+                world.setBlock(pos.set(x,y,z), surface == Surface.CURB && random.nextInt(3) == 0
+                        ? Blocks.MOSSY_COBBLESTONE.defaultBlockState() : top, 2);
             }
         }
     }
